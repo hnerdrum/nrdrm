@@ -1,4 +1,4 @@
-# Changelog for `recipes`
+# Changelog for `server`
 
 All notable changes to this project will be documented in this file.
 
