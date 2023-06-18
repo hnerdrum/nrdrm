@@ -1,7 +1,6 @@
 module Main (main) where
 
-import Gateway (gateway)
+import Lib
 
 main :: IO ()
-main =
-  gateway
+main = startApp

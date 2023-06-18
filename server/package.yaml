@@ -1,0 +1,60 @@
+name: server
+version: 0.1.0.0
+github: "hnerdrum/nrdrm"
+license: BSD3
+author: "HenrikcNerdrum"
+maintainer: "henrik.nerdrum@gmail.com"
+copyright: "2023 Henrik Nerdrum"
+
+extra-source-files:
+  - README.md
+  - CHANGELOG.md
+
+dependencies:
+  - base >= 4.7 && < 5
+  - aeson
+  - servant-server
+  - wai
+  - warp
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wmissing-export-lists
+  - -Wmissing-home-modules
+  - -Wpartial-fields
+  - -Wredundant-constraints
+
+library:
+  source-dirs: src
+
+executables:
+  server-exe:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - base
+      - server
+
+tests:
+  server-test:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
+    dependencies:
+      - base
+      - server
+      - hspec
+      - hspec-wai
+      - hspec-wai-json
+      - aeson
