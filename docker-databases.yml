@@ -1,0 +1,11 @@
+version: "3"
+
+services:
+  nrdrmdb:
+    image: "postgres:alpine"
+    environment:
+      POSTGRES_DB: "nrdrm"
+      POSTGRES_PASSWORD: "nrdrm"
+      POSTGRES_USER: "nrdrm"
+    ports:
+      - "5436:5432"
