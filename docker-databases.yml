@@ -8,4 +8,4 @@ services:
       POSTGRES_PASSWORD: "nrdrm"
       POSTGRES_USER: "nrdrm"
     ports:
-      - "5436:5432"
+      - "5432:5432"

@@ -1,6 +1,8 @@
 {-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators   #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Lib
     ( startApp
     , app
@@ -8,6 +10,7 @@ module Lib
 
 import Data.Aeson
 import Data.Aeson.TH
+import Database.PostgreSQL.Simple
 import Network.Wai
 import Network.Wai.Handler.Warp
 import Servant
@@ -22,8 +25,19 @@ $(deriveJSON defaultOptions ''User)
 
 type API = "users" :> Get '[JSON] [User]
 
+localPG :: ConnectInfo
+localPG = defaultConnectInfo
+        { connectHost = "localhost"
+        , connectDatabase = "nrdrm"
+        , connectUser = "nrdrm"
+        , connectPassword = "nrdrm"
+        }
+
 startApp :: IO ()
-startApp = run 8000 app
+startApp = do
+  conn <- connect localPG
+  mapM_ print =<< (query_ conn "SELECT 1 + 1" :: IO [Only Int])
+  run 8000 app
 
 app :: Application
 app = serve api server
