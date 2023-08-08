@@ -16,6 +16,7 @@ dependencies:
   - servant-server
   - wai
   - warp
+  - postgresql-simple
 
 ghc-options:
   - -Wall
