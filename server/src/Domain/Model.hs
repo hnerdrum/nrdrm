@@ -2,16 +2,25 @@
 
 module Domain.Model
     (
-      User(..)
+      Recipe(..)
     ) where
 
 import Data.Aeson
 import Data.Aeson.TH
+import Data.Text
+import Data.Time
+import Data.UUID
+import Database.PostgreSQL.Simple.FromRow
 
-data User = User
-  { id        :: Int
-  , firstName  :: String
-  , lastName  :: String
-  } deriving (Eq, Show)
+data Recipe = Recipe
+  { id          :: UUID
+  , createdAt   :: UTCTime
+  , updatedAt   :: UTCTime
+  , name        :: Text
+  , description :: Text
+  } deriving (Show)
 
-$(deriveJSON defaultOptions ''User)
+$(deriveJSON defaultOptions ''Recipe)
+
+instance FromRow Recipe where
+  fromRow = Recipe <$> field <*> field <*> field <*> field <*> field

@@ -1,12 +1,14 @@
+
 module Lib
     ( startApp
     ) where
 
-import API.App (app)
+import API.App
 import Database.Connection (createConnection)
 import Network.Wai.Handler.Warp
 
 startApp :: IO ()
 startApp = do
-  _ <- createConnection
-  run 8000 app
+  pool <- createConnection
+  let appContext = AppContext pool
+  run 8000 $ app appContext
