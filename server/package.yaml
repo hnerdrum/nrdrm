@@ -18,6 +18,10 @@ dependencies:
   - warp
   - postgresql-simple
   - resource-pool
+  - mtl
+  - text
+  - uuid
+  - time
 
 ghc-options:
   - -Wall

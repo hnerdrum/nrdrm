@@ -1,4 +1,3 @@
-
 module Database.Connection
     (
       createConnection
