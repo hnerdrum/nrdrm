@@ -7,13 +7,13 @@
 module API.App
     (
      app
-     , AppContext(..) 
+     , AppContext(..)
     ) where
 
 import Control.Monad.Reader (ReaderT, asks, runReaderT, liftIO)
 import Data.Pool (Pool, withResource)
 import Database.PostgreSQL.Simple
-import Domain.Model
+import Domain.Recipe
 import Network.Wai
 import Servant
 
@@ -41,4 +41,5 @@ apiHandlers = recipes
 recipes :: AppM [Recipe]
 recipes = do
   pool <- asks dbPool
-  liftIO $ withResource pool $ \conn -> query_ conn "SELECT * FROM recipe"
+  dbRecipeIngredients <- liftIO $ withResource pool $ \conn -> query_ conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r JOIN recipe_ingredient ri ON r.id = ri.recipe_id JOIN ingredient i ON i.id = ri.ingredient_id"
+  return $ fromDbRecipeIngredients dbRecipeIngredients
