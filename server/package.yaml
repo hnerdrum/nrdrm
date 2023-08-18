@@ -22,6 +22,7 @@ dependencies:
   - text
   - uuid
   - time
+  - containers
 
 ghc-options:
   - -Wall
