@@ -1,14 +1,20 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Lib
-    ( startApp
+    (
+      startApp
     ) where
 
-import API.App
+import API.Server
+import App (AppContext(..))
 import Database.Connection (createConnection)
 import Network.Wai.Handler.Warp
+import Network.Wai
+import Servant
 
 startApp :: IO ()
 startApp = do
   pool <- createConnection
   let appContext = AppContext pool
-  run 8000 $ app appContext
+  run 8000 $ serve api $ server appContext
