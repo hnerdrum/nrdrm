@@ -13,6 +13,7 @@ module Domain.Recipe
 import Data.Aeson
 import Data.Aeson.TH
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe
 import Data.Text hiding (map, head, null, filter, length)
 import Data.Time
 import Data.UUID hiding (null)
@@ -39,12 +40,12 @@ data DbRecipeIngredient = DbRecipeIngredient
   , dbRecipeUpdatedAt :: UTCTime
   , dbRecipeName      :: Text
   , dbRecipeDescription :: Text
-  , dbIngredientId :: UUID
-  , dbIngredientCreatedAt :: UTCTime
-  , dbIngredientUpdatedAt :: UTCTime
-  , dbIngredientName :: Text
-  , dbIngredientAmount :: Int
-  , dbIngredientUnit :: Unit
+  , dbIngredientId :: Maybe UUID
+  , dbIngredientCreatedAt :: Maybe UTCTime
+  , dbIngredientUpdatedAt :: Maybe UTCTime
+  , dbIngredientName :: Maybe Text
+  , dbIngredientAmount :: Maybe Int
+  , dbIngredientUnit :: Maybe Unit
   } deriving (Show)
 
 instance FromRow DbRecipeIngredient where
@@ -56,30 +57,26 @@ data RecipeDbError = RecipeNotFound | MultipleRecipesFound
 getAllRecipes :: Pool PGSimple.Connection -> IO [Recipe]
 getAllRecipes pool =
   withResource pool $ \conn -> do
-    dbRecipeIngredients <- PGSimple.query_ conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r JOIN recipe_ingredient ri ON r.id = ri.recipe_id JOIN ingredient i ON i.id = ri.ingredient_id"
+    dbRecipeIngredients <- PGSimple.query_ conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id LEFT JOIN ingredient i ON i.id = ri.ingredient_id"
     return $ mapDbRecipeIngredients dbRecipeIngredients
 
 getRecipe :: Pool PGSimple.Connection -> UUID -> IO (Either RecipeDbError Recipe)
 getRecipe pool recipeId =
   withResource pool $ \conn -> do
-    dbRecipeIngredients <- PGSimple.query conn ("SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r JOIN recipe_ingredient ri ON r.id = ri.recipe_id JOIN ingredient i ON i.id = ri.ingredient_id WHERE r.id = ?") (PGSimple.Only recipeId)
-    return $ fromDbRecipeIngredients dbRecipeIngredients
+    dbRecipeIngredients <- PGSimple.query conn ("SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id LEFT JOIN ingredient i ON i.id = ri.ingredient_id WHERE r.id = ?") (PGSimple.Only recipeId)
+    return $ reduceDbRecipeIngredients dbRecipeIngredients
 
 mapDbRecipeIngredients :: [DbRecipeIngredient] -> [Recipe]
 mapDbRecipeIngredients dbRecipeIngredients =
-  map toRecipe recipeGroups
-  where
-    groupedRecipeIngredients = Map.fromListWith (++) [(dbRecipeId ri, [ri]) | ri <- dbRecipeIngredients]
-    recipeGroups = map NE.fromList $ filter (not . null) $ Map.elems groupedRecipeIngredients
+  map toRecipe $ groupById dbRecipeIngredients
 
-fromDbRecipeIngredients :: [DbRecipeIngredient] -> Either RecipeDbError Recipe
-fromDbRecipeIngredients dbRecipeIngredients
+reduceDbRecipeIngredients :: [DbRecipeIngredient] -> Either RecipeDbError Recipe
+reduceDbRecipeIngredients dbRecipeIngredients
   | length recipeGroups == 0 = Left RecipeNotFound
   | length recipeGroups == 1 = Right $ toRecipe $ head recipeGroups
   | otherwise                = Left MultipleRecipesFound
   where
-    groupedRecipeIngredients = Map.fromListWith (++) [(dbRecipeId ri, [ri]) | ri <- dbRecipeIngredients]
-    recipeGroups = map NE.fromList $ filter (not . null) $ Map.elems groupedRecipeIngredients
+    recipeGroups = groupById dbRecipeIngredients
 
 toRecipe :: NE.NonEmpty DbRecipeIngredient -> Recipe
 toRecipe dbRIs =
@@ -89,16 +86,27 @@ toRecipe dbRIs =
     , updatedAt = dbRecipeUpdatedAt (NE.head dbRIs)
     , name = dbRecipeName (NE.head dbRIs)
     , description = dbRecipeDescription (NE.head dbRIs)
-    , ingredients = NE.toList $ NE.map toIngredient dbRIs
+    , ingredients = catMaybes $ NE.toList $ NE.map toIngredient dbRIs
     }
 
-toIngredient :: DbRecipeIngredient -> Ingredient
-toIngredient dbRI =
-  Ingredient
-    { id = dbIngredientId dbRI
-    , createdAt = dbIngredientCreatedAt dbRI
-    , updatedAt = dbIngredientUpdatedAt dbRI
-    , name = dbIngredientName dbRI
-    , amount = dbIngredientAmount dbRI
-    , unit = dbIngredientUnit dbRI
+toIngredient :: DbRecipeIngredient -> Maybe Ingredient
+toIngredient dbRI = do
+  ingredientId <- dbIngredientId dbRI
+  ingredientCreatedAt <- dbIngredientCreatedAt dbRI
+  ingredientUpdatedAt <- dbIngredientUpdatedAt dbRI
+  ingredientAmount <- dbIngredientAmount dbRI
+  ingredientName <- dbIngredientName dbRI
+  ingredientUnit <- dbIngredientUnit dbRI
+
+  return Ingredient
+    { id = ingredientId
+    , createdAt = ingredientCreatedAt
+    , updatedAt = ingredientUpdatedAt
+    , name = ingredientName
+    , amount = ingredientAmount
+    , unit = ingredientUnit
     }
+
+groupById :: [DbRecipeIngredient] -> [NE.NonEmpty DbRecipeIngredient]
+groupById dbRI = map NE.fromList $ filter (not . null) $ Map.elems groups
+  where groups = Map.fromListWith (++) [(dbRecipeId ri, [ri]) | ri <- dbRI]
