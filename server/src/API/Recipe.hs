@@ -11,7 +11,7 @@ module API.Recipe
 
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID
-import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeDbError(..))
+import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeError(..))
 import App (AppContext(..), AppM)
 import Servant
 
@@ -32,7 +32,7 @@ recipe recipeId = do
     Right r -> return r
     Left err -> throwError $ fromRecipeDbError err
 
-fromRecipeDbError :: RecipeDbError -> ServerError
+fromRecipeDbError :: RecipeError -> ServerError
 fromRecipeDbError recipeDbError
   | recipeDbError == RecipeNotFound = err404 { errBody = "Recipe could not be found" }
   | otherwise                       = err500 { errBody = "Found multiple recipes with matching ID" }
