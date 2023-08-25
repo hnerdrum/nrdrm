@@ -6,17 +6,19 @@ module Domain.Recipe
     (
       Recipe(..)
     , getAllRecipes
+    , getRecipe
+    , RecipeDbError(..)
     ) where
 
 import Data.Aeson
 import Data.Aeson.TH
 import qualified Data.List.NonEmpty as NE
-import Data.Text hiding (map, head, null, filter)
+import Data.Text hiding (map, head, null, filter, length)
 import Data.Time
 import Data.UUID hiding (null)
 import qualified Data.Map as Map
 import Data.Pool (Pool, withResource)
-import Database.PostgreSQL.Simple (Connection, query_)
+import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.FromRow
 import Domain.Ingredient
 
@@ -48,18 +50,36 @@ data DbRecipeIngredient = DbRecipeIngredient
 instance FromRow DbRecipeIngredient where
   fromRow = DbRecipeIngredient <$> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field
 
-getAllRecipes :: Pool Connection -> IO [Recipe]
+data RecipeDbError = RecipeNotFound | MultipleRecipesFound
+  deriving (Eq, Show)
+
+getAllRecipes :: Pool PGSimple.Connection -> IO [Recipe]
 getAllRecipes pool =
   withResource pool $ \conn -> do
-    dbRecipeIngredients <- query_ conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r JOIN recipe_ingredient ri ON r.id = ri.recipe_id JOIN ingredient i ON i.id = ri.ingredient_id"
+    dbRecipeIngredients <- PGSimple.query_ conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r JOIN recipe_ingredient ri ON r.id = ri.recipe_id JOIN ingredient i ON i.id = ri.ingredient_id"
+    return $ mapDbRecipeIngredients dbRecipeIngredients
+
+getRecipe :: Pool PGSimple.Connection -> UUID -> IO (Either RecipeDbError Recipe)
+getRecipe pool recipeId =
+  withResource pool $ \conn -> do
+    dbRecipeIngredients <- PGSimple.query conn ("SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r JOIN recipe_ingredient ri ON r.id = ri.recipe_id JOIN ingredient i ON i.id = ri.ingredient_id WHERE r.id = ?") (PGSimple.Only recipeId)
     return $ fromDbRecipeIngredients dbRecipeIngredients
 
-fromDbRecipeIngredients :: [DbRecipeIngredient] -> [Recipe]
-fromDbRecipeIngredients dbRecipeIngredients =
+mapDbRecipeIngredients :: [DbRecipeIngredient] -> [Recipe]
+mapDbRecipeIngredients dbRecipeIngredients =
   map toRecipe recipeGroups
   where
-    groupedRecipes = Map.fromListWith (++) [(dbRecipeId ri, [ri]) | ri <- dbRecipeIngredients]
-    recipeGroups = map NE.fromList $ filter (not . null) $ Map.elems groupedRecipes
+    groupedRecipeIngredients = Map.fromListWith (++) [(dbRecipeId ri, [ri]) | ri <- dbRecipeIngredients]
+    recipeGroups = map NE.fromList $ filter (not . null) $ Map.elems groupedRecipeIngredients
+
+fromDbRecipeIngredients :: [DbRecipeIngredient] -> Either RecipeDbError Recipe
+fromDbRecipeIngredients dbRecipeIngredients
+  | length recipeGroups == 0 = Left RecipeNotFound
+  | length recipeGroups == 1 = Right $ toRecipe $ head recipeGroups
+  | otherwise                = Left MultipleRecipesFound
+  where
+    groupedRecipeIngredients = Map.fromListWith (++) [(dbRecipeId ri, [ri]) | ri <- dbRecipeIngredients]
+    recipeGroups = map NE.fromList $ filter (not . null) $ Map.elems groupedRecipeIngredients
 
 toRecipe :: NE.NonEmpty DbRecipeIngredient -> Recipe
 toRecipe dbRIs =
