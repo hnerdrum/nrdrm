@@ -10,7 +10,6 @@ import API.Server
 import App (AppContext(..))
 import Database.Connection (createConnection)
 import Network.Wai.Handler.Warp
-import Network.Wai
 import Servant
 
 startApp :: IO ()

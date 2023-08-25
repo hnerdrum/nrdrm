@@ -10,11 +10,9 @@ module API.Server
      , api
     ) where
 
-import API.Recipe (RecipeAPI, recipes)
+import API.Recipe (RecipeAPI, recipes, recipe)
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
-import Data.Pool (Pool)
-import Database.PostgreSQL.Simple (Connection)
 import Servant
 
 type API = RecipeAPI
@@ -29,4 +27,4 @@ runAppM :: AppContext -> AppM a -> Handler a
 runAppM appContext appAction = runReaderT appAction appContext
 
 apiHandlers :: ServerT API AppM
-apiHandlers = recipes
+apiHandlers = recipes :<|> recipe
