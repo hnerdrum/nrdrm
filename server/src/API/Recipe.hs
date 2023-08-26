@@ -8,12 +8,13 @@ module API.Recipe
       , getAllRecipesHandler
       , getRecipeHandler
       , createRecipeHandler
+      , deleteRecipeHandler
     ) where
 
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID
 import Database.Recipe (CreateRecipeInput(..))
-import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeError(..), createRecipe)
+import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeError(..), createRecipe, deleteRecipe)
 import App (AppContext(..), AppM)
 import Servant
 
@@ -21,6 +22,7 @@ type RecipeAPI =
        "recipes" :> Get '[JSON] [Recipe]
   :<|> "recipes" :> Capture "recipeId" UUID :> Get '[JSON] Recipe
   :<|> "recipes" :> ReqBody '[JSON] CreateRecipeInput :> PostNoContent
+  :<|> "recipes" :> Capture "recipeId" UUID :> DeleteNoContent
 
 getAllRecipesHandler :: AppM [Recipe]
 getAllRecipesHandler = do
@@ -39,6 +41,12 @@ createRecipeHandler :: CreateRecipeInput -> AppM NoContent
 createRecipeHandler createRecipeInput = do
   pool <- asks dbPool
   _ <- liftIO $ createRecipe pool createRecipeInput
+  return NoContent
+
+deleteRecipeHandler :: UUID -> AppM NoContent
+deleteRecipeHandler recipeId = do
+  pool <- asks dbPool
+  _ <- liftIO $ deleteRecipe pool recipeId
   return NoContent
 
 fromRecipeDbError :: RecipeError -> ServerError
