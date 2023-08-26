@@ -10,7 +10,7 @@ module API.Server
      , api
     ) where
 
-import API.Recipe (RecipeAPI, recipes, recipe)
+import API.Recipe (RecipeAPI, getAllRecipesHandler, getRecipeHandler, createRecipeHandler)
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
 import Servant
@@ -27,4 +27,4 @@ runAppM :: AppContext -> AppM a -> Handler a
 runAppM appContext appAction = runReaderT appAction appContext
 
 apiHandlers :: ServerT API AppM
-apiHandlers = recipes :<|> recipe
+apiHandlers = getAllRecipesHandler :<|> getRecipeHandler :<|> createRecipeHandler
