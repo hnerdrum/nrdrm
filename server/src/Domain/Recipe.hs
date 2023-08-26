@@ -24,7 +24,7 @@ import qualified Data.Map as Map
 import Data.Pool (Pool, withResource)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.Recipe (DbRecipeIngredient(..), CreateRecipeInput(..), getCreateRecipeInput, getCreateRecipeIngredientInput)
-import Domain.Ingredient (Ingredient(..), toIngredient)
+import Domain.Ingredient (RecipeIngredient(..), toRecipeIngredient)
 
 data Recipe = Recipe
   { id          :: UUID
@@ -32,7 +32,7 @@ data Recipe = Recipe
   , updatedAt   :: UTCTime
   , name        :: Text
   , description :: Text
-  , ingredients :: [Ingredient]
+  , ingredients :: [RecipeIngredient]
   } deriving (Show)
 
 $(deriveJSON defaultOptions ''Recipe)
@@ -89,7 +89,7 @@ toRecipe dbRIs =
     , updatedAt = dbRecipeUpdatedAt (NE.head dbRIs)
     , name = dbRecipeName (NE.head dbRIs)
     , description = dbRecipeDescription (NE.head dbRIs)
-    , ingredients = catMaybes $ NE.toList $ NE.map toIngredient dbRIs
+    , ingredients = catMaybes $ NE.toList $ NE.map toRecipeIngredient dbRIs
     }
 
 groupById :: [DbRecipeIngredient] -> [NE.NonEmpty DbRecipeIngredient]

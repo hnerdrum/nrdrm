@@ -3,12 +3,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module API.Recipe
-    (
-      RecipeAPI
-      , getAllRecipesHandler
-      , getRecipeHandler
-      , createRecipeHandler
-      , deleteRecipeHandler
+    ( getAllRecipesHandler
+    , getRecipeHandler
+    , createRecipeHandler
+    , deleteRecipeHandler
     ) where
 
 import Control.Monad.Reader (asks, liftIO)
@@ -17,12 +15,6 @@ import Database.Recipe (CreateRecipeInput(..))
 import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeError(..), createRecipe, deleteRecipe)
 import App (AppContext(..), AppM)
 import Servant
-
-type RecipeAPI =
-       "recipes" :> Get '[JSON] [Recipe]
-  :<|> "recipes" :> Capture "recipeId" UUID :> Get '[JSON] Recipe
-  :<|> "recipes" :> ReqBody '[JSON] CreateRecipeInput :> PostNoContent
-  :<|> "recipes" :> Capture "recipeId" UUID :> DeleteNoContent
 
 getAllRecipesHandler :: AppM [Recipe]
 getAllRecipesHandler = do
