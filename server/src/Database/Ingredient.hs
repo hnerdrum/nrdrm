@@ -5,16 +5,32 @@ module Database.Ingredient
 (
   Unit(..)
 , unitToString
+, Ingredient(..)
 ) where
 
 import Data.Aeson
 import Data.Aeson.TH
 import Data.Text
+import Data.Time
+import Data.UUID
 import Database.PostgreSQL.Simple.FromField
+import Database.PostgreSQL.Simple.FromRow
 
 data Unit = G | Ml | Tsp | Tbsp | Qty deriving (Show)
 
 $(deriveJSON defaultOptions ''Unit)
+
+data Ingredient = Ingredient
+  { id        :: UUID
+  , createdAt :: UTCTime
+  , updatedAt :: UTCTime
+  , name      :: Text
+  }
+
+$(deriveJSON defaultOptions ''Ingredient)
+
+instance FromRow Ingredient where
+  fromRow = Ingredient <$> field <*> field <*> field <*> field
 
 instance FromField Unit where
   fromField f bs

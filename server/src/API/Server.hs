@@ -10,12 +10,22 @@ module API.Server
      , api
     ) where
 
-import API.Recipe (RecipeAPI, getAllRecipesHandler, getRecipeHandler, createRecipeHandler, deleteRecipeHandler)
+import API.Ingredient (getAllIngredientsHandler)
+import API.Recipe (getAllRecipesHandler, getRecipeHandler, createRecipeHandler, deleteRecipeHandler)
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
+import Data.UUID
+import Database.Recipe (CreateRecipeInput(..))
+import Database.Ingredient (Ingredient(..))
+import Domain.Recipe (Recipe(..))
 import Servant
 
-type API = RecipeAPI
+type API =
+       "recipes" :> Get '[JSON] [Recipe]
+  :<|> "recipes" :> Capture "recipeId" UUID :> Get '[JSON] Recipe
+  :<|> "recipes" :> ReqBody '[JSON] CreateRecipeInput :> PostNoContent
+  :<|> "recipes" :> Capture "recipeId" UUID :> DeleteNoContent
+  :<|> "ingredients" :> Get '[JSON] [Ingredient]
 
 server :: AppContext ->  Server API
 server appContext = hoistServer api (runAppM appContext) apiHandlers
@@ -31,3 +41,4 @@ apiHandlers = getAllRecipesHandler
     :<|> getRecipeHandler
     :<|> createRecipeHandler
     :<|> deleteRecipeHandler
+    :<|> getAllIngredientsHandler
