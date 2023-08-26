@@ -22,7 +22,7 @@ import qualified Data.UUID.V4 as V4
 import qualified Data.Map as Map
 import Data.Pool (Pool, withResource)
 import qualified Database.PostgreSQL.Simple as PGSimple
-import Database.Recipe (DbRecipeIngredient(..), CreateRecipeInput, getCreateRecipeInput)
+import Database.Recipe (DbRecipeIngredient(..), CreateRecipeInput(..), getCreateRecipeInput, getCreateRecipeIngredientInput)
 import Domain.Ingredient (Ingredient(..), toIngredient)
 
 data Recipe = Recipe
@@ -56,7 +56,8 @@ createRecipe pool newRecipe =
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
       newRecipeId <- V4.nextRandom
-      _ <- PGSimple.execute conn "INSERT INTO recipe (id, name, description) VALUES (?, ?, ?)" (getCreateRecipeInput newRecipeId newRecipe)
+      _ <- PGSimple.execute conn "INSERT INTO recipe (id, name, description) VALUES (?, ?, ?)" $ getCreateRecipeInput newRecipeId newRecipe
+      _ <- PGSimple.executeMany conn "INSERT INTO recipe_ingredient (recipe_id, ingredient_id, amount, unit) VALUES (?, ?, ?, ?)" $ getCreateRecipeIngredientInput newRecipeId newRecipe
       return ()
 
 
