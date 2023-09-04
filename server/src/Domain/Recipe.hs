@@ -51,9 +51,7 @@ getAllRecipes pool =
 
 getRecipe :: Pool PGSimple.Connection -> UUID -> IO (Either RecipeError Recipe)
 getRecipe pool recipeId =
-  withResource pool $ \conn -> do
-    dbRecipeIngredients <- PGSimple.query conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id LEFT JOIN ingredient i ON i.id = ri.ingredient_id WHERE r.id = ?" $ PGSimple.Only recipeId
-    return $ reduceDbRecipeIngredients dbRecipeIngredients
+  withResource pool $ \conn -> getRecipeById conn recipeId
 
 createRecipe :: Pool PGSimple.Connection -> CreateRecipeInput -> IO (Either RecipeError Recipe)
 createRecipe pool newRecipe =
@@ -62,8 +60,7 @@ createRecipe pool newRecipe =
       newRecipeId <- V4.nextRandom
       _ <- PGSimple.execute conn "INSERT INTO recipe (id, name, description) VALUES (?, ?, ?)" $ getCreateRecipeInput newRecipeId newRecipe
       _ <- PGSimple.executeMany conn "INSERT INTO recipe_ingredient (recipe_id, ingredient_id, amount, unit) VALUES (?, ?, ?, ?)" $ getCreateRecipeIngredientInput newRecipeId newRecipe
-      dbRecipeIngredients <- PGSimple.query conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id LEFT JOIN ingredient i ON i.id = ri.ingredient_id WHERE r.id = ?" $ PGSimple.Only newRecipeId
-      return $ reduceDbRecipeIngredients dbRecipeIngredients
+      getRecipeById conn newRecipeId
 
 updateRecipe :: Pool PGSimple.Connection -> UUID -> UpdateRecipeInput -> IO (Either RecipeError Recipe)
 updateRecipe pool recipeId updateRecipeInput =
@@ -73,8 +70,7 @@ updateRecipe pool recipeId updateRecipeInput =
       _ <- PGSimple.execute conn "UPDATE recipe SET updated_at = ?, name = COALESCE(?, name), description = COALESCE(?, description) WHERE id = ?" (now, updateRecipeInput.name, updateRecipeInput.description, recipeId)
       forM_ (getUpdateRecipeIngredientInput recipeId updateRecipeInput) $ \params ->
         PGSimple.execute conn "UPDATE recipe_ingredient SET amount = COALESCE(?, amount), unit = COALESCE(?, unit) WHERE recipe_id = ? AND ingredient_id = ?" params
-      dbRecipeIngredients <- PGSimple.query conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id LEFT JOIN ingredient i ON i.id = ri.ingredient_id WHERE r.id = ?" $ PGSimple.Only recipeId
-      return $ reduceDbRecipeIngredients dbRecipeIngredients
+      getRecipeById conn recipeId
 
 deleteRecipe :: Pool PGSimple.Connection -> UUID -> IO ()
 deleteRecipe pool recipeId =
@@ -83,6 +79,11 @@ deleteRecipe pool recipeId =
       _ <- PGSimple.execute conn "DELETE FROM recipe_ingredient WHERE recipe_id = ?" $ PGSimple.Only recipeId
       _ <- PGSimple.execute conn "DELETE FROM recipe WHERE id = ?" $ PGSimple.Only recipeId
       return ()
+
+getRecipeById :: PGSimple.Connection -> UUID -> IO (Either RecipeError Recipe)
+getRecipeById conn recipeId = do
+  dbRecipeIngredients <- PGSimple.query conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id LEFT JOIN ingredient i ON i.id = ri.ingredient_id WHERE r.id = ?" $ PGSimple.Only recipeId
+  return $ reduceDbRecipeIngredients dbRecipeIngredients
 
 mapDbRecipeIngredients :: [DbRecipeIngredient] -> [Recipe]
 mapDbRecipeIngredients dbRecipeIngredients =
