@@ -24,7 +24,7 @@ type API =
   "api" :> "v1" :> (
        "recipes" :> Get '[JSON] [Recipe]
   :<|> "recipes" :> Capture "recipeId" UUID :> Get '[JSON] Recipe
-  :<|> "recipes" :> ReqBody '[JSON] CreateRecipeInput :> PostNoContent
+  :<|> "recipes" :> ReqBody '[JSON] CreateRecipeInput :> PostCreated '[JSON] Recipe
   :<|> "recipes" :> Capture "recipeId" UUID :> DeleteNoContent
 
   :<|> "ingredients" :> Get '[JSON] [Ingredient]

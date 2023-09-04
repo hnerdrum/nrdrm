@@ -29,11 +29,13 @@ getRecipeHandler recipeId = do
     Right r -> return r
     Left err -> throwError $ fromRecipeDbError err
 
-createRecipeHandler :: CreateRecipeInput -> AppM NoContent
+createRecipeHandler :: CreateRecipeInput -> AppM Recipe
 createRecipeHandler createRecipeInput = do
   pool <- asks dbPool
-  _ <- liftIO $ createRecipe pool createRecipeInput
-  return NoContent
+  eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
+  case eitherRecipe of
+    Right r -> return r
+    Left err -> throwError $ fromRecipeDbError err
 
 deleteRecipeHandler :: UUID -> AppM NoContent
 deleteRecipeHandler recipeId = do
