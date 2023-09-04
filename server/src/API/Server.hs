@@ -21,11 +21,14 @@ import Domain.Recipe (Recipe(..))
 import Servant
 
 type API =
+  "api" :> "v1" :> (
        "recipes" :> Get '[JSON] [Recipe]
   :<|> "recipes" :> Capture "recipeId" UUID :> Get '[JSON] Recipe
   :<|> "recipes" :> ReqBody '[JSON] CreateRecipeInput :> PostNoContent
   :<|> "recipes" :> Capture "recipeId" UUID :> DeleteNoContent
+
   :<|> "ingredients" :> Get '[JSON] [Ingredient]
+  )
 
 server :: AppContext ->  Server API
 server appContext = hoistServer api (runAppM appContext) apiHandlers
@@ -37,8 +40,10 @@ runAppM :: AppContext -> AppM a -> Handler a
 runAppM appContext appAction = runReaderT appAction appContext
 
 apiHandlers :: ServerT API AppM
-apiHandlers = getAllRecipesHandler
+apiHandlers =
+         getAllRecipesHandler
     :<|> getRecipeHandler
     :<|> createRecipeHandler
     :<|> deleteRecipeHandler
+
     :<|> getAllIngredientsHandler
