@@ -43,5 +43,6 @@ deleteRecipeHandler recipeId = do
 
 fromRecipeDbError :: RecipeError -> ServerError
 fromRecipeDbError recipeDbError
-  | recipeDbError == RecipeNotFound = err404 { errBody = "Recipe could not be found" }
-  | otherwise                       = err500 { errBody = "Found multiple recipes with matching ID" }
+  | recipeDbError == RecipeNotFound       = err404 { errBody = "Recipe could not be found" }
+  | recipeDbError == MultipleRecipesFound = err500 { errBody = "Found multiple recipes with matching ID" }
+  | otherwise                             = err500 { errBody = "An unexpected error occurred" }
