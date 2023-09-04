@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Domain.Recipe
     (
@@ -9,21 +10,23 @@ module Domain.Recipe
     , getRecipe
     , RecipeError(..)
     , createRecipe
+    , updateRecipe
     , deleteRecipe
     ) where
 
+import Control.Monad
 import Data.Aeson
 import Data.Aeson.TH
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe
-import Data.Text hiding (map, head, null, filter, length)
+import Data.Text hiding (map, head, null, filter, length, zip)
 import Data.Time
 import Data.UUID hiding (null)
 import qualified Data.UUID.V4 as V4
 import qualified Data.Map as Map
 import Data.Pool (Pool, withResource)
 import qualified Database.PostgreSQL.Simple as PGSimple
-import Database.Recipe (DbRecipeIngredient(..), CreateRecipeInput(..), getCreateRecipeInput, getCreateRecipeIngredientInput)
+import Database.Recipe (DbRecipeIngredient(..), CreateRecipeInput(..), getCreateRecipeInput, getCreateRecipeIngredientInput, UpdateRecipeInput(..), getUpdateRecipeIngredientInput)
 import Domain.Ingredient (RecipeIngredient(..), toRecipeIngredient)
 
 data Recipe = Recipe
@@ -62,6 +65,17 @@ createRecipe pool newRecipe =
       dbRecipeIngredients <- PGSimple.query conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id LEFT JOIN ingredient i ON i.id = ri.ingredient_id WHERE r.id = ?" $ PGSimple.Only newRecipeId
       return $ reduceDbRecipeIngredients dbRecipeIngredients
 
+updateRecipe :: Pool PGSimple.Connection -> UUID -> UpdateRecipeInput -> IO (Either RecipeError Recipe)
+updateRecipe pool recipeId updateRecipeInput =
+  withResource pool $ \conn ->
+    PGSimple.withTransaction conn $ do
+      now <- getCurrentTime
+      _ <- PGSimple.execute conn "UPDATE recipe SET updated_at = ?, name = COALESCE(?, name), description = COALESCE(?, description) WHERE id = ?" (now, updateRecipeInput.name, updateRecipeInput.description, recipeId)
+      forM_ (getUpdateRecipeIngredientInput recipeId updateRecipeInput) $ \params ->
+        PGSimple.execute conn "UPDATE recipe_ingredient SET amount = COALESCE(?, amount), unit = COALESCE(?, unit) WHERE recipe_id = ? AND ingredient_id = ?" params
+      dbRecipeIngredients <- PGSimple.query conn "SELECT r.id, r.created_at, r.updated_at, r.name, r.description, i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit FROM recipe r LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id LEFT JOIN ingredient i ON i.id = ri.ingredient_id WHERE r.id = ?" $ PGSimple.Only recipeId
+      return $ reduceDbRecipeIngredients dbRecipeIngredients
+
 deleteRecipe :: Pool PGSimple.Connection -> UUID -> IO ()
 deleteRecipe pool recipeId =
   withResource pool $ \conn -> do
@@ -76,7 +90,7 @@ mapDbRecipeIngredients dbRecipeIngredients =
 
 reduceDbRecipeIngredients :: [DbRecipeIngredient] -> Either RecipeError Recipe
 reduceDbRecipeIngredients dbRecipeIngredients
-  | length recipeGroups == 0 = Left RecipeNotFound
+  | null recipeGroups        = Left RecipeNotFound
   | length recipeGroups == 1 = Right $ toRecipe $ head recipeGroups
   | otherwise                = Left MultipleRecipesFound
   where
@@ -85,13 +99,15 @@ reduceDbRecipeIngredients dbRecipeIngredients
 toRecipe :: NE.NonEmpty DbRecipeIngredient -> Recipe
 toRecipe dbRIs =
   Recipe
-    { id = dbRecipeId (NE.head dbRIs)
-    , createdAt = dbRecipeCreatedAt (NE.head dbRIs)
-    , updatedAt = dbRecipeUpdatedAt (NE.head dbRIs)
-    , name = dbRecipeName (NE.head dbRIs)
-    , description = dbRecipeDescription (NE.head dbRIs)
+    { id = dbRecipeId dbRecipeIngredient
+    , createdAt = dbRecipeCreatedAt dbRecipeIngredient
+    , updatedAt = dbRecipeUpdatedAt dbRecipeIngredient
+    , name = dbRecipeName dbRecipeIngredient
+    , description = dbRecipeDescription dbRecipeIngredient
     , ingredients = catMaybes $ NE.toList $ NE.map toRecipeIngredient dbRIs
     }
+
+    where dbRecipeIngredient = NE.head dbRIs
 
 groupById :: [DbRecipeIngredient] -> [NE.NonEmpty DbRecipeIngredient]
 groupById dbRI = map NE.fromList $ filter (not . null) $ Map.elems groups

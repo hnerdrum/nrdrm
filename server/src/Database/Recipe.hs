@@ -1,6 +1,6 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Database.Recipe
 (
@@ -9,6 +9,9 @@ module Database.Recipe
 , CreateRecipeIngredientInput(..)
 , getCreateRecipeInput
 , getCreateRecipeIngredientInput
+, UpdateRecipeInput(..)
+, UpdateRecipeIngredientInput(..)
+, getUpdateRecipeIngredientInput
 ) where
 
 import Data.Aeson
@@ -52,12 +55,29 @@ instance FromJSON CreateRecipeInput where
       , ingredients = ingredientsValue
       }
 
+data UpdateRecipeInput = UpdateRecipeInput
+  { name        :: Maybe Text
+  , description :: Maybe Text
+  , ingredients :: Maybe [UpdateRecipeIngredientInput]
+  } deriving (Show)
+
+instance FromJSON UpdateRecipeInput where
+  parseJSON = withObject "UpdateRecipeInput" $ \obj -> do
+    nameValue <- obj .:? "name"
+    descriptionValue <- obj .:? "description"
+    ingredientsValue <- obj .:? "ingredients"
+    return $ UpdateRecipeInput
+      { name        = nameValue
+      , description = descriptionValue
+      , ingredients = ingredientsValue
+      }
+
 getCreateRecipeInput :: UUID -> CreateRecipeInput -> (UUID, Text, Text)
-getCreateRecipeInput recipeId input = (recipeId, name input, description input)
+getCreateRecipeInput recipeId input = (recipeId, input.name, input.description)
 
 getCreateRecipeIngredientInput :: UUID -> CreateRecipeInput -> [(UUID, UUID, Int, Text)]
 getCreateRecipeIngredientInput recipeId input =
-  map (\ingredient -> (recipeId, ingredientId ingredient, amount ingredient, unitToString $ unit ingredient)) (ingredients input)
+  map (\ingredient -> (recipeId, ingredient.ingredientId, ingredient.amount, unitToString ingredient.unit)) (input.ingredients)
 
 data CreateRecipeIngredientInput = CreateRecipeIngredientInput
   { ingredientId :: UUID
@@ -75,3 +95,25 @@ instance FromJSON CreateRecipeIngredientInput where
       , amount         = amountValue
       , unit           = unitValue
       }
+
+data UpdateRecipeIngredientInput = UpdateRecipeIngredientInput
+ { ingredientId :: UUID
+ , amount       :: Maybe Int
+ , unit         :: Maybe Unit
+ } deriving (Show)
+
+instance FromJSON UpdateRecipeIngredientInput where
+  parseJSON = withObject "UpdateRecipeIngredientInput" $ \obj -> do
+    ingredientIdValue <- obj .: "ingredientId"
+    amountValue <- obj .:? "amount"
+    unitValue <- obj .:? "unit"
+    return $ UpdateRecipeIngredientInput
+      { ingredientId   = ingredientIdValue
+      , amount         = amountValue
+      , unit           = unitValue
+      }
+
+getUpdateRecipeIngredientInput :: UUID -> UpdateRecipeInput -> [(Maybe Int, Maybe Text, UUID, UUID)]
+getUpdateRecipeIngredientInput recipeId input = case input.ingredients of
+  Nothing -> []
+  Just ings -> map (\ingredient -> (ingredient.amount, fmap unitToString ingredient.unit, recipeId, ingredient.ingredientId)) ings
