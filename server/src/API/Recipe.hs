@@ -6,13 +6,14 @@ module API.Recipe
     ( getAllRecipesHandler
     , getRecipeHandler
     , createRecipeHandler
+    , updateRecipeHandler
     , deleteRecipeHandler
     ) where
 
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID
-import Database.Recipe (CreateRecipeInput(..))
-import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeError(..), createRecipe, deleteRecipe)
+import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
+import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeError(..), createRecipe, updateRecipe, deleteRecipe)
 import App (AppContext(..), AppM)
 import Servant
 
@@ -33,6 +34,14 @@ createRecipeHandler :: CreateRecipeInput -> AppM Recipe
 createRecipeHandler createRecipeInput = do
   pool <- asks dbPool
   eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
+  case eitherRecipe of
+    Right r -> return r
+    Left err -> throwError $ fromRecipeDbError err
+
+updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM Recipe
+updateRecipeHandler recipeId updateRecipeInput = do
+  pool <- asks dbPool
+  eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
   case eitherRecipe of
     Right r -> return r
     Left err -> throwError $ fromRecipeDbError err
