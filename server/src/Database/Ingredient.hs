@@ -10,6 +10,7 @@ module Database.Ingredient
 
 import Data.Aeson
 import Data.Aeson.TH
+import Data.Maybe
 import Data.Text
 import Data.Time
 import Data.UUID
@@ -34,7 +35,7 @@ instance FromRow Ingredient where
 
 instance FromField Unit where
   fromField f bs
-    | bs == Nothing     = returnError UnexpectedNull f ""
+    | isNothing bs      = returnError UnexpectedNull f ""
     | bs == Just "g"    = pure G
     | bs == Just "ml"   = pure Ml
     | bs == Just "tsp"  = pure Tsp
