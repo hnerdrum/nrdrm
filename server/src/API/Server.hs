@@ -1,8 +1,6 @@
 {-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE TypeOperators   #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module API.Server
     (
@@ -31,7 +29,7 @@ type API =
   :<|> "ingredients" :> Get '[JSON] [Ingredient]
   )
 
-server :: AppContext ->  Server API
+server :: AppContext -> Server API
 server appContext = hoistServer api (runAppM appContext) apiHandlers
 
 api :: Proxy API

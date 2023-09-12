@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds       #-}
-{-# LANGUAGE TypeOperators   #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module API.Recipe
     ( getAllRecipesHandler
@@ -10,16 +10,19 @@ module API.Recipe
     , deleteRecipeHandler
     ) where
 
+import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
 import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeError(..), createRecipe, updateRecipe, deleteRecipe)
-import App (AppContext(..), AppM)
+import Logger (logInfo)
 import Servant
 
 getAllRecipesHandler :: AppM [Recipe]
 getAllRecipesHandler = do
   pool <- asks dbPool
+  logEnv <- asks appLogEnv
+  liftIO $ logInfo logEnv "Getting all recipes"
   liftIO $ getAllRecipes pool
 
 getRecipeHandler :: UUID -> AppM Recipe

@@ -23,6 +23,7 @@ dependencies:
   - uuid
   - time
   - containers
+  - katip
 
 ghc-options:
   - -Wall
