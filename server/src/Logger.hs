@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Logger
     (
@@ -17,7 +16,7 @@ initializeLogEnv = do
     jsonScribe <- mkHandleScribe ColorIfTerminal stdout (permitItem InfoS) V2
     registerScribe "stdout" jsonScribe defaultScribeSettings logEnv
 
-logInfo :: LogEnv -> Text -> IO ()
-logInfo logEnv message =
+logInfo :: LogEnv -> Namespace -> Text -> IO ()
+logInfo logEnv namespace message =
   runKatipT logEnv $ do
-    logMsg "recipes-app" InfoS (logStr message)
+    logMsg namespace InfoS (logStr message)

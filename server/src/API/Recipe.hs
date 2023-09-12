@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds       #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module API.Recipe
     ( getAllRecipesHandler
@@ -13,6 +12,7 @@ module API.Recipe
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID
+import Data.Text
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
 import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeError(..), createRecipe, updateRecipe, deleteRecipe)
 import Logger (logInfo)
@@ -22,12 +22,14 @@ getAllRecipesHandler :: AppM [Recipe]
 getAllRecipesHandler = do
   pool <- asks dbPool
   logEnv <- asks appLogEnv
-  liftIO $ logInfo logEnv "Getting all recipes"
+  liftIO $ logInfo logEnv "getAllRecipesHandler" "[GET] /api/v1/recipes"
   liftIO $ getAllRecipes pool
 
 getRecipeHandler :: UUID -> AppM Recipe
 getRecipeHandler recipeId = do
   pool <- asks dbPool
+  logEnv <- asks appLogEnv
+  liftIO $ logInfo logEnv "getRecipeHandler" $ "[GET] /api/v1/recipes/" <> (pack . show) recipeId
   eitherRecipe <- liftIO $ getRecipe pool recipeId
   case eitherRecipe of
     Right r -> return r
@@ -36,6 +38,8 @@ getRecipeHandler recipeId = do
 createRecipeHandler :: CreateRecipeInput -> AppM Recipe
 createRecipeHandler createRecipeInput = do
   pool <- asks dbPool
+  logEnv <- asks appLogEnv
+  liftIO $ logInfo logEnv "createRecipeHandler" "[POST] /api/v1/recipes/"
   eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
   case eitherRecipe of
     Right r -> return r
@@ -44,6 +48,8 @@ createRecipeHandler createRecipeInput = do
 updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM Recipe
 updateRecipeHandler recipeId updateRecipeInput = do
   pool <- asks dbPool
+  logEnv <- asks appLogEnv
+  liftIO $ logInfo logEnv "updateRecipeHandler" "[PUT] /api/v1/recipes/"
   eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
   case eitherRecipe of
     Right r -> return r
@@ -52,6 +58,8 @@ updateRecipeHandler recipeId updateRecipeInput = do
 deleteRecipeHandler :: UUID -> AppM NoContent
 deleteRecipeHandler recipeId = do
   pool <- asks dbPool
+  logEnv <- asks appLogEnv
+  liftIO $ logInfo logEnv "deleteRecipeHandler" $ "[DELETE] /api/v1/recipes/" <> (pack . show) recipeId
   _ <- liftIO $ deleteRecipe pool recipeId
   return NoContent
 
