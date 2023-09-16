@@ -4,6 +4,8 @@ module Logger
     (
       initializeLogEnv
     , logInfo
+    , logWarn
+    , logError
     ) where
 
 import Data.Text
@@ -17,6 +19,15 @@ initializeLogEnv = do
     registerScribe "stdout" jsonScribe defaultScribeSettings logEnv
 
 logInfo :: LogEnv -> Namespace -> Text -> IO ()
-logInfo logEnv namespace message =
+logInfo = logWithSeverity InfoS
+
+logWarn :: LogEnv -> Namespace -> Text -> IO ()
+logWarn = logWithSeverity WarningS
+
+logError :: LogEnv -> Namespace -> Text -> IO ()
+logError = logWithSeverity ErrorS
+
+logWithSeverity :: Severity -> LogEnv -> Namespace -> Text -> IO ()
+logWithSeverity severity logEnv namespace message =
   runKatipT logEnv $ do
-    logMsg namespace InfoS (logStr message)
+    logMsg namespace severity (logStr message)
