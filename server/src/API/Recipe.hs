@@ -16,7 +16,7 @@ import Data.UUID
 import Data.Text
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
 import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, createRecipe, updateRecipe, deleteRecipe)
-import Logger (logInfo)
+import Logger (logInfo, logError)
 import Servant
 
 getAllRecipesHandler :: AppM [Recipe]
@@ -34,7 +34,9 @@ getRecipeHandler recipeId = do
   eitherRecipe <- liftIO $ getRecipe pool recipeId
   case eitherRecipe of
     Right r -> return r
-    Left err -> throwError $ toServerError err
+    Left err -> do
+      liftIO $ logError logEnv "getRecipeHandler" $ "Recipe with ID: " <> (pack . show) recipeId <> " not found"
+      throwError $ toServerError err
 
 createRecipeHandler :: CreateRecipeInput -> AppM Recipe
 createRecipeHandler createRecipeInput = do
@@ -44,7 +46,9 @@ createRecipeHandler createRecipeInput = do
   eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
   case eitherRecipe of
     Right r -> return r
-    Left err -> throwError $ toServerError err
+    Left err -> do
+      liftIO $ logError logEnv "createRecipeHandler" "Recipe not found"
+      throwError $ toServerError err
 
 updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM Recipe
 updateRecipeHandler recipeId updateRecipeInput = do
@@ -54,7 +58,9 @@ updateRecipeHandler recipeId updateRecipeInput = do
   eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
   case eitherRecipe of
     Right r -> return r
-    Left err -> throwError $ toServerError err
+    Left err -> do
+      liftIO $ logError logEnv "updateRecipeHandler" $ "Recipe with ID: " <> (pack . show) recipeId <> " not found"
+      throwError $ toServerError err
 
 deleteRecipeHandler :: UUID -> AppM NoContent
 deleteRecipeHandler recipeId = do
