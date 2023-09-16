@@ -9,12 +9,13 @@ module API.Recipe
     , deleteRecipeHandler
     ) where
 
+import API.Errors (ToServantError (toServerError))
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID
 import Data.Text
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
-import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, RecipeError(..), createRecipe, updateRecipe, deleteRecipe)
+import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, createRecipe, updateRecipe, deleteRecipe)
 import Logger (logInfo)
 import Servant
 
@@ -33,7 +34,7 @@ getRecipeHandler recipeId = do
   eitherRecipe <- liftIO $ getRecipe pool recipeId
   case eitherRecipe of
     Right r -> return r
-    Left err -> throwError $ fromRecipeDbError err
+    Left err -> throwError $ toServerError err
 
 createRecipeHandler :: CreateRecipeInput -> AppM Recipe
 createRecipeHandler createRecipeInput = do
@@ -43,7 +44,7 @@ createRecipeHandler createRecipeInput = do
   eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
   case eitherRecipe of
     Right r -> return r
-    Left err -> throwError $ fromRecipeDbError err
+    Left err -> throwError $ toServerError err
 
 updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM Recipe
 updateRecipeHandler recipeId updateRecipeInput = do
@@ -53,7 +54,7 @@ updateRecipeHandler recipeId updateRecipeInput = do
   eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
   case eitherRecipe of
     Right r -> return r
-    Left err -> throwError $ fromRecipeDbError err
+    Left err -> throwError $ toServerError err
 
 deleteRecipeHandler :: UUID -> AppM NoContent
 deleteRecipeHandler recipeId = do
@@ -62,9 +63,3 @@ deleteRecipeHandler recipeId = do
   liftIO $ logInfo logEnv "deleteRecipeHandler" $ "[DELETE] /api/v1/recipes/" <> (pack . show) recipeId
   _ <- liftIO $ deleteRecipe pool recipeId
   return NoContent
-
-fromRecipeDbError :: RecipeError -> ServerError
-fromRecipeDbError recipeDbError
-  | recipeDbError == RecipeNotFound       = err404 { errBody = "Recipe could not be found" }
-  | recipeDbError == MultipleRecipesFound = err500 { errBody = "Found multiple recipes with matching ID" }
-  | otherwise                             = err500 { errBody = "An unexpected error occurred" }

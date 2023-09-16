@@ -9,7 +9,6 @@ module Domain.Recipe
       Recipe(..)
     , getAllRecipes
     , getRecipe
-    , RecipeError(..)
     , createRecipe
     , updateRecipe
     , deleteRecipe
@@ -29,6 +28,7 @@ import Data.Pool (Pool, withResource)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.Recipe (DbRecipeIngredient(..), CreateRecipeInput(..), getCreateRecipeInput, getCreateRecipeIngredientInput, UpdateRecipeInput(..), getUpdateRecipeIngredientInput)
+import Domain.Errors (RecipeError(..))
 import Domain.Ingredient (RecipeIngredient(..), toRecipeIngredient)
 
 data Recipe = Recipe
@@ -41,9 +41,6 @@ data Recipe = Recipe
   } deriving (Show)
 
 $(deriveJSON defaultOptions ''Recipe)
-
-data RecipeError = RecipeNotFound | MultipleRecipesFound
-  deriving (Eq, Show)
 
 getAllRecipes :: Pool PGSimple.Connection -> IO [Recipe]
 getAllRecipes pool =
