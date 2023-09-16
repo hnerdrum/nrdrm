@@ -1,6 +1,4 @@
 {-# LANGUAGE DataKinds       #-}
-{-# LANGUAGE TypeOperators   #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module API.Ingredient
   ( getAllIngredientsHandler
