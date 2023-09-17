@@ -10,12 +10,15 @@ module API.Recipe
     ) where
 
 import API.Errors (ToServantError (toServerError))
+import API.Utils (handleEither)
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID
 import Data.Text
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
+import Domain.Errors (RecipeError(..))
 import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, createRecipe, updateRecipe, deleteRecipe)
+import Katip (LogEnv, Namespace)
 import Logger (logInfo, logError)
 import Servant
 
@@ -32,11 +35,7 @@ getRecipeHandler recipeId = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "getRecipeHandler" $ "[GET] /api/v1/recipes/" <> (pack . show) recipeId
   eitherRecipe <- liftIO $ getRecipe pool recipeId
-  case eitherRecipe of
-    Right r -> return r
-    Left err -> do
-      liftIO $ logError logEnv "getRecipeHandler" $ "Recipe with ID: " <> (pack . show) recipeId <> " not found"
-      throwError $ toServerError err
+  handleEither (handleError logEnv "getRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) eitherRecipe
 
 createRecipeHandler :: CreateRecipeInput -> AppM Recipe
 createRecipeHandler createRecipeInput = do
@@ -44,11 +43,7 @@ createRecipeHandler createRecipeInput = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "createRecipeHandler" "[POST] /api/v1/recipes/"
   eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
-  case eitherRecipe of
-    Right r -> return r
-    Left err -> do
-      liftIO $ logError logEnv "createRecipeHandler" "Recipe not found"
-      throwError $ toServerError err
+  handleEither (handleError logEnv "createRecipeHandler" "Recipe not found") eitherRecipe
 
 updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM Recipe
 updateRecipeHandler recipeId updateRecipeInput = do
@@ -56,11 +51,7 @@ updateRecipeHandler recipeId updateRecipeInput = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "updateRecipeHandler" "[PUT] /api/v1/recipes/"
   eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
-  case eitherRecipe of
-    Right r -> return r
-    Left err -> do
-      liftIO $ logError logEnv "updateRecipeHandler" $ "Recipe with ID: " <> (pack . show) recipeId <> " not found"
-      throwError $ toServerError err
+  handleEither (handleError logEnv "updateRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) eitherRecipe
 
 deleteRecipeHandler :: UUID -> AppM NoContent
 deleteRecipeHandler recipeId = do
@@ -69,3 +60,8 @@ deleteRecipeHandler recipeId = do
   liftIO $ logInfo logEnv "deleteRecipeHandler" $ "[DELETE] /api/v1/recipes/" <> (pack . show) recipeId
   _ <- liftIO $ deleteRecipe pool recipeId
   return NoContent
+
+handleError :: LogEnv -> Namespace -> Text ->  RecipeError -> AppM Recipe
+handleError logEnv namespace message err = do
+          liftIO $ logError logEnv namespace message
+          throwError $ toServerError err
