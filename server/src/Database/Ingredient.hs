@@ -26,7 +26,7 @@ data Ingredient = Ingredient
   , createdAt :: UTCTime
   , updatedAt :: UTCTime
   , name      :: Text
-  }
+  } deriving (Show)
 
 $(deriveJSON defaultOptions ''Ingredient)
 
