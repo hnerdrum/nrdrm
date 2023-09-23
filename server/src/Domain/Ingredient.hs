@@ -2,6 +2,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 module Domain.Ingredient
     (
@@ -9,6 +10,7 @@ module Domain.Ingredient
     , getAllIngredients
     , toRecipeIngredient
     , getIngredient
+    , createIngredient
     ) where
 
 import Data.Aeson
@@ -16,10 +18,11 @@ import Data.Aeson.TH
 import Data.Text hiding (null, length, head)
 import Data.Time
 import Data.UUID hiding (null)
+import qualified Data.UUID.V4 as V4
 import Data.Pool (Pool, withResource)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import Database.Ingredient (Unit(..), Ingredient(..))
+import Database.Ingredient (Unit(..), Ingredient(..), CreateIngredientInput(..))
 import Database.Recipe (DbRecipeIngredient(..))
 import Domain.Errors (IngredientError(..))
 
@@ -41,14 +44,29 @@ getAllIngredients pool =
 
 getIngredient :: Pool PGSimple.Connection -> UUID -> IO (Either IngredientError Ingredient)
 getIngredient pool ingredientId =
-  withResource pool $ \conn -> do
-    dbIngredients <- PGSimple.query conn
-      [sql|
-      SELECT id, created_at, updated_at, name
-      FROM ingredient
-      WHERE id = ?
-    |] $ PGSimple.Only ingredientId
-    return $ reduceDbIngredients dbIngredients
+  withResource pool $ \conn -> getIngredientById conn ingredientId
+
+createIngredient :: Pool PGSimple.Connection -> CreateIngredientInput -> IO (Either IngredientError Ingredient)
+createIngredient pool ingredient =
+  withResource pool $ \conn ->
+    PGSimple.withTransaction conn $ do
+      ingredientId <- V4.nextRandom
+      _ <- PGSimple.execute conn
+        [sql|
+          INSERT INTO ingredient (id, name)
+          VALUES (?, ?)
+        |] (ingredientId, ingredient.name)
+      getIngredientById conn ingredientId
+
+getIngredientById :: PGSimple.Connection -> UUID -> IO (Either IngredientError Ingredient)
+getIngredientById conn ingredientId = do
+  dbIngredients <- PGSimple.query conn
+    [sql|
+    SELECT id, created_at, updated_at, name
+    FROM ingredient
+    WHERE id = ?
+  |] $ PGSimple.Only ingredientId
+  return $ reduceDbIngredients dbIngredients
 
 reduceDbIngredients :: [Ingredient] -> Either IngredientError Ingredient
 reduceDbIngredients dbIngredients

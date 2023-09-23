@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Database.Ingredient
@@ -6,6 +7,7 @@ module Database.Ingredient
   Unit(..)
 , unitToString
 , Ingredient(..)
+, CreateIngredientInput(..)
 ) where
 
 import Data.Aeson
@@ -32,6 +34,15 @@ $(deriveJSON defaultOptions ''Ingredient)
 
 instance FromRow Ingredient where
   fromRow = Ingredient <$> field <*> field <*> field <*> field
+
+newtype CreateIngredientInput = CreateIngredientInput
+  { name :: Text
+  } deriving (Show)
+
+instance FromJSON CreateIngredientInput where
+  parseJSON = withObject "CreateIngredientInput" $ \obj -> do
+    nameValue <- obj .: "name"
+    return $ CreateIngredientInput { name = nameValue }
 
 instance FromField Unit where
   fromField f bs
