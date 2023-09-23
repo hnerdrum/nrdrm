@@ -60,21 +60,21 @@ getRecipe pool recipeId =
   withResource pool $ \conn -> getRecipeById conn recipeId
 
 createRecipe :: Pool PGSimple.Connection -> CreateRecipeInput -> IO (Either RecipeError Recipe)
-createRecipe pool newRecipe =
+createRecipe pool recipe =
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
-      newRecipeId <- V4.nextRandom
+      recipeId <- V4.nextRandom
       _ <- PGSimple.execute conn
         [sql|
           INSERT INTO recipe (id, name, description)
           VALUES (?, ?, ?)
-        |] $ getCreateRecipeInput newRecipeId newRecipe
+        |] $ getCreateRecipeInput recipeId recipe
       _ <- PGSimple.executeMany conn
         [sql|
           INSERT INTO recipe_ingredient (recipe_id, ingredient_id, amount, unit)
           VALUES (?, ?, ?, ?)
-        |] $ getCreateRecipeIngredientInput newRecipeId newRecipe
-      getRecipeById conn newRecipeId
+        |] $ getCreateRecipeIngredientInput recipeId recipe
+      getRecipeById conn recipeId
 
 updateRecipe :: Pool PGSimple.Connection -> UUID -> UpdateRecipeInput -> IO (Either RecipeError Recipe)
 updateRecipe pool recipeId updateRecipeInput =
