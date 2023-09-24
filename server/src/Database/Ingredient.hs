@@ -8,6 +8,7 @@ module Database.Ingredient
 , unitToString
 , Ingredient(..)
 , CreateIngredientInput(..)
+, UpdateIngredientInput(..)
 ) where
 
 import Data.Aeson
@@ -43,6 +44,15 @@ instance FromJSON CreateIngredientInput where
   parseJSON = withObject "CreateIngredientInput" $ \obj -> do
     nameValue <- obj .: "name"
     return $ CreateIngredientInput { name = nameValue }
+
+newtype UpdateIngredientInput = UpdateIngredientInput
+  { name :: Text
+  } deriving (Show)
+
+instance FromJSON UpdateIngredientInput where
+  parseJSON = withObject "UpdateIngredientInput" $ \obj -> do
+    nameValue <- obj .: "name"
+    return $ UpdateIngredientInput { name = nameValue }
 
 instance FromField Unit where
   fromField f bs
