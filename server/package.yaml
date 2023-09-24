@@ -15,6 +15,7 @@ dependencies:
   - aeson
   - servant-server
   - wai
+  - wai-cors
   - warp
   - postgresql-simple
   - resource-pool
