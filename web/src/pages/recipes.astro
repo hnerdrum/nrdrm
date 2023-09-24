@@ -1,8 +1,8 @@
 ---
-import { Recipes } from '../components/recipes/Recipes';
+import { RecipesView } from '../components/recipes/RecipesView';
 import Layout from '../layouts/Layout.astro';
 ---
 
 <Layout title="Recipes">
-	<Recipes />
+	<RecipesView client:load />
 </Layout>
