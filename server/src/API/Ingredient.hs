@@ -5,6 +5,7 @@ module API.Ingredient
   ( getAllIngredientsHandler
   , getIngredientHandler
   , createIngredientHandler
+  , updateIngredientHandler
   ) where
 
 import API.Errors (ToServantError (toServerError))
@@ -13,9 +14,9 @@ import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.Text
 import Data.UUID
-import Database.Ingredient (Ingredient(..), CreateIngredientInput(..))
+import Database.Ingredient (Ingredient(..), CreateIngredientInput(..), UpdateIngredientInput(..))
 import Domain.Errors (IngredientError(..))
-import Domain.Ingredient (getAllIngredients, getIngredient, createIngredient)
+import Domain.Ingredient (getAllIngredients, getIngredient, createIngredient, updateIngredient)
 import Katip (LogEnv, Namespace)
 import Logger (logInfo, logError)
 import Servant
@@ -42,6 +43,14 @@ createIngredientHandler createIngredientInput = do
   liftIO $ logInfo logEnv "createIngredientHandler" "[POST] /api/v1/ingredients/"
   eitherIngredient <- liftIO $ createIngredient pool createIngredientInput
   handleEither (handleError logEnv "createIngredientHandler" "Ingredient not found") eitherIngredient
+
+updateIngredientHandler :: UUID -> UpdateIngredientInput -> AppM Ingredient
+updateIngredientHandler ingredientId updateIngredientInput = do
+  pool <- asks dbPool
+  logEnv <- asks appLogEnv
+  liftIO $ logInfo logEnv "updateIngredientHandler" $ "[PUT] /api/v1/ingredients/" <> (pack . show) ingredientId
+  eitherIngredient <- liftIO $ updateIngredient pool ingredientId updateIngredientInput
+  handleEither (handleError logEnv "updateIngredientHandler" ("Ingredient with ID: " <> (pack . show) ingredientId <> " not found")) eitherIngredient
 
 handleError :: LogEnv -> Namespace -> Text -> IngredientError -> AppM Ingredient
 handleError logEnv namespace message err = do

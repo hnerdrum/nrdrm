@@ -8,13 +8,13 @@ module API.Server
      , api
     ) where
 
-import API.Ingredient (getAllIngredientsHandler, getIngredientHandler, createIngredientHandler)
+import API.Ingredient (getAllIngredientsHandler, getIngredientHandler, createIngredientHandler, updateIngredientHandler)
 import API.Recipe (getAllRecipesHandler, getRecipeHandler, createRecipeHandler, updateRecipeHandler, deleteRecipeHandler)
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
 import Data.UUID
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
-import Database.Ingredient (Ingredient(..), CreateIngredientInput(..))
+import Database.Ingredient (Ingredient(..), CreateIngredientInput(..), UpdateIngredientInput(..))
 import Domain.Recipe (Recipe(..))
 import Servant
 
@@ -29,6 +29,7 @@ type API =
   :<|> "ingredients" :> Get '[JSON] [Ingredient]
   :<|> "ingredients" :> Capture "ingredientId" UUID :> Get '[JSON] Ingredient
   :<|> "ingredients" :> ReqBody '[JSON] CreateIngredientInput :> PostCreated '[JSON] Ingredient
+  :<|> "ingredients" :> Capture "ingredientId" UUID :> ReqBody '[JSON] UpdateIngredientInput :> Put '[JSON] Ingredient
   )
 
 server :: AppContext -> Server API
@@ -51,3 +52,4 @@ apiHandlers =
     :<|> getAllIngredientsHandler
     :<|> getIngredientHandler
     :<|> createIngredientHandler
+    :<|> updateIngredientHandler

@@ -11,6 +11,7 @@ module Domain.Ingredient
     , toRecipeIngredient
     , getIngredient
     , createIngredient
+    , updateIngredient
     ) where
 
 import Data.Aeson
@@ -22,7 +23,7 @@ import qualified Data.UUID.V4 as V4
 import Data.Pool (Pool, withResource)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import Database.Ingredient (Unit(..), Ingredient(..), CreateIngredientInput(..))
+import Database.Ingredient (Unit(..), Ingredient(..), CreateIngredientInput(..), UpdateIngredientInput(..))
 import Database.Recipe (DbRecipeIngredient(..))
 import Domain.Errors (IngredientError(..))
 
@@ -56,6 +57,18 @@ createIngredient pool ingredient =
           INSERT INTO ingredient (id, name)
           VALUES (?, ?)
         |] (ingredientId, ingredient.name)
+      getIngredientById conn ingredientId
+
+updateIngredient :: Pool PGSimple.Connection -> UUID -> UpdateIngredientInput -> IO (Either IngredientError Ingredient)
+updateIngredient pool ingredientId ingredient =
+  withResource pool $ \conn ->
+    PGSimple.withTransaction conn $ do
+      now <- getCurrentTime
+      _ <- PGSimple.execute conn
+        [sql|
+          UPDATE ingredient SET updated_at = ?, name = ?
+          WHERE id = ?
+        |] (now, ingredient.name, ingredientId)
       getIngredientById conn ingredientId
 
 getIngredientById :: PGSimple.Connection -> UUID -> IO (Either IngredientError Ingredient)
