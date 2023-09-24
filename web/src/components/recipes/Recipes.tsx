@@ -1,10 +1,7 @@
-import { Button } from "@material-tailwind/react";
-
 export const Recipes = () => {
   return (
     <div className="container mx-auto bg-gray-200 rounded-xl shadow border p-8 m-10">
       <p className="text-3xl text-gray-700 font-bold mb-5">Recipes</p>
-      <Button>Hello world</Button>
     </div>
   );
 };
