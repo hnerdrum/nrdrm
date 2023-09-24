@@ -12,6 +12,7 @@ module Domain.Ingredient
     , getIngredient
     , createIngredient
     , updateIngredient
+    , deleteIngredient
     ) where
 
 import Data.Aeson
@@ -70,6 +71,16 @@ updateIngredient pool ingredientId ingredient =
           WHERE id = ?
         |] (now, ingredient.name, ingredientId)
       getIngredientById conn ingredientId
+
+deleteIngredient :: Pool PGSimple.Connection -> UUID -> IO ()
+deleteIngredient pool ingredientId =
+  withResource pool $ \conn -> do
+    _ <- PGSimple.execute conn
+      [sql|
+        DELETE FROM ingredient
+        WHERE id = ?
+      |] $ PGSimple.Only ingredientId
+    return ()
 
 getIngredientById :: PGSimple.Connection -> UUID -> IO (Either IngredientError Ingredient)
 getIngredientById conn ingredientId = do
