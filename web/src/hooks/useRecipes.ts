@@ -14,7 +14,11 @@ export type Ingredient = {
   createdAt: Date;
   updatedAt: Date;
   name: string;
+  amount: number;
+  unit: Unit;
 };
+
+export type Unit = "G" | "Ml" | "Tbsp" | "Tsp" | "Qty";
 
 const fetcher = (arg: string): Promise<Recipe[]> =>
   fetch(arg).then((res) => res.json());
