@@ -12,9 +12,9 @@ export const RecipesView = () => {
     <div className="flex flex-col gap-4 w-1/3 mx-auto">
       <div className="flex items-center justify-between mt-8">
         <h1 className="text-3xl font-bold text-gray-200">Recipes</h1>
-        <button className="btn btn-primary">
-          <a href="/recipes/new">Add recipe</a>
-        </button>
+        <a className="btn btn-primary" href="/recipes/new">
+          Add recipe
+        </a>
       </div>
       {recipes.map((recipe) => (
         <div
