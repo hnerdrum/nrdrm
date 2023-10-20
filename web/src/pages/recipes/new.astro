@@ -1,7 +1,8 @@
 ---
+import { NewRecipeView } from '../../components/recipes/NewRecipeView';
 import Layout from '../../layouts/Layout.astro';
 ---
 
 <Layout title="Recipes">
-	<h1>New recipe</h1>
+	<NewRecipeView client:load />
 </Layout>
