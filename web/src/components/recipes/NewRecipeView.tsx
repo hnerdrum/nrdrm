@@ -1,21 +1,23 @@
 import { useForm } from "react-hook-form";
-
-type RecipeFormData = {
-  name: string;
-  description: string;
-  ingredients: string[];
-};
+import { CreateRecipeData, createRecipe } from "./api";
 
 export const NewRecipeView = () => {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<RecipeFormData>({
+  } = useForm<CreateRecipeData>({
     defaultValues: { ingredients: [] },
   });
 
-  const onSubmit = (data: RecipeFormData) => console.log(data);
+  const onSubmit = async (data: CreateRecipeData) => {
+    const result = await createRecipe(data);
+    if (result.status === "success") {
+      window.location.href = "/recipes";
+    } else {
+      alert(`Recipe creation failed with message: ${result.message}`);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4 w-1/3 mx-auto mt-8">
