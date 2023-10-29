@@ -1,7 +1,6 @@
 import { useRecipes } from "../../hooks/useRecipes";
 import { NoRecipes } from "./NoRecipes";
 import { RecipeList } from "./RecipeList";
-import { formatIngredient } from "./utils";
 
 export const RecipesView = () => {
   const { recipes, isLoading, error } = useRecipes();
