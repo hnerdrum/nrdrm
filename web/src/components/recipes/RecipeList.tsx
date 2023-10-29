@@ -18,7 +18,9 @@ export const RecipeList = ({ recipes }: Props) => {
             {recipe.name}
           </div>
           <div className="collapse-content">
-            <p className="mb-4 text-gray-300">{recipe.description}</p>
+            <p className="mb-4 text-gray-300 whitespace-pre-line">
+              {recipe.description}
+            </p>
             <div className="flex gap-2">
               {recipe.ingredients.map((ingredient) => (
                 <div className="badge badge-primary">
