@@ -33,8 +33,6 @@ import Domain.Ingredient (RecipeIngredient(..), fromDbRecipeIngredient)
 
 data Recipe = Recipe
   { id          :: UUID
-  , createdAt   :: UTCTime
-  , updatedAt   :: UTCTime
   , name        :: Text
   , description :: Text
   , ingredients :: [RecipeIngredient]
@@ -139,8 +137,6 @@ toRecipe :: NE.NonEmpty DbRecipeIngredient -> Recipe
 toRecipe dbRIs =
   Recipe
     { id = dbRecipeId dbRecipeIngredient
-    , createdAt = dbRecipeCreatedAt dbRecipeIngredient
-    , updatedAt = dbRecipeUpdatedAt dbRecipeIngredient
     , name = dbRecipeName dbRecipeIngredient
     , description = dbRecipeDescription dbRecipeIngredient
     , ingredients = catMaybes $ NE.toList $ NE.map fromDbRecipeIngredient dbRIs
