@@ -4,7 +4,7 @@ import { useIngredients } from "../../hooks/useIngredients";
 import { useState } from "react";
 import { Autocomplete } from "../Autocomplete";
 import { useSearchFilter } from "../../hooks/useSearchFilter";
-import { Unit } from "../../domain";
+import { RecipeIngredient, Unit } from "../../domain";
 import { unitFromString } from "../../domain/utils";
 
 export const NewRecipeView = () => {
@@ -16,9 +16,13 @@ export const NewRecipeView = () => {
     defaultValues: { ingredients: [] },
   });
 
+  const [recipeIngredients, setRecipeIngredients] = useState<
+    RecipeIngredient[]
+  >([]);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+  const [showIngredientError, setShowIngredientError] = useState(null);
 
   const { ingredients, isLoading, error } = useIngredients();
 
@@ -42,6 +46,25 @@ export const NewRecipeView = () => {
       return;
     }
     setSelectedAmount(parseFloat(value));
+  };
+
+  const handleAddIngredient = () => {
+    setShowIngredientError(false);
+
+    if (!selectedIngredient || !selectedAmount || !selectedUnit) {
+      setShowIngredientError(true);
+      return;
+    }
+
+    setRecipeIngredients((recipeIngredients) => [
+      ...recipeIngredients.filter((ri) => ri.id !== selectedIngredient.id),
+      {
+        id: selectedIngredient.id,
+        name: selectedIngredient.name,
+        amount: selectedAmount,
+        unit: selectedUnit,
+      },
+    ]);
   };
 
   if (isLoading || error) {
@@ -111,13 +134,13 @@ export const NewRecipeView = () => {
                 />
               </div>
               <input
-                className="w-1/6 mx-2 px-3 py-2 text-gray-200 border-neutral rounded shadow-md bg-neutral appearance-none focus:outline-none focus:shadow-outline"
+                className="w-1/4 mx-2 px-3 py-2 text-gray-200 border-neutral rounded shadow-md bg-neutral appearance-none focus:outline-none focus:shadow-outline"
                 type="number"
                 value={selectedAmount}
                 onChange={(e) => handleAmountInputChange(e.target.value)}
               />
               <select
-                className="select w-1/6 max-w-xs px-2 py-2 text-gray-200 border-neutral rounded shadow-md bg-neutral"
+                className="select w-1/4 max-w-xs px-2 py-2 text-gray-200 border-neutral rounded shadow-md bg-neutral"
                 onChange={(e) =>
                   setSelectedUnit(unitFromString(e.target.value))
                 }
@@ -129,7 +152,22 @@ export const NewRecipeView = () => {
                 <option value="Tsp">tsp</option>
                 <option value="Qty">qty</option>
               </select>
+              <button
+                className="btn btn-primary ml-2"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleAddIngredient();
+                }}
+              >
+                Add
+              </button>
             </div>
+            {showIngredientError && (
+              <p className="text-red-400 text-sm mt-2">
+                You must specify ingredient name, amount and unit to add it to
+                the recipe
+              </p>
+            )}
           </div>
           <div className="mb-6">
             <button type="submit" className="btn btn-primary w-full">
