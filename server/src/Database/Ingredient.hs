@@ -6,7 +6,7 @@ module Database.Ingredient
 (
   Unit(..)
 , unitToString
-, Ingredient(..)
+, DbIngredient(..)
 , CreateIngredientInput(..)
 , UpdateIngredientInput(..)
 ) where
@@ -24,17 +24,17 @@ data Unit = G | Ml | Tsp | Tbsp | Qty deriving (Show)
 
 $(deriveJSON defaultOptions ''Unit)
 
-data Ingredient = Ingredient
+data DbIngredient = DbIngredient
   { id        :: UUID
   , createdAt :: UTCTime
   , updatedAt :: UTCTime
   , name      :: Text
   } deriving (Show)
 
-$(deriveJSON defaultOptions ''Ingredient)
+$(deriveJSON defaultOptions ''DbIngredient)
 
-instance FromRow Ingredient where
-  fromRow = Ingredient <$> field <*> field <*> field <*> field
+instance FromRow DbIngredient where
+  fromRow = DbIngredient <$> field <*> field <*> field <*> field
 
 newtype CreateIngredientInput = CreateIngredientInput
   { name :: Text

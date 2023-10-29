@@ -6,9 +6,10 @@
 
 module Domain.Ingredient
     (
+      Ingredient(..),
       RecipeIngredient(..)
     , getAllIngredients
-    , toRecipeIngredient
+    , fromDbRecipeIngredient
     , getIngredient
     , createIngredient
     , updateIngredient
@@ -17,14 +18,14 @@ module Domain.Ingredient
 
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Text hiding (null, length, head)
+import Data.Text hiding (map, head, null, filter, length, zip)
 import Data.Time
 import Data.UUID hiding (null)
 import qualified Data.UUID.V4 as V4
 import Data.Pool (Pool, withResource)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import Database.Ingredient (Unit(..), Ingredient(..), CreateIngredientInput(..), UpdateIngredientInput(..))
+import Database.Ingredient (Unit(..), DbIngredient(..), CreateIngredientInput(..), UpdateIngredientInput(..))
 import Database.Recipe (DbRecipeIngredient(..))
 import Domain.Errors (IngredientError(..))
 
@@ -39,10 +40,18 @@ data RecipeIngredient = RecipeIngredient
 
 $(deriveJSON defaultOptions ''RecipeIngredient)
 
+data Ingredient = Ingredient
+  { id :: UUID
+  , name :: Text
+  } deriving (Show)
+
+$(deriveJSON defaultOptions ''Ingredient)
+
 getAllIngredients :: Pool PGSimple.Connection -> IO [Ingredient]
 getAllIngredients pool =
   withResource pool $ \conn -> do
-    PGSimple.query_ conn "SELECT * from ingredient"
+   dbIngredients <- PGSimple.query_ conn "SELECT * from ingredient"
+   return $ map fromDbIngredient dbIngredients
 
 getIngredient :: Pool PGSimple.Connection -> UUID -> IO (Either IngredientError Ingredient)
 getIngredient pool ingredientId =
@@ -92,14 +101,21 @@ getIngredientById conn ingredientId = do
   |] $ PGSimple.Only ingredientId
   return $ reduceDbIngredients dbIngredients
 
-reduceDbIngredients :: [Ingredient] -> Either IngredientError Ingredient
+reduceDbIngredients :: [DbIngredient] -> Either IngredientError Ingredient
 reduceDbIngredients dbIngredients
   | null dbIngredients        = Left IngredientNotFound
-  | length dbIngredients == 1 = Right $ head dbIngredients
+  | length dbIngredients == 1 = Right $ fromDbIngredient (head dbIngredients)
   | otherwise                 = Left MultipleIngredientsFound
 
-toRecipeIngredient :: DbRecipeIngredient -> Maybe RecipeIngredient
-toRecipeIngredient dbRI = do
+fromDbIngredient :: DbIngredient -> Ingredient
+fromDbIngredient dbIngredient =
+  Ingredient
+    { id = dbIngredient.id
+    , name = dbIngredient.name
+    }
+
+fromDbRecipeIngredient :: DbRecipeIngredient -> Maybe RecipeIngredient
+fromDbRecipeIngredient dbRI = do
   ingredientId <- dbIngredientId dbRI
   ingredientCreatedAt <- dbIngredientCreatedAt dbRI
   ingredientUpdatedAt <- dbIngredientUpdatedAt dbRI
