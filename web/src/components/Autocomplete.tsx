@@ -1,22 +1,28 @@
 import { useRef, useState } from "react";
 
-type Props = {
-  items: string[];
-  value: string;
-  onChange(val: string): void;
+type Props<T extends { name: string }> = {
+  items: T[];
+  value: string | null;
+  onInputChange(value: string): void;
+  onItemClick(item: T): void;
 };
 
-export const Autocomplete = ({ items, value, onChange }: Props) => {
-  const ref = useRef<HTMLDivElement>(null);
+export const Autocomplete = <T extends { name: string }>({
+  items,
+  value,
+  onInputChange,
+  onItemClick,
+}: Props<T>) => {
+  const ref = useRef(null);
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="dropdown dropdown-end w-full">
+    <div className={`dropdown w-full ${open ? "dropdown-open" : ""}`} ref={ref}>
       <input
         type="text"
         className="w-full px-3 py-2 text-gray-200 border-neutral rounded shadow-md bg-neutral appearance-none focus:outline-none focus:shadow-outline"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onInputChange(e.target.value)}
         placeholder="Add ingredients..."
         tabIndex={0}
       />
@@ -31,12 +37,13 @@ export const Autocomplete = ({ items, value, onChange }: Props) => {
                 key={index}
                 tabIndex={index + 1}
                 onClick={() => {
-                  onChange(item);
+                  onItemClick(item);
+                  onInputChange(item.name);
                   setOpen(false);
                 }}
                 className="w-full border-b border-b-base-content/10"
               >
-                <button>{item}</button>
+                <button>{item.name}</button>
               </li>
             );
           })}

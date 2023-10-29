@@ -1,5 +1,9 @@
 import { useForm } from "react-hook-form";
 import { CreateRecipeData, createRecipe } from "./api";
+import { useIngredients } from "../../hooks/useIngredients";
+import { useState } from "react";
+import { Autocomplete } from "../Autocomplete";
+import { useSearchFilter } from "../../hooks/useSearchFilter";
 
 export const NewRecipeView = () => {
   const {
@@ -10,6 +14,16 @@ export const NewRecipeView = () => {
     defaultValues: { ingredients: [] },
   });
 
+  const [selectedIngredient, setSelectedIngredient] = useState(null);
+
+  const { ingredients, isLoading, error } = useIngredients();
+
+  const {
+    searchInput,
+    filteredItems: filteredIngredients,
+    setSearchInput,
+  } = useSearchFilter(ingredients, ["name"]);
+
   const onSubmit = async (data: CreateRecipeData) => {
     const result = await createRecipe(data);
     if (result.status === "success") {
@@ -18,6 +32,10 @@ export const NewRecipeView = () => {
       alert(`Recipe creation failed with message: ${result.message}`);
     }
   };
+
+  if (isLoading || error) {
+    return null;
+  }
 
   return (
     <div className="flex flex-col gap-4 w-1/3 mx-auto mt-8">
@@ -72,6 +90,12 @@ export const NewRecipeView = () => {
             >
               Ingredients
             </label>
+            <Autocomplete
+              value={searchInput}
+              onItemClick={setSelectedIngredient}
+              onInputChange={setSearchInput}
+              items={filteredIngredients}
+            />
           </div>
           <div className="mb-6">
             <button type="submit" className="btn btn-primary w-full">
