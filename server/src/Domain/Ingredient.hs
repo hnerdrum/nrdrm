@@ -31,8 +31,6 @@ import Domain.Errors (IngredientError(..))
 
 data RecipeIngredient = RecipeIngredient
   { id          :: UUID
-  , createdAt   :: UTCTime
-  , updatedAt   :: UTCTime
   , name        :: Text
   , amount      :: Int
   , unit        :: Unit
@@ -117,16 +115,12 @@ fromDbIngredient dbIngredient =
 fromDbRecipeIngredient :: DbRecipeIngredient -> Maybe RecipeIngredient
 fromDbRecipeIngredient dbRI = do
   ingredientId <- dbIngredientId dbRI
-  ingredientCreatedAt <- dbIngredientCreatedAt dbRI
-  ingredientUpdatedAt <- dbIngredientUpdatedAt dbRI
   ingredientAmount <- dbIngredientAmount dbRI
   ingredientName <- dbIngredientName dbRI
   ingredientUnit <- dbIngredientUnit dbRI
 
   return RecipeIngredient
     { id = ingredientId
-    , createdAt = ingredientCreatedAt
-    , updatedAt = ingredientUpdatedAt
     , name = ingredientName
     , amount = ingredientAmount
     , unit = ingredientUnit
