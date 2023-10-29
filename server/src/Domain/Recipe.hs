@@ -29,7 +29,7 @@ import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.Recipe (DbRecipeIngredient(..), CreateRecipeInput(..), getCreateRecipeInput, getCreateRecipeIngredientInput, UpdateRecipeInput(..), getUpdateRecipeIngredientInput)
 import Domain.Errors (RecipeError(..))
-import Domain.Ingredient (RecipeIngredient(..), toRecipeIngredient)
+import Domain.Ingredient (RecipeIngredient(..), fromDbRecipeIngredient)
 
 data Recipe = Recipe
   { id          :: UUID
@@ -143,7 +143,7 @@ toRecipe dbRIs =
     , updatedAt = dbRecipeUpdatedAt dbRecipeIngredient
     , name = dbRecipeName dbRecipeIngredient
     , description = dbRecipeDescription dbRecipeIngredient
-    , ingredients = catMaybes $ NE.toList $ NE.map toRecipeIngredient dbRIs
+    , ingredients = catMaybes $ NE.toList $ NE.map fromDbRecipeIngredient dbRIs
     }
 
     where dbRecipeIngredient = NE.head dbRIs

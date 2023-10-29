@@ -15,9 +15,9 @@ import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.Text
 import Data.UUID
-import Database.Ingredient (Ingredient(..), CreateIngredientInput(..), UpdateIngredientInput(..))
+import Database.Ingredient (CreateIngredientInput(..), UpdateIngredientInput(..))
 import Domain.Errors (IngredientError(..))
-import Domain.Ingredient (getAllIngredients, getIngredient, createIngredient, updateIngredient, deleteIngredient)
+import Domain.Ingredient (Ingredient(..), getAllIngredients, getIngredient, createIngredient, updateIngredient, deleteIngredient)
 import Katip (LogEnv, Namespace)
 import Logger (logInfo, logError)
 import Servant

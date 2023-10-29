@@ -14,7 +14,8 @@ import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
 import Data.UUID
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
-import Database.Ingredient (Ingredient(..), CreateIngredientInput(..), UpdateIngredientInput(..))
+import Database.Ingredient (CreateIngredientInput(..), UpdateIngredientInput(..))
+import Domain.Ingredient (Ingredient(..))
 import Domain.Recipe (Recipe(..))
 import Servant
 
