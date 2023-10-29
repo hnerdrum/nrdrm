@@ -1,19 +1,20 @@
 export type Recipe = {
   id: string;
-  createdAt: Date;
-  updatedAt: Date;
   name: string;
   description: string;
-  ingredients: Ingredient[];
+  ingredients: RecipeIngredient[];
 };
 
-export type Ingredient = {
+export type RecipeIngredient = {
   id: string;
-  createdAt: Date;
-  updatedAt: Date;
   name: string;
   amount: number;
   unit: Unit;
 };
 
 export type Unit = "G" | "Ml" | "Tbsp" | "Tsp" | "Qty";
+
+export type Ingredient = {
+  id: string;
+  name: string;
+};
