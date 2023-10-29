@@ -12,7 +12,15 @@ export type RecipeIngredient = {
   unit: Unit;
 };
 
-export type Unit = "G" | "Ml" | "Tbsp" | "Tsp" | "Qty";
+export const Unit = {
+  G: "G",
+  Ml: "Ml",
+  Tbsp: "Tbsp",
+  Tsp: "Tsp",
+  Qty: "Qty",
+} as const;
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export type Unit = (typeof Unit)[keyof typeof Unit];
 
 export type Ingredient = {
   id: string;

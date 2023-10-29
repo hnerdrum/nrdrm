@@ -20,10 +20,9 @@ export const Autocomplete = <T extends { name: string }>({
     <div className={`dropdown w-full ${open ? "dropdown-open" : ""}`} ref={ref}>
       <input
         type="text"
-        className="w-full px-3 py-2 text-gray-200 border-neutral rounded shadow-md bg-neutral appearance-none focus:outline-none focus:shadow-outline"
+        className="w-full px-3 py-3 text-gray-200 border-neutral rounded shadow-md bg-neutral appearance-none focus:outline-none focus:shadow-outline"
         value={value}
         onChange={(e) => onInputChange(e.target.value)}
-        placeholder="Add ingredients..."
         tabIndex={0}
       />
       <div className="w-full dropdown-content bg-neutral top-14 max-h-96 overflow-auto flex-col rounded-md">
