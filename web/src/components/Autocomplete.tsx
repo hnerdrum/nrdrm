@@ -5,6 +5,7 @@ type Props<T extends { name: string }> = {
   value: string | null;
   onInputChange(value: string): void;
   onItemClick(item: T): void;
+  onItemCreate(item: { name: string }): void;
 };
 
 export const Autocomplete = <T extends { name: string }>({
@@ -12,6 +13,7 @@ export const Autocomplete = <T extends { name: string }>({
   value,
   onInputChange,
   onItemClick,
+  onItemCreate,
 }: Props<T>) => {
   const ref = useRef(null);
 
@@ -21,6 +23,16 @@ export const Autocomplete = <T extends { name: string }>({
   ) => {
     e.preventDefault();
     onItemClick(item);
+    onInputChange(item.name);
+    (document.activeElement as HTMLElement).blur();
+  };
+
+  const handleNewItem = (
+    e: React.MouseEvent<HTMLLIElement, MouseEvent>,
+    item: T
+  ) => {
+    e.preventDefault();
+    onItemCreate(item);
     onInputChange(item.name);
     (document.activeElement as HTMLElement).blur();
   };
@@ -45,6 +57,7 @@ export const Autocomplete = <T extends { name: string }>({
             value={value}
             items={items}
             handleItemClick={handleItemClick}
+            handleNewItem={handleNewItem}
           />
         </ul>
       </div>
@@ -56,6 +69,7 @@ const DropdownItemList = <T extends { name: string }>({
   value,
   items,
   handleItemClick,
+  handleNewItem,
 }: {
   value: string | null;
   items: T[];
@@ -63,10 +77,17 @@ const DropdownItemList = <T extends { name: string }>({
     e: React.MouseEvent<HTMLLIElement, MouseEvent>,
     item: T
   ): void;
+  handleNewItem(
+    e: React.MouseEvent<HTMLLIElement, MouseEvent>,
+    item: { name: string }
+  ): void;
 }) => {
   if (!items || !items.length) {
     return (
-      <li className="w-full border-b border-b-base-content/10">
+      <li
+        className="w-full border-b border-b-base-content/10"
+        onClick={(e) => handleNewItem(e, { name: value })}
+      >
         <button>Create ingredient "{value}"</button>
       </li>
     );

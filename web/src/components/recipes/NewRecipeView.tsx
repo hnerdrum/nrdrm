@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { CreateRecipeData, createRecipe } from "./api";
+import { CreateRecipeData, createIngredient, createRecipe } from "./api";
 import { useIngredients } from "../../hooks/useIngredients";
 import { useState } from "react";
 import { Autocomplete } from "../Autocomplete";
@@ -47,6 +47,15 @@ export const NewRecipeView = () => {
       window.location.href = "/recipes";
     } else {
       alert(`Recipe creation failed with message: ${result.message}`);
+    }
+  };
+
+  const onCreateNewIngredient = async (data: { name: string }) => {
+    const result = await createIngredient(data);
+    if (result.status === "success") {
+      setSelectedIngredient(result.data);
+    } else {
+      alert(`Ingredient creation failed with message: ${result.message}`);
     }
   };
 
@@ -139,6 +148,7 @@ export const NewRecipeView = () => {
                   value={searchInput}
                   onItemClick={setSelectedIngredient}
                   onInputChange={setSearchInput}
+                  onItemCreate={onCreateNewIngredient}
                   items={filteredIngredients}
                 />
               </div>
