@@ -77,38 +77,38 @@ getCreateRecipeInput recipeId input = (recipeId, input.name, input.description)
 
 getCreateRecipeIngredientInput :: UUID -> CreateRecipeInput -> [(UUID, UUID, Int, Text)]
 getCreateRecipeIngredientInput recipeId input =
-  map (\ingredient -> (recipeId, ingredient.ingredientId, ingredient.amount, unitToString ingredient.unit)) (input.ingredients)
+  map (\ingredient -> (recipeId, ingredient.id, ingredient.amount, unitToString ingredient.unit)) input.ingredients
 
 data CreateRecipeIngredientInput = CreateRecipeIngredientInput
-  { ingredientId :: UUID
+  { id :: UUID
   , amount       :: Int
   , unit         :: Unit
   } deriving (Show)
 
 instance FromJSON CreateRecipeIngredientInput where
   parseJSON = withObject "CreateRecipeIngredientInput" $ \obj -> do
-    ingredientIdValue <- obj .: "ingredientId"
+    ingredientIdValue <- obj .: "id"
     amountValue <- obj .: "amount"
     unitValue <- obj .: "unit"
     return $ CreateRecipeIngredientInput
-      { ingredientId   = ingredientIdValue
+      { id   = ingredientIdValue
       , amount         = amountValue
       , unit           = unitValue
       }
 
 data UpdateRecipeIngredientInput = UpdateRecipeIngredientInput
- { ingredientId :: UUID
- , amount       :: Maybe Int
- , unit         :: Maybe Unit
+ { id     :: UUID
+ , amount :: Maybe Int
+ , unit   :: Maybe Unit
  } deriving (Show)
 
 instance FromJSON UpdateRecipeIngredientInput where
   parseJSON = withObject "UpdateRecipeIngredientInput" $ \obj -> do
-    ingredientIdValue <- obj .: "ingredientId"
+    ingredientIdValue <- obj .: "id"
     amountValue <- obj .:? "amount"
     unitValue <- obj .:? "unit"
     return $ UpdateRecipeIngredientInput
-      { ingredientId   = ingredientIdValue
+      { id   = ingredientIdValue
       , amount         = amountValue
       , unit           = unitValue
       }
@@ -116,4 +116,4 @@ instance FromJSON UpdateRecipeIngredientInput where
 getUpdateRecipeIngredientInput :: UUID -> UpdateRecipeInput -> [(Maybe Int, Maybe Text, UUID, UUID)]
 getUpdateRecipeIngredientInput recipeId input = case input.ingredients of
   Nothing -> []
-  Just ings -> map (\ingredient -> (ingredient.amount, fmap unitToString ingredient.unit, recipeId, ingredient.ingredientId)) ings
+  Just ings -> map (\ingredient -> (ingredient.amount, fmap unitToString ingredient.unit, recipeId, ingredient.id)) ings
