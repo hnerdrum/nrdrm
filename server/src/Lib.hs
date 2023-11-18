@@ -9,25 +9,28 @@ module Lib
 import API.Server
 import App (AppContext(..))
 import Database.Connection (createConnection)
+import qualified Data.ByteString.Char8 as B8
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
 import Network.Wai (Middleware)
 import Servant
 import Logger (initializeLogEnv)
+import qualified Config
 
-corsResourcePolicy :: CorsResourcePolicy
-corsResourcePolicy = simpleCorsResourcePolicy
+corsResourcePolicy :: [String] -> CorsResourcePolicy
+corsResourcePolicy allowedOrigins = simpleCorsResourcePolicy
    { corsRequestHeaders = ["Content-Type"]
    , corsMethods = ["GET", "POST", "PUT", "DELETE"]
-   , corsOrigins = Just (["http://localhost:3000"], True)
+   , corsOrigins = Just (map B8.pack allowedOrigins, True)
    }
 
-corsMiddleware :: Middleware
-corsMiddleware = cors (const $ Just corsResourcePolicy)
+corsMiddleware :: [String] -> Middleware
+corsMiddleware allowedOrigins = cors (const $ Just (corsResourcePolicy allowedOrigins))
 
 startApp :: IO ()
 startApp = do
-  pool <- createConnection
+  config <- Config.loadConfig
+  pool <- createConnection $ Config.databaseUrl config
   logEnv <- initializeLogEnv
   let appContext = AppContext pool logEnv
-  run 8000 $ corsMiddleware $ serve api $ server appContext
+  run 8000 $ corsMiddleware (Config.allowedOrigins config) $ serve api $ server appContext
