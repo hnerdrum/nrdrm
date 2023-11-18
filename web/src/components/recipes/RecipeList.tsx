@@ -23,7 +23,7 @@ export const RecipeList = ({ recipes }: Props) => {
             </p>
             <div className="flex gap-2">
               {recipe.ingredients.map((ingredient) => (
-                <div className="badge badge-primary">
+                <div key={ingredient.id} className="badge badge-primary">
                   {formatIngredient(ingredient)}
                 </div>
               ))}
