@@ -15,7 +15,7 @@ export const Autocomplete = <T extends { name: string }>({
 }: Props<T>) => {
   const ref = useRef(null);
 
-  const handleElementClick = (
+  const handleItemClick = (
     e: React.MouseEvent<HTMLLIElement, MouseEvent>,
     item: T
   ) => {
@@ -41,20 +41,51 @@ export const Autocomplete = <T extends { name: string }>({
           className="menu menu-compact "
           style={{ width: ref.current?.clientWidth }}
         >
-          {items.map((item, index) => {
-            return (
-              <li
-                key={index}
-                tabIndex={index + 1}
-                onClick={(e) => handleElementClick(e, item)}
-                className="w-full border-b border-b-base-content/10"
-              >
-                <button>{item.name}</button>
-              </li>
-            );
-          })}
+          <DropdownItemList
+            value={value}
+            items={items}
+            handleItemClick={handleItemClick}
+          />
         </ul>
       </div>
     </div>
+  );
+};
+
+const DropdownItemList = <T extends { name: string }>({
+  value,
+  items,
+  handleItemClick,
+}: {
+  value: string | null;
+  items: T[];
+  handleItemClick(
+    e: React.MouseEvent<HTMLLIElement, MouseEvent>,
+    item: T
+  ): void;
+}) => {
+  if (!items || !items.length) {
+    return (
+      <li className="w-full border-b border-b-base-content/10">
+        <button>Create ingredient "{value}"</button>
+      </li>
+    );
+  }
+
+  return (
+    <>
+      {items.map((item, index) => {
+        return (
+          <li
+            key={index}
+            tabIndex={index + 1}
+            onClick={(e) => handleItemClick(e, item)}
+            className="w-full border-b border-b-base-content/10"
+          >
+            <button>{item.name}</button>
+          </li>
+        );
+      })}
+    </>
   );
 };
