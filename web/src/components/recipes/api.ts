@@ -1,4 +1,4 @@
-import { RecipeIngredient } from "../../domain";
+import { Ingredient, Recipe, RecipeIngredient } from "../../domain";
 
 export type CreateRecipeData = {
   name: string;
@@ -6,15 +6,19 @@ export type CreateRecipeData = {
   ingredients: RecipeIngredient[];
 };
 
-type CreateRecipeResult = CreateRecipeSuccess | CreateRecipeFailure;
+export type CreateIngredientData = {
+  name: string;
+};
 
-type CreateRecipeSuccess = { status: "success" };
+type PostRequestResult<T> = PostRequestSuccess<T> | PostRequestFailure;
 
-type CreateRecipeFailure = { status: "failure"; message: string };
+type PostRequestSuccess<T> = { status: "success"; data: T };
+
+type PostRequestFailure = { status: "failure"; message: string };
 
 export const createRecipe = async (
   recipe: CreateRecipeData
-): Promise<CreateRecipeResult> => {
+): Promise<PostRequestResult<Recipe>> => {
   try {
     const response = await fetch("http://localhost:8000/api/v1/recipes", {
       method: "POST",
@@ -35,6 +39,40 @@ export const createRecipe = async (
 
     return {
       status: "success",
+      data: message as Recipe,
+    };
+  } catch (e) {
+    return {
+      status: "failure",
+      message: (e as Error).message,
+    };
+  }
+};
+
+export const createIngredient = async (
+  ingredient: CreateIngredientData
+): Promise<PostRequestResult<Ingredient>> => {
+  try {
+    const response = await fetch("http://localhost:8000/api/v1/ingredients", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(ingredient),
+    });
+
+    const message = await response.json();
+
+    if (!response.ok) {
+      return {
+        status: "failure",
+        message: message.message,
+      };
+    }
+
+    return {
+      status: "success",
+      data: message as Ingredient,
     };
   } catch (e) {
     return {
