@@ -1,6 +1,6 @@
-import { Ingredient, Unit } from "../../domain";
+import { Ingredient, RecipeIngredient, Unit } from "../../domain";
 
-export const formatIngredient = (ingredient: Ingredient) => {
+export const formatIngredient = (ingredient: RecipeIngredient) => {
   return `${ingredient.amount} ${formatUnit(ingredient.unit)} ${
     ingredient.name
   }`;

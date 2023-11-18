@@ -22,7 +22,10 @@ export const Autocomplete = <T extends { name: string }>({
         type="text"
         className="w-full px-3 py-3 text-gray-200 border-neutral rounded shadow-md bg-neutral appearance-none focus:outline-none focus:shadow-outline"
         value={value}
-        onChange={(e) => onInputChange(e.target.value)}
+        onChange={(e) => {
+          e.preventDefault();
+          onInputChange(e.target.value);
+        }}
         tabIndex={0}
       />
       <div className="w-full dropdown-content bg-neutral top-14 max-h-96 overflow-auto flex-col rounded-md">
@@ -35,7 +38,8 @@ export const Autocomplete = <T extends { name: string }>({
               <li
                 key={index}
                 tabIndex={index + 1}
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
                   onItemClick(item);
                   onInputChange(item.name);
                   setOpen(false);
