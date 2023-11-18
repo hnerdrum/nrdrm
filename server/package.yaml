@@ -25,6 +25,9 @@ dependencies:
   - time
   - containers
   - katip
+  - dotenv
+  - bytestring
+  - split
 
 ghc-options:
   - -Wall
