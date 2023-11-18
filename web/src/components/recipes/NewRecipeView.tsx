@@ -24,7 +24,9 @@ export const NewRecipeView = () => {
     RecipeIngredient[]
   >([]);
   const [selectedIngredient, setSelectedIngredient] = useState(null);
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  const [selectedAmount, setSelectedAmount] = useState<number | undefined>(
+    undefined
+  );
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [showIngredientError, setShowIngredientError] = useState(null);
 
@@ -163,7 +165,6 @@ export const NewRecipeView = () => {
                 type="button"
                 className="btn btn-primary ml-2"
                 onClick={(e) => {
-                  e.preventDefault();
                   handleAddIngredient();
                 }}
               >

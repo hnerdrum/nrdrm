@@ -14,16 +14,24 @@ export const Autocomplete = <T extends { name: string }>({
   onItemClick,
 }: Props<T>) => {
   const ref = useRef(null);
-  const [open, setOpen] = useState(false);
+
+  const handleElementClick = (
+    e: React.MouseEvent<HTMLLIElement, MouseEvent>,
+    item: T
+  ) => {
+    e.preventDefault();
+    onItemClick(item);
+    onInputChange(item.name);
+    (document.activeElement as HTMLElement).blur();
+  };
 
   return (
-    <div className={`dropdown w-full ${open ? "dropdown-open" : ""}`} ref={ref}>
+    <div className={`dropdown w-full`} ref={ref}>
       <input
         type="text"
         className="w-full px-3 py-3 text-gray-200 border-neutral rounded shadow-md bg-neutral appearance-none focus:outline-none focus:shadow-outline"
         value={value}
         onChange={(e) => {
-          e.preventDefault();
           onInputChange(e.target.value);
         }}
         tabIndex={0}
@@ -38,12 +46,7 @@ export const Autocomplete = <T extends { name: string }>({
               <li
                 key={index}
                 tabIndex={index + 1}
-                onClick={(e) => {
-                  e.preventDefault();
-                  onItemClick(item);
-                  onInputChange(item.name);
-                  setOpen(false);
-                }}
+                onClick={(e) => handleElementClick(e, item)}
                 className="w-full border-b border-b-base-content/10"
               >
                 <button>{item.name}</button>
