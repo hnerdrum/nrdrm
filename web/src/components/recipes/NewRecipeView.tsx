@@ -6,15 +6,19 @@ import { Autocomplete } from "../Autocomplete";
 import { useSearchFilter } from "../../hooks/useSearchFilter";
 import { RecipeIngredient, Unit } from "../../domain";
 import { unitFromString } from "../../domain/utils";
+import { formatIngredient } from "./utils";
+
+type CreateRecipeFormData = {
+  name: string;
+  description: string;
+};
 
 export const NewRecipeView = () => {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<CreateRecipeData>({
-    defaultValues: { ingredients: [] },
-  });
+  } = useForm<CreateRecipeFormData>();
 
   const [recipeIngredients, setRecipeIngredients] = useState<
     RecipeIngredient[]
@@ -32,8 +36,11 @@ export const NewRecipeView = () => {
     setSearchInput,
   } = useSearchFilter(ingredients, ["name"]);
 
-  const onSubmit = async (data: CreateRecipeData) => {
-    const result = await createRecipe(data);
+  const onSubmit = async (data: CreateRecipeFormData) => {
+    const result = await createRecipe({
+      ...data,
+      ingredients: recipeIngredients,
+    });
     if (result.status === "success") {
       window.location.href = "/recipes";
     } else {
@@ -153,6 +160,7 @@ export const NewRecipeView = () => {
                 <option value="Qty">qty</option>
               </select>
               <button
+                type="button"
                 className="btn btn-primary ml-2"
                 onClick={(e) => {
                   e.preventDefault();
@@ -168,12 +176,17 @@ export const NewRecipeView = () => {
                 the recipe
               </p>
             )}
+            <div className="flex gap-2 p-4">
+              {recipeIngredients.map((ingredient) => (
+                <div className="badge badge-primary">
+                  {formatIngredient(ingredient)}
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="mb-6">
-            <button type="submit" className="btn btn-primary w-full">
-              Add recipe
-            </button>
-          </div>
+          <button type="submit" className="btn btn-primary">
+            Add recipe
+          </button>
         </form>
       </div>
     </div>

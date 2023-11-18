@@ -1,7 +1,9 @@
+import { RecipeIngredient } from "../../domain";
+
 export type CreateRecipeData = {
   name: string;
   description: string;
-  ingredients: string[];
+  ingredients: RecipeIngredient[];
 };
 
 type CreateRecipeResult = CreateRecipeSuccess | CreateRecipeFailure;
