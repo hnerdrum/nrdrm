@@ -5,8 +5,16 @@ import { RecipeList } from "./RecipeList";
 export const RecipesView = () => {
   const { recipes, isLoading, error } = useRecipes();
 
-  if (isLoading || error) {
+  if (isLoading) {
     return null;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center ">
+        <h1 className="text-red-500 font-bold">Could not show recipes.</h1>
+      </div>
+    );
   }
 
   return (
