@@ -1,3 +1,4 @@
+import { config } from "../../../config";
 import { Ingredient, Recipe, RecipeIngredient } from "../../domain";
 
 export type CreateRecipeData = {
@@ -20,7 +21,7 @@ export const createRecipe = async (
   recipe: CreateRecipeData
 ): Promise<PostRequestResult<Recipe>> => {
   try {
-    const response = await fetch("http://localhost:8000/api/v1/recipes", {
+    const response = await fetch(`${config.baseServerUrl}/api/v1/recipes`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -53,7 +54,7 @@ export const createIngredient = async (
   ingredient: CreateIngredientData
 ): Promise<PostRequestResult<Ingredient>> => {
   try {
-    const response = await fetch("http://localhost:8000/api/v1/ingredients", {
+    const response = await fetch(`${config.baseServerUrl}/api/v1/ingredients`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
