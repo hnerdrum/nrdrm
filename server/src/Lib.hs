@@ -10,6 +10,7 @@ import API.Server
 import App (AppContext(..))
 import Control.Monad.Reader (liftIO)
 import Database.Connection (createConnection)
+import Database.Migrations (runDbMigrations)
 import Data.Text (pack)
 import qualified Data.ByteString.Char8 as B8
 import Network.Wai.Handler.Warp
@@ -33,6 +34,7 @@ startApp :: IO ()
 startApp = do
   config <- Config.loadConfig
   pool <- createConnection $ Config.databaseUrl config
+  runDbMigrations $ Config.databaseUrl config
   let appName = "Recipes"
   logEnv <- initializeLogEnv
   let appContext = AppContext appName pool logEnv

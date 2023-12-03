@@ -18,6 +18,7 @@ dependencies:
   - wai-cors
   - warp
   - postgresql-simple
+  - postgresql-migration
   - resource-pool
   - mtl
   - text
