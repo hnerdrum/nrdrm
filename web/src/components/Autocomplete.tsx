@@ -82,7 +82,8 @@ const DropdownItemList = <T extends { name: string }>({
     item: { name: string }
   ): void;
 }) => {
-  if (!items || !items.length) {
+  const isMissingItems = !items || !items.length;
+  if (isMissingItems && !!value) {
     return (
       <li
         className="w-full border-b border-b-base-content/10"

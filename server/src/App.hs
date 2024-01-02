@@ -16,7 +16,6 @@ data AppContext = AppContext
   { name :: Text
   , dbPool :: Pool Connection
   , appLogEnv :: LogEnv
-
   }
 
 type AppM = ReaderT AppContext Handler
