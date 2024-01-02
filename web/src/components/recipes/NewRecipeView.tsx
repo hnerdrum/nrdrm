@@ -104,9 +104,9 @@ export const NewRecipeView = () => {
   }
 
   return (
-    <div className="flex flex-col gap-4 w-1/2 mx-auto mt-8">
+    <div className="flex flex-col gap-4 w-full lg:w-1/2 lg:px-0 px-8 mx-auto mt-8">
       <h1 className="text-3xl font-bold text-gray-200">New recipe</h1>
-      <div className="w-full  mx-auto">
+      <div className="w-full mx-auto">
         <form
           className="bg-gray-900 shadow-lg rounded px-8 pt-6 pb-8 mb-4"
           onSubmit={handleSubmit(onSubmit)}
