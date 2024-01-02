@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 
 type Props<T extends { name: string }> = {
   items: T[];
+  placeholder?: string;
   value: string | null;
   onInputChange(value: string): void;
   onItemClick(item: T): void;
@@ -10,6 +11,7 @@ type Props<T extends { name: string }> = {
 
 export const Autocomplete = <T extends { name: string }>({
   items,
+  placeholder,
   value,
   onInputChange,
   onItemClick,
@@ -41,6 +43,7 @@ export const Autocomplete = <T extends { name: string }>({
     <div className={`dropdown w-full`} ref={ref}>
       <input
         type="text"
+        placeholder={placeholder}
         className="w-full px-3 py-3 text-gray-200 border-neutral rounded shadow-md bg-neutral appearance-none focus:outline-none focus:shadow-outline"
         value={value}
         onChange={(e) => {
