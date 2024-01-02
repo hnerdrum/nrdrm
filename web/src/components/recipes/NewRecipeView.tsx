@@ -4,7 +4,7 @@ import { useIngredients } from "../../hooks/useIngredients";
 import { useState } from "react";
 import { Autocomplete } from "../Autocomplete";
 import { useSearchFilter } from "../../hooks/useSearchFilter";
-import { RecipeIngredient, Unit } from "../../domain";
+import { Ingredient, RecipeIngredient, Unit } from "../../domain";
 import { unitFromString } from "../../domain/utils";
 import { formatIngredient } from "./utils";
 
@@ -23,11 +23,10 @@ export const NewRecipeView = () => {
   const [recipeIngredients, setRecipeIngredients] = useState<
     RecipeIngredient[]
   >([]);
-  const [selectedIngredient, setSelectedIngredient] = useState(null);
-  const [selectedAmount, setSelectedAmount] = useState<number | undefined>(
-    undefined
-  );
-  const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
+  const [selectedIngredient, setSelectedIngredient] =
+    useState<Ingredient | null>(null);
+  const [selectedAmount, setSelectedAmount] = useState<number | "">("");
+  const [selectedUnit, setSelectedUnit] = useState<Unit | "">("");
   const [showIngredientError, setShowIngredientError] = useState(null);
 
   const { ingredients, isLoading, error } = useIngredients();
@@ -83,6 +82,21 @@ export const NewRecipeView = () => {
         unit: selectedUnit,
       },
     ]);
+
+    resetIngredientForm();
+  };
+
+  const resetIngredientForm = () => {
+    setSelectedIngredient((_) => null);
+    setSearchInput((_) => "");
+    setSelectedAmount((_) => "");
+    setSelectedUnit((_) => "");
+  };
+
+  const handleRemoveIngredient = (ingredient: RecipeIngredient) => {
+    setRecipeIngredients(
+      recipeIngredients.filter((ri) => ri.id !== ingredient.id)
+    );
   };
 
   if (isLoading || error) {
@@ -146,6 +160,7 @@ export const NewRecipeView = () => {
               <div className="w-1/2">
                 <Autocomplete
                   value={searchInput}
+                  placeholder="Search for ingredients..."
                   onItemClick={setSelectedIngredient}
                   onInputChange={setSearchInput}
                   onItemCreate={onCreateNewIngredient}
@@ -154,17 +169,19 @@ export const NewRecipeView = () => {
               </div>
               <input
                 className="w-1/4 mx-2 px-3 py-2 text-gray-200 border-neutral rounded shadow-md bg-neutral appearance-none focus:outline-none focus:shadow-outline"
+                placeholder="Specify amount"
                 type="number"
                 value={selectedAmount}
                 onChange={(e) => handleAmountInputChange(e.target.value)}
               />
               <select
                 className="select w-1/4 max-w-xs px-2 py-2 text-gray-200 border-neutral rounded shadow-md bg-neutral"
+                value={selectedUnit}
                 onChange={(e) =>
                   setSelectedUnit(unitFromString(e.target.value))
                 }
               >
-                <option disabled selected></option>
+                <option disabled value=""></option>
                 <option value="G">g</option>
                 <option value="Ml">ml</option>
                 <option value="Tbsp">tbsp</option>
@@ -189,7 +206,11 @@ export const NewRecipeView = () => {
             )}
             <div className="flex gap-2 p-4">
               {recipeIngredients.map((ingredient) => (
-                <div className="badge badge-primary">
+                <div
+                  key={ingredient.id}
+                  className="badge badge-primary cursor-pointer"
+                  onClick={() => handleRemoveIngredient(ingredient)}
+                >
                   {formatIngredient(ingredient)}
                 </div>
               ))}
