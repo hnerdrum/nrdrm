@@ -29,6 +29,10 @@ dependencies:
   - dotenv
   - bytestring
   - split
+  - random
+  - cryptonite
+  - memory
+  - base64-bytestring
 
 ghc-options:
   - -Wall
