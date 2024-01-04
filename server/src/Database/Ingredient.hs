@@ -31,8 +31,6 @@ data DbIngredient = DbIngredient
   , name      :: Text
   } deriving (Show)
 
-$(deriveJSON defaultOptions ''DbIngredient)
-
 instance FromRow DbIngredient where
   fromRow = DbIngredient <$> field <*> field <*> field <*> field
 
