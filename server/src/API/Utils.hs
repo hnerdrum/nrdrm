@@ -5,7 +5,7 @@ module API.Utils
 
 import App (AppM)
 
-resolveEitherAppResult :: (b -> AppM a) -> (a -> AppM a) -> Either b a -> AppM a
+resolveEitherAppResult :: (b -> AppM c) -> (a -> AppM c) -> Either b a -> AppM c
 resolveEitherAppResult leftAction rightAction eitherValue = case eitherValue of
     Right a -> rightAction a
     Left b -> leftAction b

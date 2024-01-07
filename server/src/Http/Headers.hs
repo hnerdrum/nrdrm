@@ -7,10 +7,10 @@ module Http.Headers
     SetCookieHeader
   ) where
 
+import Data.Text
 import Servant
 
--- TODO: use text?
-type SetCookieHeader v = Headers '[ Header SetCookieHeaderName String ] v
+type SetCookieHeader v = Headers '[ Header SetCookieHeaderName Text ] v
 
 type family SetCookieHeaderName where
   SetCookieHeaderName = "Set-Cookie"

@@ -8,6 +8,7 @@ module API.Server
      , api
     ) where
 
+import API.Auth (loginUserHandler)
 import API.Ingredient (getAllIngredientsHandler, getIngredientHandler, createIngredientHandler, updateIngredientHandler, deleteIngredientHandler)
 import API.Recipe (getAllRecipesHandler, getRecipeHandler, createRecipeHandler, updateRecipeHandler, deleteRecipeHandler)
 import App (AppContext, AppM)
@@ -15,8 +16,11 @@ import Control.Monad.Reader (runReaderT)
 import Data.UUID
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
 import Database.Ingredient (CreateIngredientInput(..), UpdateIngredientInput(..))
+import Domain.Auth (LoginInput(..))
 import Domain.Ingredient (Ingredient(..))
 import Domain.Recipe (Recipe(..))
+import Domain.User (User(..))
+import Http.Headers (SetCookieHeader)
 import Servant
 
 type API =
@@ -32,6 +36,8 @@ type API =
   :<|> "ingredients" :> ReqBody '[JSON] CreateIngredientInput :> PostCreated '[JSON] Ingredient
   :<|> "ingredients" :> Capture "ingredientId" UUID :> ReqBody '[JSON] UpdateIngredientInput :> Put '[JSON] Ingredient
   :<|> "ingredients" :> Capture "ingredientId" UUID :> DeleteNoContent
+
+  :<|> "login" :> ReqBody '[JSON] LoginInput :> Post '[JSON] (SetCookieHeader User)
   )
 
 server :: AppContext -> Server API
@@ -56,3 +62,5 @@ apiHandlers =
     :<|> createIngredientHandler
     :<|> updateIngredientHandler
     :<|> deleteIngredientHandler
+
+    :<|> loginUserHandler

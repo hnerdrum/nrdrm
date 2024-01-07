@@ -33,6 +33,7 @@ dependencies:
   - cryptonite
   - memory
   - base64-bytestring
+  - bcrypt
 
 ghc-options:
   - -Wall
