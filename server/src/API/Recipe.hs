@@ -10,7 +10,7 @@ module API.Recipe
     ) where
 
 import API.Errors (ToServantError (toServerError))
-import API.Utils (handleEither)
+import API.Utils (resolveEitherAppResult)
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID
@@ -35,7 +35,7 @@ getRecipeHandler recipeId = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "getRecipeHandler" $ "[GET] /api/v1/recipes/" <> (pack . show) recipeId
   eitherRecipe <- liftIO $ getRecipe pool recipeId
-  handleEither (handleError logEnv "getRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) eitherRecipe
+  resolveEitherAppResult (handleError logEnv "getRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
 
 createRecipeHandler :: CreateRecipeInput -> AppM Recipe
 createRecipeHandler createRecipeInput = do
@@ -43,7 +43,7 @@ createRecipeHandler createRecipeInput = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "createRecipeHandler" "[POST] /api/v1/recipes/"
   eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
-  handleEither (handleError logEnv "createRecipeHandler" "Recipe not found") eitherRecipe
+  resolveEitherAppResult (handleError logEnv "createRecipeHandler" "Recipe not found") return eitherRecipe
 
 updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM Recipe
 updateRecipeHandler recipeId updateRecipeInput = do
@@ -51,7 +51,7 @@ updateRecipeHandler recipeId updateRecipeInput = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "updateRecipeHandler" "[PUT] /api/v1/recipes/"
   eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
-  handleEither (handleError logEnv "updateRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) eitherRecipe
+  resolveEitherAppResult (handleError logEnv "updateRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
 
 deleteRecipeHandler :: UUID -> AppM NoContent
 deleteRecipeHandler recipeId = do

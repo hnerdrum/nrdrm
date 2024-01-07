@@ -10,7 +10,7 @@ module API.Ingredient
   ) where
 
 import API.Errors (ToServantError (toServerError))
-import API.Utils (handleEither)
+import API.Utils (resolveEitherAppResult)
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.Text
@@ -35,7 +35,7 @@ getIngredientHandler ingredientId = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "getIngredientHandler" $ "[GET] /api/v1/ingredients/" <> (pack . show) ingredientId
   eitherIngredient <- liftIO $ getIngredient pool ingredientId
-  handleEither (handleError logEnv "getIngredientHandler" ("Ingredient with ID: " <> (pack . show) ingredientId <> " not found")) eitherIngredient
+  resolveEitherAppResult (handleError logEnv "getIngredientHandler" ("Ingredient with ID: " <> (pack . show) ingredientId <> " not found")) return eitherIngredient
 
 createIngredientHandler :: CreateIngredientInput -> AppM Ingredient
 createIngredientHandler createIngredientInput = do
@@ -43,7 +43,7 @@ createIngredientHandler createIngredientInput = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "createIngredientHandler" "[POST] /api/v1/ingredients/"
   eitherIngredient <- liftIO $ createIngredient pool createIngredientInput
-  handleEither (handleError logEnv "createIngredientHandler" "Ingredient not found") eitherIngredient
+  resolveEitherAppResult (handleError logEnv "createIngredientHandler" "Ingredient not found") return eitherIngredient
 
 updateIngredientHandler :: UUID -> UpdateIngredientInput -> AppM Ingredient
 updateIngredientHandler ingredientId updateIngredientInput = do
@@ -51,7 +51,7 @@ updateIngredientHandler ingredientId updateIngredientInput = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "updateIngredientHandler" $ "[PUT] /api/v1/ingredients/" <> (pack . show) ingredientId
   eitherIngredient <- liftIO $ updateIngredient pool ingredientId updateIngredientInput
-  handleEither (handleError logEnv "updateIngredientHandler" ("Ingredient with ID: " <> (pack . show) ingredientId <> " not found")) eitherIngredient
+  resolveEitherAppResult (handleError logEnv "updateIngredientHandler" ("Ingredient with ID: " <> (pack . show) ingredientId <> " not found")) return eitherIngredient
 
 deleteIngredientHandler :: UUID -> AppM NoContent
 deleteIngredientHandler ingredientId = do
