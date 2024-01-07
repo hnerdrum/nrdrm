@@ -33,7 +33,7 @@ getUserByEmail pool userEmail =
   withResource pool $ \conn -> do
     dbUsers <- PGSimple.query conn
       [sql|
-        SELECT * FROM "user"
+        SELECT * FROM "user_account"
         WHERE email = ?
       |] $ PGSimple.Only userEmail
     return $ reduceDbUsers dbUsers
