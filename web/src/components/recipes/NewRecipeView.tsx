@@ -204,7 +204,7 @@ export const NewRecipeView = () => {
                 the recipe
               </p>
             )}
-            <div className="flex gap-2 p-4">
+            <div className="flex flex-wrap gap-2 p-4">
               {recipeIngredients.map((ingredient) => (
                 <div
                   key={ingredient.id}
