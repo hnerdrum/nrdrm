@@ -21,7 +21,7 @@ export const RecipeList = ({ recipes }: Props) => {
             <p className="mb-4 text-gray-300 whitespace-pre-line">
               {recipe.description}
             </p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {recipe.ingredients.map((ingredient) => (
                 <div key={ingredient.id} className="badge badge-primary">
                   {formatIngredient(ingredient)}
