@@ -14,8 +14,10 @@ import API.Errors (toServerError)
 import API.Utils (resolveEitherAppResult)
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
+import Data.Pool (Pool)
+import qualified Database.PostgreSQL.Simple as PGSimple
 import Data.Text
-import Domain.Auth (LoginInput(..), loginUser, generateToken)
+import Domain.Auth (LoginInput(..), loginUser, generateToken, upsertUserAuthToken)
 import Domain.Errors (UserError(..))
 import Domain.User (User(..))
 import Http.Headers (SetCookieHeader)
@@ -32,17 +34,19 @@ authCookieName = "recipes-login"
 authCookieMaxAge :: Int
 authCookieMaxAge = 86400 -- 24 hours
 
+
 loginUserHandler :: LoginInput -> AppM (SetCookieHeader User)
 loginUserHandler loginInput = do
   pool <- asks dbPool
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "loginUserHandler" "[POST] /api/v1/login/"
   eitherUser <- liftIO $ loginUser pool loginInput
-  resolveEitherAppResult (handleError logEnv "loginUserHandler" "Error when trying to login with email") handleValidUser eitherUser
+  resolveEitherAppResult (handleError logEnv "loginUserHandler" "Error when trying to login with email") (handleValidUser pool) eitherUser
 
-handleValidUser :: User -> AppM (SetCookieHeader User)
-handleValidUser user = do
+handleValidUser :: Pool PGSimple.Connection -> User -> AppM (SetCookieHeader User)
+handleValidUser pool user = do
   token <- liftIO $ generateToken user
+  _ <- liftIO $ upsertUserAuthToken pool user token
   let cookieHeader = addHeader $ authCookie token
   return $ cookieHeader $ user
 
