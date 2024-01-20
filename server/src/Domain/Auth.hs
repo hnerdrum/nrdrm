@@ -21,6 +21,7 @@ import Data.Pool (Pool, withResource)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Data.Text
+import Data.Time
 import qualified Data.Text.Encoding as TE
 import Database.Auth (AuthTokenStatus(..))
 import Database.User (DbUser(..))
@@ -60,13 +61,14 @@ upsertUserAuthToken :: Pool PGSimple.Connection -> User -> Token -> IO ()
 upsertUserAuthToken pool user token =
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
+      now <- getCurrentTime
       _ <- PGSimple.execute conn
          [sql|
            INSERT INTO auth_token (value, status, user_id)
            VALUES (?, ?, ?)
            ON CONFLICT (value, user_id)
-           DO UPDATE SET status = EXCLUDED.status
-         |] $ (token, NORMAL, user.id)
+           DO UPDATE SET status = EXCLUDED.status, updated_at = ?
+         |] $ (token, NORMAL, user.id, now)
       return ()
 
 generateToken :: User -> IO Token
