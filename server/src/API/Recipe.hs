@@ -9,6 +9,7 @@ module API.Recipe
     , deleteRecipeHandler
     ) where
 
+import API.Auth (authMiddleware)
 import API.Errors (ToServantError (toServerError))
 import API.Utils (resolveEitherAppResult)
 import App (AppContext(..), AppM)
@@ -53,8 +54,11 @@ updateRecipeHandler recipeId updateRecipeInput = do
   eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
   resolveEitherAppResult (handleError logEnv "updateRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
 
-deleteRecipeHandler :: UUID -> AppM NoContent
-deleteRecipeHandler recipeId = do
+deleteRecipeHandler :: UUID -> Maybe Text -> AppM NoContent
+deleteRecipeHandler  = authMiddleware deleteRecipeUnsafe
+
+deleteRecipeUnsafe :: UUID -> AppM NoContent
+deleteRecipeUnsafe recipeId = do
   pool <- asks dbPool
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "deleteRecipeHandler" $ "[DELETE] /api/v1/recipes/" <> (pack . show) recipeId

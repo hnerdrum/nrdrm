@@ -4,12 +4,28 @@
 
 module Database.Auth
 (
-  AuthTokenStatus(..)
+   DbAuthToken(..)
+ , AuthTokenStatus(..)
 ) where
 
 import Data.Maybe
+import Data.Text
+import Data.Time
+import Data.UUID
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
+import Database.PostgreSQL.Simple.FromRow
+
+data DbAuthToken = DbAuthToken
+  { id         :: UUID
+  , createdAt  :: UTCTime
+  , updatedAt  :: UTCTime
+  , value      :: Text
+  , userId     :: UUID
+  } deriving (Show)
+
+instance FromRow DbAuthToken where
+  fromRow = DbAuthToken <$> field <*> field <*> field <*> field <*> field
 
 data AuthTokenStatus = NORMAL | WITHDRAWN | EXPIRED deriving (Show)
 

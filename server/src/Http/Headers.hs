@@ -5,6 +5,7 @@
 module Http.Headers
   (
     SetCookieHeader
+  , SetCookieHeaderName
   ) where
 
 import Data.Text

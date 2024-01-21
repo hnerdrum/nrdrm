@@ -13,6 +13,7 @@ import API.Ingredient (getAllIngredientsHandler, getIngredientHandler, createIng
 import API.Recipe (getAllRecipesHandler, getRecipeHandler, createRecipeHandler, updateRecipeHandler, deleteRecipeHandler)
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
+import Data.Text
 import Data.UUID
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
 import Database.Ingredient (CreateIngredientInput(..), UpdateIngredientInput(..))
@@ -29,7 +30,7 @@ type API =
   :<|> "recipes" :> Capture "recipeId" UUID :> Get '[JSON] Recipe
   :<|> "recipes" :> ReqBody '[JSON] CreateRecipeInput :> PostCreated '[JSON] Recipe
   :<|> "recipes" :> Capture "recipeId" UUID :> ReqBody '[JSON] UpdateRecipeInput :> Put '[JSON] Recipe
-  :<|> "recipes" :> Capture "recipeId" UUID :> DeleteNoContent
+  :<|> "recipes" :> Capture "recipeId" UUID :> Header "Cookie" Text :> DeleteNoContent
 
   :<|> "ingredients" :> Get '[JSON] [Ingredient]
   :<|> "ingredients" :> Capture "ingredientId" UUID :> Get '[JSON] Ingredient
