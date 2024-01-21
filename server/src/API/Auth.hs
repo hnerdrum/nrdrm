@@ -21,20 +21,11 @@ import Data.Text
 import Domain.Auth (LoginInput(..), loginUser, generateToken, upsertUserAuthToken, getAuthToken)
 import Domain.Errors (UserError(..))
 import Domain.User (User(..))
-import Http.Cookies (getCookie)
+import Http.Cookies (getCookie, authCookie, authCookieName)
 import Http.Headers (SetCookieHeader)
 import Katip (LogEnv, Namespace)
 import Logger (logInfo, logError)
 import Servant
-
-authCookie :: Text -> Text
-authCookie value = authCookieName <> "=" <> value <> "; Max-Age=" <> ((pack . show) authCookieMaxAge) <> "; Path=/; HttpOnly"
-
-authCookieName :: Text
-authCookieName = "recipes-login"
-
-authCookieMaxAge :: Int
-authCookieMaxAge = 86400 -- 24 hours
 
 loginUserHandler :: LoginInput -> AppM (SetCookieHeader User)
 loginUserHandler loginInput = do

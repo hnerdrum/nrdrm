@@ -21,7 +21,7 @@ import Domain.Auth (LoginInput(..))
 import Domain.Ingredient (Ingredient(..))
 import Domain.Recipe (Recipe(..))
 import Domain.User (User(..))
-import Http.Headers (SetCookieHeader)
+import Http.Headers (SetCookieHeader, CookieHeader)
 import Servant
 
 type API =
@@ -30,7 +30,7 @@ type API =
   :<|> "recipes" :> Capture "recipeId" UUID :> Get '[JSON] Recipe
   :<|> "recipes" :> ReqBody '[JSON] CreateRecipeInput :> PostCreated '[JSON] Recipe
   :<|> "recipes" :> Capture "recipeId" UUID :> ReqBody '[JSON] UpdateRecipeInput :> Put '[JSON] Recipe
-  :<|> "recipes" :> Capture "recipeId" UUID :> Header "Cookie" Text :> DeleteNoContent
+  :<|> "recipes" :> Capture "recipeId" UUID :> Header CookieHeader Text :> DeleteNoContent
 
   :<|> "ingredients" :> Get '[JSON] [Ingredient]
   :<|> "ingredients" :> Capture "ingredientId" UUID :> Get '[JSON] Ingredient
