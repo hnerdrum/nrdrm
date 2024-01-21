@@ -6,20 +6,22 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module API.Auth
-(
-  loginUserHandler
-) where
+  (
+    loginUserHandler
+  , authMiddleware
+  ) where
 
 import API.Errors (toServerError)
-import API.Utils (resolveEitherAppResult)
+import API.Utils (resolveEitherAppResult, liftMaybe)
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.Pool (Pool)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Data.Text
-import Domain.Auth (LoginInput(..), loginUser, generateToken, upsertUserAuthToken)
+import Domain.Auth (LoginInput(..), loginUser, generateToken, upsertUserAuthToken, getAuthToken)
 import Domain.Errors (UserError(..))
 import Domain.User (User(..))
+import Http.Cookies (getCookie)
 import Http.Headers (SetCookieHeader)
 import Katip (LogEnv, Namespace)
 import Logger (logInfo, logError)
@@ -33,7 +35,6 @@ authCookieName = "recipes-login"
 
 authCookieMaxAge :: Int
 authCookieMaxAge = 86400 -- 24 hours
-
 
 loginUserHandler :: LoginInput -> AppM (SetCookieHeader User)
 loginUserHandler loginInput = do
@@ -54,3 +55,19 @@ handleError :: LogEnv -> Namespace -> Text -> UserError -> AppM (SetCookieHeader
 handleError logEnv namespace message err = do
           liftIO $ logError logEnv namespace message
           throwError $ toServerError err
+
+authMiddleware :: (a -> AppM b) -> a -> Maybe Text -> AppM b
+authMiddleware action input maybeCookies = do
+  pool <- asks dbPool
+  maybeAuthCookie <- validateAuthCookie pool maybeCookies
+  case maybeAuthCookie of
+    Just _ -> action input
+    _ -> throwError err403 { errBody = "Unauthorized" }
+
+validateAuthCookie :: Pool PGSimple.Connection -> Maybe Text -> AppM (Maybe Text)
+validateAuthCookie pool maybeCookies = do
+  cookie <- liftMaybe $ getCookie authCookieName maybeCookies
+  eitherAuthToken <- liftIO $ getAuthToken pool cookie
+  case eitherAuthToken of
+    Right _ -> return (Just cookie)
+    Left _  -> return Nothing

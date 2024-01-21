@@ -9,6 +9,7 @@ module Domain.Auth
 , generateToken
 , loginUser
 , upsertUserAuthToken
+, getAuthToken
 ) where
 
 import Control.Monad.Reader (liftIO)
@@ -23,9 +24,9 @@ import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Data.Text
 import Data.Time
 import qualified Data.Text.Encoding as TE
-import Database.Auth (AuthTokenStatus(..))
+import Database.Auth (DbAuthToken(..), AuthTokenStatus(..))
 import Database.User (DbUser(..))
-import Domain.Errors (UserError(..))
+import Domain.Errors (UserError(..), AuthTokenError(..))
 import Domain.User (User(..), getUserByEmail, fromDbUser)
 
 type Token = Text
@@ -47,10 +48,10 @@ instance FromJSON LoginInput where
 loginUser :: Pool PGSimple.Connection -> LoginInput -> IO (Either UserError User)
 loginUser pool loginInput = do
   eitherUser <- liftIO $ getUserByEmail pool loginInput.email
-  return $ eitherUser >>= (verifyUserLogin loginInput)
+  return $ eitherUser >>= (validateUserLogin loginInput)
 
-verifyUserLogin :: LoginInput -> DbUser -> Either UserError User
-verifyUserLogin loginInput user = fmap fromDbUser $ validateUserPassword user loginInput.password
+validateUserLogin :: LoginInput -> DbUser -> Either UserError User
+validateUserLogin loginInput user = fmap fromDbUser $ validateUserPassword user loginInput.password
 
 validateUserPassword :: DbUser -> Text -> Either UserError DbUser
 validateUserPassword user inputPassword
@@ -70,6 +71,23 @@ upsertUserAuthToken pool user token =
            DO UPDATE SET status = EXCLUDED.status, updated_at = ?
          |] $ (token, NORMAL, user.id, now)
       return ()
+
+getAuthToken :: Pool PGSimple.Connection -> Text -> IO (Either AuthTokenError Text)
+getAuthToken pool value =
+  withResource pool $ \conn -> do
+    authTokens <- PGSimple.query conn
+      [sql|
+        SELECT id, created_at, updated_at, value, user_id
+        FROM auth_token
+        WHERE value = ? AND status = ?
+      |] $ (value, NORMAL)
+    return $ mapAuthTokenResult authTokens
+
+mapAuthTokenResult :: [DbAuthToken] -> Either AuthTokenError Text
+mapAuthTokenResult [] = Left AuthTokenNotFound
+mapAuthTokenResult [token] = Right token.value
+mapAuthTokenResult _ = Left MultipleAuthTokensFound
+
 
 generateToken :: User -> IO Token
 generateToken user = do

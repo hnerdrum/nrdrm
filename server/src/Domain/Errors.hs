@@ -5,6 +5,7 @@ module Domain.Errors
       RecipeError(..)
     , IngredientError(..)
     , UserError(..)
+    , AuthTokenError(..)
     ) where
 
 import API.Errors (ToServantError (toServerError))
@@ -31,3 +32,10 @@ instance ToServantError UserError where
   toServerError UserNotFound = err404 { errBody = "User could not be found" }
   toServerError MultipleUsersFound = err409 { errBody = "Found multiple users with matching email"}
   toServerError WrongPasswordError = err401 { errBody = "Wrong password" }
+
+data AuthTokenError = AuthTokenNotFound | MultipleAuthTokensFound
+  deriving (Eq, Show)
+
+instance ToServantError AuthTokenError where
+  toServerError AuthTokenNotFound = err404 { errBody = "Auth token could not be found" }
+  toServerError MultipleAuthTokensFound = err409 { errBody = "Found multiple auth tokens with matching value"}
