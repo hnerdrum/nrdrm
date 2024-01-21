@@ -5,7 +5,7 @@
 module Http.Headers
   (
     SetCookieHeader
-  , SetCookieHeaderName
+  , CookieHeader
   ) where
 
 import Data.Text
@@ -15,3 +15,5 @@ type SetCookieHeader v = Headers '[ Header SetCookieHeaderName Text ] v
 
 type family SetCookieHeaderName where
   SetCookieHeaderName = "Set-Cookie"
+
+type CookieHeader = "Cookie"
