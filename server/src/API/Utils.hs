@@ -3,7 +3,7 @@
 module API.Utils
   (
     resolveEitherAppResult
-  , liftMaybe
+  , eitherToMaybe
   ) where
 
 import App (AppM)
@@ -14,6 +14,6 @@ resolveEitherAppResult leftAction rightAction eitherValue = case eitherValue of
     Right a -> rightAction a
     Left b -> leftAction b
 
-liftMaybe :: Maybe a -> AppM a
-liftMaybe (Just x) = return x
-liftMaybe Nothing  = throwError err403 { errBody = "Unauthorized" }
+eitherToMaybe :: Either a b -> Maybe b
+eitherToMaybe (Right b) = Just b
+eitherToMaybe (Left _) = Nothing

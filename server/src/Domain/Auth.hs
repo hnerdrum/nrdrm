@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -6,6 +7,8 @@
 module Domain.Auth
 (
   LoginInput(..)
+, UserSettings(..)
+, Auth(..)
 , generateToken
 , loginUser
 , upsertUserAuthToken
@@ -16,6 +19,7 @@ import Control.Monad.Reader (liftIO)
 import Crypto.BCrypt (validatePassword)
 import Crypto.Hash (Digest, SHA256, hash)
 import Data.Aeson
+import Data.Aeson.TH
 import qualified Data.ByteString.Base64 as B64
 import qualified Data.ByteString.Char8 as BS
 import Data.Pool (Pool, withResource)
@@ -23,6 +27,7 @@ import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Data.Text
 import Data.Time
+import Data.UUID
 import qualified Data.Text.Encoding as TE
 import Database.Auth (DbAuthToken(..), AuthTokenStatus(..))
 import Database.User (DbUser(..))
@@ -30,6 +35,16 @@ import Domain.Errors (UserError(..), AuthTokenError(..))
 import Domain.User (User(..), getUserByEmail, fromDbUser)
 
 type Token = Text
+
+data Auth = Auth
+  { userId :: UUID } deriving Show
+
+$(deriveJSON defaultOptions ''Auth)
+
+data UserSettings = UserSettings
+  { auth :: Maybe Auth } deriving Show
+
+$(deriveJSON defaultOptions ''UserSettings)
 
 data LoginInput = LoginInput
   { email    :: Text
@@ -72,7 +87,7 @@ upsertUserAuthToken pool user token =
          |] $ (token, NORMAL, user.id, now)
       return ()
 
-getAuthToken :: Pool PGSimple.Connection -> Text -> IO (Either AuthTokenError Text)
+getAuthToken :: Pool PGSimple.Connection -> Text -> IO (Either AuthTokenError Auth)
 getAuthToken pool value =
   withResource pool $ \conn -> do
     authTokens <- PGSimple.query conn
@@ -83,9 +98,9 @@ getAuthToken pool value =
       |] $ (value, NORMAL)
     return $ mapAuthTokenResult authTokens
 
-mapAuthTokenResult :: [DbAuthToken] -> Either AuthTokenError Text
+mapAuthTokenResult :: [DbAuthToken] -> Either AuthTokenError Auth
 mapAuthTokenResult [] = Left AuthTokenNotFound
-mapAuthTokenResult [token] = Right token.value
+mapAuthTokenResult [token] = Right $ Auth { userId = token.userId }
 mapAuthTokenResult _ = Left MultipleAuthTokensFound
 
 
