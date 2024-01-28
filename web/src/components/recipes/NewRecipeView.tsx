@@ -29,7 +29,7 @@ export const NewRecipeView = () => {
   const [selectedUnit, setSelectedUnit] = useState<Unit | "">("");
   const [showIngredientError, setShowIngredientError] = useState(null);
 
-  const { ingredients, isLoading, error } = useIngredients();
+  const { ingredients } = useIngredients();
 
   const {
     searchInput,
@@ -98,10 +98,6 @@ export const NewRecipeView = () => {
       recipeIngredients.filter((ri) => ri.id !== ingredient.id)
     );
   };
-
-  if (isLoading || error) {
-    return null;
-  }
 
   return (
     <div className="flex flex-col gap-4 w-full lg:w-1/2 lg:px-0 px-8 mx-auto mt-8">
