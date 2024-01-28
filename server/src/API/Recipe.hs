@@ -10,17 +10,15 @@ module API.Recipe
     ) where
 
 import API.Auth (authMiddleware)
-import API.Errors (ToServantError (toServerError))
+import API.Errors (handleError)
 import API.Utils (resolveEitherAppResult)
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID
 import Data.Text
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
-import Domain.Errors (RecipeError(..))
 import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, createRecipe, updateRecipe, deleteRecipe)
-import Katip (LogEnv, Namespace)
-import Logger (logInfo, logError)
+import Logger (logInfo)
 import Servant
 
 getAllRecipesHandler :: AppM [Recipe]
@@ -36,7 +34,7 @@ getRecipeHandler recipeId = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "getRecipeHandler" $ "[GET] /api/v1/recipes/" <> (pack . show) recipeId
   eitherRecipe <- liftIO $ getRecipe pool recipeId
-  resolveEitherAppResult (handleError logEnv "getRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
+  resolveEitherAppResult (handleError "getRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
 
 createRecipeHandler :: CreateRecipeInput -> AppM Recipe
 createRecipeHandler createRecipeInput = do
@@ -44,7 +42,7 @@ createRecipeHandler createRecipeInput = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "createRecipeHandler" "[POST] /api/v1/recipes/"
   eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
-  resolveEitherAppResult (handleError logEnv "createRecipeHandler" "Recipe not found") return eitherRecipe
+  resolveEitherAppResult (handleError "createRecipeHandler" "Recipe not found") return eitherRecipe
 
 updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM Recipe
 updateRecipeHandler recipeId updateRecipeInput = do
@@ -52,7 +50,7 @@ updateRecipeHandler recipeId updateRecipeInput = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "updateRecipeHandler" "[PUT] /api/v1/recipes/"
   eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
-  resolveEitherAppResult (handleError logEnv "updateRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
+  resolveEitherAppResult (handleError "updateRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
 
 deleteRecipeHandler :: UUID -> Maybe Text -> AppM NoContent
 deleteRecipeHandler  = authMiddleware deleteRecipeUnsafe
@@ -64,8 +62,3 @@ deleteRecipeUnsafe recipeId = do
   liftIO $ logInfo logEnv "deleteRecipeHandler" $ "[DELETE] /api/v1/recipes/" <> (pack . show) recipeId
   _ <- liftIO $ deleteRecipe pool recipeId
   return NoContent
-
-handleError :: LogEnv -> Namespace -> Text ->  RecipeError -> AppM Recipe
-handleError logEnv namespace message err = do
-          liftIO $ logError logEnv namespace message
-          throwError $ toServerError err

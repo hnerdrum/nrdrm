@@ -12,7 +12,7 @@ module API.Auth
   , authMiddleware
   ) where
 
-import API.Errors (toServerError)
+import API.Errors (handleError)
 import API.Utils (resolveEitherAppResult, eitherToMaybe)
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
@@ -20,12 +20,10 @@ import Data.Pool (Pool)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Data.Text
 import Domain.Auth (LoginInput(..), UserSettings(..), Auth(..), loginUser, generateToken, upsertUserAuthToken, getAuthToken)
-import Domain.Errors (UserError(..))
 import Domain.User (User(..))
 import Http.Cookies (getCookie, authCookie, authCookieName)
 import Http.Headers (SetCookieHeader)
-import Katip (LogEnv, Namespace)
-import Logger (logInfo, logError)
+import Logger (logInfo)
 import Servant
 
 meHandler :: Maybe Text -> AppM UserSettings
@@ -40,7 +38,7 @@ loginUserHandler loginInput = do
   logEnv <- asks appLogEnv
   liftIO $ logInfo logEnv "loginUserHandler" "[POST] /api/v1/login/"
   eitherUser <- liftIO $ loginUser pool loginInput
-  resolveEitherAppResult (handleError logEnv "loginUserHandler" "Error when trying to login with email") (handleValidUser pool) eitherUser
+  resolveEitherAppResult (handleError "loginUserHandler" "Error when trying to login with email") (handleValidUser pool) eitherUser
 
 handleValidUser :: Pool PGSimple.Connection -> User -> AppM (SetCookieHeader User)
 handleValidUser pool user = do
@@ -48,11 +46,6 @@ handleValidUser pool user = do
   _ <- liftIO $ upsertUserAuthToken pool user token
   let cookieHeader = addHeader $ authCookie token
   return $ cookieHeader $ user
-
-handleError :: LogEnv -> Namespace -> Text -> UserError -> AppM (SetCookieHeader User)
-handleError logEnv namespace message err = do
-  liftIO $ logError logEnv namespace message
-  throwError $ toServerError err
 
 authMiddleware :: (a -> AppM b) -> a -> Maybe Text -> AppM b
 authMiddleware action input maybeCookies = do
