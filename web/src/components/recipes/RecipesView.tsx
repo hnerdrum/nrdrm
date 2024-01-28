@@ -1,5 +1,6 @@
 import { useRecipes } from "../../hooks/useRecipes";
 import { useAuth } from "../../providers/AuthProvider";
+import { Loading } from "../Loading";
 import { NoRecipes } from "./NoRecipes";
 import { RecipeList } from "./RecipeList";
 
@@ -7,12 +8,12 @@ export const RecipesView = () => {
   const { recipes, isLoading, error } = useRecipes();
 
   if (isLoading) {
-    return null;
+    return <Loading />;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center ">
+      <div className="min-h-screen flex items-center justify-center">
         <h1 className="text-red-500 font-bold">Could not show recipes.</h1>
       </div>
     );
