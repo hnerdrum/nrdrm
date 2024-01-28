@@ -11,7 +11,7 @@ export const RecipeList = ({ recipes }: Props) => {
       {recipes.map((recipe) => (
         <div
           key={recipe.id}
-          className="collapse collapse-arrow border border-base-300 bg-base-200"
+          className="collapse rounded-lg collapse-arrow border border-base-300 bg-base-200"
         >
           <input type="checkbox" />
           <div className="collapse-title text-xl text-gray-200 font-medium">
