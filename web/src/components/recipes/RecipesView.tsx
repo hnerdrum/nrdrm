@@ -1,4 +1,5 @@
 import { useRecipes } from "../../hooks/useRecipes";
+import { useAuth } from "../../providers/AuthProvider";
 import { NoRecipes } from "./NoRecipes";
 import { RecipeList } from "./RecipeList";
 

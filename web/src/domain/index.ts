@@ -26,3 +26,9 @@ export type Ingredient = {
   id: string;
   name: string;
 };
+
+export type UserSettings = {
+  auth: Auth | null;
+};
+
+export type Auth = { userId: string };
