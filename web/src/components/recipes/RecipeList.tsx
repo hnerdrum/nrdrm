@@ -4,6 +4,7 @@ import { Icon } from "../icon/Icon";
 import { formatIngredient } from "./utils";
 import { deleteRecipe, recipesApiUrl } from "./api";
 import { useSWRConfig } from "swr";
+import { useAuth } from "../../providers/AuthProvider";
 
 type Props = {
   recipes: Recipe[];
@@ -21,6 +22,7 @@ export const RecipeList = ({ recipes }: Props) => {
 
 const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
   const [open, setOpen] = useState(false);
+  const { isLoggedIn } = useAuth();
 
   const toggleOpen = () => {
     setOpen((open) => !open);
@@ -28,11 +30,11 @@ const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
 
   return (
     <div className="cursor-pointer rounded-lg border border-base-300 bg-base-200">
-      <div className="flex justify-between items-center px-4 text-xl text-gray-200 font-medium">
+      <div className="flex justify-between items-center px-4 text-xl text-gray-200 font-medium p-4">
         <div className="w-full" onClick={toggleOpen}>
           <span>{recipe.name}</span>
         </div>
-        <RecipeMenu recipe={recipe} />
+        {isLoggedIn && <RecipeMenu recipe={recipe} />}
       </div>
       {open && (
         <div className="p-4 pt-0">
