@@ -53,7 +53,7 @@ export const Autocomplete = <T extends { name: string }>({
       />
       <div className="w-full dropdown-content bg-neutral top-14 max-h-96 overflow-auto flex-col rounded-md">
         <ul
-          className="menu menu-compact "
+          className="menu menu-compact"
           style={{ width: ref.current?.clientWidth }}
         >
           <DropdownItemList

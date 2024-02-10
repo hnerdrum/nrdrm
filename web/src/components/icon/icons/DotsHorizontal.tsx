@@ -1,6 +1,6 @@
 export const DotsHorizontal = ({
   color = "currentColor",
-  size = "1.5em",
+  size = "2em",
   strokeWidth = 3,
   className = "",
   ariaHidden = true,
