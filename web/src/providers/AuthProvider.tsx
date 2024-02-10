@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo } from "react";
 import { config } from "../../config";
 import { Auth, UserSettings } from "../domain";
 import useSWR from "swr";
+import { meApiUrl } from "../components/auth/api";
 
 type AuthData = {
   isLoggedIn: boolean;
@@ -17,7 +18,7 @@ const defaultData: AuthData = {
 export const AuthContext = createContext<AuthData>(defaultData);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { data } = useSWR(`/api/v1/me`, fetcher);
+  const { data } = useSWR(meApiUrl, fetcher);
 
   const AuthProviderValue = useMemo(
     () => ({
