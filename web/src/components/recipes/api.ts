@@ -1,5 +1,8 @@
+import { mutate } from "swr";
 import { config } from "../../../config";
 import { Ingredient, Recipe, RecipeIngredient } from "../../domain";
+
+export const recipesApiUrl = `/api/v1/recipes`;
 
 export type CreateRecipeData = {
   name: string;
@@ -21,7 +24,7 @@ export const createRecipe = async (
   recipe: CreateRecipeData
 ): Promise<PostRequestResult<Recipe>> => {
   try {
-    const response = await fetch(`${config.baseServerUrl}/api/v1/recipes`, {
+    const response = await fetch(`${config.baseServerUrl}${recipesApiUrl}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -41,6 +44,41 @@ export const createRecipe = async (
     return {
       status: "success",
       data: message as Recipe,
+    };
+  } catch (e) {
+    return {
+      status: "failure",
+      message: (e as Error).message,
+    };
+  }
+};
+
+type DeleteRequestResult<T> = DeleteRequestSuccess<T> | DeleteRequestFailure;
+
+type DeleteRequestSuccess<T> = { status: "deleted" };
+
+type DeleteRequestFailure = { status: "failure"; message: string };
+
+export const deleteRecipe = async (
+  recipeId: string
+): Promise<DeleteRequestResult<Recipe>> => {
+  try {
+    const response = await fetch(
+      `${config.baseServerUrl}${recipesApiUrl}/${recipeId}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (!response.ok) {
+      return {
+        status: "failure",
+        message: response.statusText,
+      };
+    }
+
+    return {
+      status: "deleted",
     };
   } catch (e) {
     return {
