@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { CreateRecipeData, createIngredient, createRecipe } from "./api";
+import { createIngredient, createRecipe } from "./api";
 import { useIngredients } from "../../hooks/useIngredients";
 import { useState } from "react";
 import { Autocomplete } from "../Autocomplete";
@@ -42,6 +42,7 @@ export const NewRecipeView = () => {
       ...data,
       ingredients: recipeIngredients,
     });
+
     if (result.status === "success") {
       window.location.href = "/recipes";
     } else {
