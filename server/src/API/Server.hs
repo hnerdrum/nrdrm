@@ -9,6 +9,7 @@ module API.Server
     ) where
 
 import API.Auth (meHandler, loginUserHandler)
+import API.Health (healthHandler)
 import API.Ingredient (getAllIngredientsHandler, getIngredientHandler, createIngredientHandler, updateIngredientHandler, deleteIngredientHandler)
 import API.Recipe (getAllRecipesHandler, getRecipeHandler, createRecipeHandler, updateRecipeHandler, deleteRecipeHandler)
 import App (AppContext, AppM)
@@ -40,6 +41,8 @@ type API =
 
   :<|> "me" :> Header CookieHeader Text :> Get '[JSON] UserSettings
   :<|> "login" :> ReqBody '[JSON] LoginInput :> Post '[JSON] (SetCookieHeader User)
+
+  :<|> "health" :> Get '[PlainText] Text
   )
 
 server :: AppContext -> Server API
@@ -67,3 +70,5 @@ apiHandlers =
 
     :<|> meHandler
     :<|> loginUserHandler
+
+    :<|> healthHandler
