@@ -10,7 +10,7 @@ module Http.Cookies
 import qualified Data.Text as T hiding (map)
 
 authCookie :: T.Text -> T.Text
-authCookie value = authCookieName <> "=" <> value <> "; Max-Age=" <> ((T.pack . show) authCookieMaxAge) <> "; Path=/; HttpOnly; Secure; SameSite=None;"
+authCookie value = authCookieName <> "=" <> value <> "; Max-Age=" <> ((T.pack . show) authCookieMaxAge) <> "; Domain=api.nrdrm.dev" <> "; Path=/; HttpOnly; Secure; SameSite=Lax;"
 
 authCookieName :: T.Text
 authCookieName = "recipes-login"
