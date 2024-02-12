@@ -35,8 +35,6 @@ meHandler maybeCookies = do
 loginUserHandler :: LoginInput -> AppM (SetCookieHeader User)
 loginUserHandler loginInput = do
   pool <- asks dbPool
-  logEnv <- asks appLogEnv
-  liftIO $ logInfo logEnv "loginUserHandler" "[POST] /api/v1/login/"
   eitherUser <- liftIO $ loginUser pool loginInput
   resolveEitherAppResult (handleError "loginUserHandler" "Error when trying to login with email") (handleValidUser pool) eitherUser
 
