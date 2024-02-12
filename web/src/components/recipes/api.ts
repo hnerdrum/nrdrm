@@ -25,14 +25,14 @@ export const postRequest = async <
       body: JSON.stringify(body),
     });
 
-    const message = await response.json();
-
     if (!response.ok) {
       return {
         status: "failure",
-        message: message.message,
+        message: response.statusText,
       };
     }
+
+    const message = await response.json();
 
     return {
       status: "success",
