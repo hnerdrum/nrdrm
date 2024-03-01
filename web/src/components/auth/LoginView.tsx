@@ -22,6 +22,7 @@ export const LoginView = () => {
 
     if (result.status === "success") {
       mutate(meApiUrl);
+      window.location.href = "/recipes";
     } else {
       setLoginError("Failed");
     }

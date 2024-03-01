@@ -23,8 +23,8 @@ import Servant
 
 corsResourcePolicy :: [String] -> CorsResourcePolicy
 corsResourcePolicy allowedOrigins = simpleCorsResourcePolicy
-   { corsRequestHeaders = ["Content-Type"]
-   , corsMethods = ["GET", "POST", "PUT", "DELETE"]
+   { corsRequestHeaders = ["Content-Type", "Credentials"]
+   , corsMethods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
    , corsOrigins = Just (map B8.pack allowedOrigins, True)
    }
 

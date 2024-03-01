@@ -23,7 +23,6 @@ import Domain.Auth (LoginInput(..), UserSettings(..), Auth(..), loginUser, gener
 import Domain.User (User(..))
 import Http.Cookies (getCookie, authCookie, authCookieName)
 import Http.Headers (SetCookieHeader)
-import Logger (logInfo)
 import Servant
 
 meHandler :: Maybe Text -> AppM UserSettings
