@@ -3,6 +3,7 @@
 module Logger
     (
       initializeLogEnv
+    , loggingMiddleware
     , logInfo
     , logWarn
     , logError
@@ -10,6 +11,7 @@ module Logger
 
 import Data.Text
 import Katip
+import Network.Wai (Middleware, rawPathInfo, requestMethod)
 import System.IO (stdout)
 
 initializeLogEnv :: IO LogEnv
@@ -17,6 +19,12 @@ initializeLogEnv = do
     logEnv <- initLogEnv "recipes-app" "production"
     jsonScribe <- mkHandleScribe ColorIfTerminal stdout (permitItem InfoS) V2
     registerScribe "stdout" jsonScribe defaultScribeSettings logEnv
+
+loggingMiddleware :: LogEnv -> Middleware
+loggingMiddleware logEnv app req res = do
+  let method = requestMethod req
+  logInfo logEnv "api" $ (pack . show) method <> " " <> (pack . show) (rawPathInfo req)
+  app req $ res
 
 logInfo :: LogEnv -> Namespace -> Text -> IO ()
 logInfo = logWithSeverity InfoS
