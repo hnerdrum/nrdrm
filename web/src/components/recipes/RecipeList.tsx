@@ -22,7 +22,6 @@ export const RecipeList = ({ recipes }: Props) => {
 
 const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
   const [open, setOpen] = useState(false);
-  const { isLoggedIn } = useAuth();
 
   const toggleOpen = () => {
     setOpen((open) => !open);
@@ -34,7 +33,6 @@ const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
         <div className="w-full" onClick={toggleOpen}>
           <span>{recipe.name}</span>
         </div>
-        {isLoggedIn && <RecipeMenu recipe={recipe} />}
       </div>
       {open && (
         <div className="p-4 pt-0">
