@@ -14,22 +14,13 @@ import Database.Connection (createConnection)
 import Database.Migrations (runDbMigrations)
 import Data.Text (pack)
 import qualified Data.ByteString.Char8 as B8
+import Http.Cors (corsMiddleware)
 import Katip
 import Logger (initializeLogEnv, logInfo)
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
 import Network.Wai (Middleware, rawPathInfo, requestMethod)
 import Servant
-
-corsResourcePolicy :: [String] -> CorsResourcePolicy
-corsResourcePolicy allowedOrigins = simpleCorsResourcePolicy
-   { corsRequestHeaders = ["Content-Type", "Credentials"]
-   , corsMethods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-   , corsOrigins = Just (map B8.pack allowedOrigins, True)
-   }
-
-corsMiddleware :: [String] -> Middleware
-corsMiddleware allowedOrigins = cors (const $ Just (corsResourcePolicy allowedOrigins))
 
 loggingMiddleware :: LogEnv -> Middleware
 loggingMiddleware logEnv app req res = do
