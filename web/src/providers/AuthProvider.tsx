@@ -9,7 +9,13 @@ type AuthData = {
 };
 
 const fetcher = (arg: string): Promise<UserSettings> =>
-  fetch(`${config.baseServerUrl}${arg}`).then((res) => res.json());
+  fetch(`${config.baseServerUrl}${arg}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+  }).then((res) => res.json());
 
 const defaultData: AuthData = {
   isLoggedIn: false,
