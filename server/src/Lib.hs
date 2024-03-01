@@ -21,11 +21,16 @@ import Servant
 startApp :: IO ()
 startApp = do
   config <- Config.loadConfig
-  pool <- createConnection $ Config.databaseUrl config
+
   runDbMigrations $ Config.databaseUrl config
+
   let appName = "Recipes"
+  pool <- createConnection $ Config.databaseUrl config
   logEnv <- initializeLogEnv
   let appContext = AppContext appName pool logEnv
+
   let port = Config.port config
+
   liftIO $ logInfo logEnv "app" $ "Starting " <> appName <> " app on port " <> (pack . show) port
+
   run port $ corsMiddleware (Config.allowedOrigins config) $ (loggingMiddleware logEnv) $ serve api $ server appContext
