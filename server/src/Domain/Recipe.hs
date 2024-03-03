@@ -87,9 +87,11 @@ updateRecipe pool recipeId updateRecipeInput =
       forM_ (getUpdateRecipeIngredientInput recipeId updateRecipeInput) $ \params ->
         PGSimple.execute conn
           [sql|
-            UPDATE recipe_ingredient SET amount = COALESCE(?, amount), unit = COALESCE(?, unit)
-            WHERE recipe_id = ? AND ingredient_id = ?
-          |] params
+            INSERT INTO recipe_ingredient (recipe_id, ingredient_id, amount, unit)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (recipe_id, ingredient_id)
+            DO UPDATE SET amount = EXCLUDED.amount, unit = EXCLUDED.unit
+         |] params
       getRecipeById conn recipeId
 
 deleteRecipe :: Pool PGSimple.Connection -> UUID -> IO ()

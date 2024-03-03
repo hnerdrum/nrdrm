@@ -37,14 +37,17 @@ createRecipeHandler createRecipeInput = do
   eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
   resolveEitherAppResult (handleError "createRecipeHandler" "Recipe not found") return eitherRecipe
 
-updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM Recipe
-updateRecipeHandler recipeId updateRecipeInput = do
+updateRecipeHandler :: UUID -> UpdateRecipeInput -> Maybe Text -> AppM Recipe
+updateRecipeHandler = authMiddleware . updateRecipeUnsafe
+
+updateRecipeUnsafe :: UUID -> UpdateRecipeInput -> AppM Recipe
+updateRecipeUnsafe recipeId updateRecipeInput = do
   pool <- asks dbPool
   eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
   resolveEitherAppResult (handleError "updateRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
 
 deleteRecipeHandler :: UUID -> Maybe Text -> AppM NoContent
-deleteRecipeHandler  = authMiddleware deleteRecipeUnsafe
+deleteRecipeHandler = authMiddleware deleteRecipeUnsafe
 
 deleteRecipeUnsafe :: UUID -> AppM NoContent
 deleteRecipeUnsafe recipeId = do
