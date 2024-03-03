@@ -6,6 +6,7 @@ import { meApiUrl } from "../components/auth/api";
 
 type AuthData = {
   isLoggedIn: boolean;
+  isLoading: boolean;
 };
 
 const fetcher = (arg: string): Promise<UserSettings> =>
@@ -19,16 +20,18 @@ const fetcher = (arg: string): Promise<UserSettings> =>
 
 const defaultData: AuthData = {
   isLoggedIn: false,
+  isLoading: false,
 };
 
 export const AuthContext = createContext<AuthData>(defaultData);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { data } = useSWR(meApiUrl, fetcher);
+  const { data, isLoading } = useSWR(meApiUrl, fetcher);
 
   const AuthProviderValue = useMemo(
     () => ({
       isLoggedIn: !!data?.auth?.userId,
+      isLoading,
     }),
     [data]
   );

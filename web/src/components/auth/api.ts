@@ -1,4 +1,4 @@
-import { PostRequestResult, postRequest } from "../recipes/api";
+import { RequestResult, postRequest } from "../recipes/api";
 
 export const meApiUrl = `/api/v1/me`;
 
@@ -9,5 +9,5 @@ type LoginData = {
 
 export const login = async (
   loginData: LoginData
-): Promise<PostRequestResult<{ token: string }>> =>
+): Promise<RequestResult<{ token: string }>> =>
   postRequest("/api/v1/login", loginData);
