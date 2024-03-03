@@ -3,11 +3,10 @@ import { Ingredient, Recipe, RecipeIngredient } from "../../domain";
 
 export const recipesApiUrl = `/api/v1/recipes`;
 
-export type PostRequestResult<T> = PostRequestSuccess<T> | PostRequestFailure;
+export type RequestResult<T> = RequestSuccess<T> | RequestFailure;
 
-type PostRequestSuccess<T> = { status: "success"; data: T };
-
-type PostRequestFailure = { status: "failure"; message: string };
+type RequestSuccess<T> = { status: "success"; data?: T };
+type RequestFailure = { status: "failure"; message: string };
 
 export const postRequest = async <
   Data extends Record<never, never>,
@@ -15,10 +14,27 @@ export const postRequest = async <
 >(
   path: string,
   body: Data
-): Promise<PostRequestResult<Response>> => {
+): Promise<RequestResult<Response>> => makeRequest(path, body, "POST");
+
+export const putRequest = async <
+  Data extends Record<never, never>,
+  Response extends Record<string, any>
+>(
+  path: string,
+  body: Data
+): Promise<RequestResult<Response>> => makeRequest(path, body, "PUT");
+
+export const makeRequest = async <
+  Data extends Record<never, never>,
+  Response extends Record<string, any>
+>(
+  path: string,
+  body: Data,
+  method: "POST" | "PUT"
+): Promise<RequestResult<Response>> => {
   try {
     const response = await fetch(`${config.baseServerUrl}${path}`, {
-      method: "POST",
+      method: method,
       headers: {
         "Content-Type": "application/json",
       },
@@ -47,30 +63,9 @@ export const postRequest = async <
   }
 };
 
-export type CreateRecipeData = {
-  name: string;
-  description: string;
-  ingredients: RecipeIngredient[];
-};
-
-export type CreateIngredientData = {
-  name: string;
-};
-
-export const createRecipe = async (
-  recipe: CreateRecipeData
-): Promise<PostRequestResult<Recipe>> =>
-  postRequest<CreateRecipeData, Recipe>(recipesApiUrl, recipe);
-
-export type DeleteRequestResult = DeleteRequestSuccess | DeleteRequestFailure;
-
-type DeleteRequestSuccess = { status: "deleted" };
-
-type DeleteRequestFailure = { status: "failure"; message: string };
-
 export const deleteRequest = async (
   path: string
-): Promise<DeleteRequestResult> => {
+): Promise<RequestResult<never>> => {
   try {
     const response = await fetch(`${config.baseServerUrl}${path}`, {
       method: "DELETE",
@@ -84,7 +79,7 @@ export const deleteRequest = async (
     }
 
     return {
-      status: "deleted",
+      status: "success",
     };
   } catch (e) {
     return {
@@ -94,12 +89,34 @@ export const deleteRequest = async (
   }
 };
 
-export const deleteRecipe = async (
-  recipeId: string
-): Promise<DeleteRequestResult> =>
+export type CreateRecipeData = {
+  name: string;
+  description: string;
+  ingredients: RecipeIngredient[];
+};
+
+export type CreateIngredientData = {
+  name: string;
+};
+
+export const createRecipe = async (
+  recipe: CreateRecipeData
+): Promise<RequestResult<Recipe>> =>
+  postRequest<CreateRecipeData, Recipe>(recipesApiUrl, recipe);
+
+export const updateRecipe = async ({
+  id,
+  recipe,
+}: {
+  id: string;
+  recipe: CreateRecipeData;
+}): Promise<RequestResult<Recipe>> =>
+  putRequest(`${recipesApiUrl}/${id}`, recipe);
+
+export const deleteRecipe = async (recipeId: string) =>
   deleteRequest(`${recipesApiUrl}/${recipeId}`);
 
 export const createIngredient = async (
   ingredient: CreateIngredientData
-): Promise<PostRequestResult<Ingredient>> =>
+): Promise<RequestResult<Ingredient>> =>
   postRequest(`/api/v1/ingredients`, ingredient);
