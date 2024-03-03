@@ -7,19 +7,15 @@ import { CreateRecipeFormData, RecipeForm } from "./RecipeForm";
 import { LoadingWrap } from "../LoadingWrap";
 import { RecipeIngredient } from "../../domain";
 import { updateRecipe } from "./api";
+import { RequestWrap } from "../RequestWrap";
 
 export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
   const { isLoggedIn, isLoading: isAuthLoading } = useAuth();
   const { recipe, isLoading, error } = useRecipe({ recipeId });
 
-  if (error) {
-    <Error text="Could not show recipe." />;
-  }
-
   const onSubmit = async (
     data: CreateRecipeFormData & { ingredients: RecipeIngredient[] }
   ) => {
-    console.log("data", data);
     const result = await updateRecipe({ id: recipeId, recipe: data });
 
     if (result.status === "success") {
@@ -30,7 +26,11 @@ export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
   };
 
   return (
-    <LoadingWrap isLoading={isAuthLoading || isLoading}>
+    <RequestWrap
+      isLoading={isAuthLoading || isLoading}
+      isError={!!error}
+      errorComponent={<Error text="Could not show recipe." />}
+    >
       {!isLoggedIn && <Error404 />}
       {isLoggedIn && (
         <div className="flex flex-col gap-4 w-full lg:w-1/2 lg:px-0 px-8 mx-auto mt-8">
@@ -38,6 +38,6 @@ export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
           <RecipeForm recipe={recipe} onSubmit={onSubmit} />
         </div>
       )}
-    </LoadingWrap>
+    </RequestWrap>
   );
 };
