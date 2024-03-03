@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import { Recipe } from "../../domain";
+import type { Recipe } from "../../domain";
 import { config } from "../../../config";
 import { recipesApiUrl } from "../../domain/api";
 
