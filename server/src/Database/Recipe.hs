@@ -113,7 +113,8 @@ instance FromJSON UpdateRecipeIngredientInput where
       , unit           = unitValue
       }
 
-getUpdateRecipeIngredientInput :: UUID -> UpdateRecipeInput -> [(Maybe Int, Maybe Text, UUID, UUID)]
+getUpdateRecipeIngredientInput :: UUID -> UpdateRecipeInput -> [(UUID, UUID, Maybe Int, Maybe Text)]
 getUpdateRecipeIngredientInput recipeId input = case input.ingredients of
   Nothing -> []
-  Just ings -> map (\ingredient -> (ingredient.amount, fmap unitToString ingredient.unit, recipeId, ingredient.id)) ings
+  Just ings -> map (\ingredient ->
+    (recipeId, ingredient.id, ingredient.amount, fmap unitToString ingredient.unit)) ings
