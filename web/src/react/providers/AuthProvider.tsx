@@ -1,8 +1,8 @@
 import { createContext, useContext, useMemo } from "react";
-import { config } from "../../config";
-import { Auth, UserSettings } from "../domain";
+import { config } from "../../../config";
+import { UserSettings } from "../../domain";
 import useSWR from "swr";
-import { meApiUrl } from "../components/auth/api";
+import { meApiUrl } from "../views/LoginView";
 
 type AuthData = {
   isLoggedIn: boolean;
