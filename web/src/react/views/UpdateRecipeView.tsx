@@ -1,14 +1,12 @@
 import { useRecipe } from "../hooks/useRecipe";
 import { Error } from "../components/Error";
-import { Loading } from "../components/Loading";
 import { useAuth } from "../providers/AuthProvider";
-import { Error404 } from "../components/404";
+import { Error404 } from "./404";
 import {
-  CreateRecipeFormData,
+  type CreateRecipeFormData,
   RecipeForm,
 } from "../components/recipes/RecipeForm";
-import { LoadingWrap } from "../components/LoadingWrap";
-import { RecipeIngredient } from "../../domain";
+import type { RecipeIngredient } from "../../domain";
 import { updateRecipe } from "../../domain/api";
 import { RequestWrap } from "../components/RequestWrap";
 

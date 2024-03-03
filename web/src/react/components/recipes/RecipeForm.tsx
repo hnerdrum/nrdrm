@@ -4,7 +4,12 @@ import { useIngredients } from "../../hooks/useIngredients";
 import { useState } from "react";
 import { Autocomplete } from "../Autocomplete";
 import { useSearchFilter } from "../../hooks/useSearchFilter";
-import { Ingredient, Recipe, RecipeIngredient, Unit } from "../../../domain";
+import type {
+  Ingredient,
+  Recipe,
+  RecipeIngredient,
+  Unit,
+} from "../../../domain";
 import { unitFromString } from "../../../domain/utils";
 import { formatIngredient } from "./utils";
 

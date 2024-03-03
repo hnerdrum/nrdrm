@@ -1,6 +1,6 @@
-import { RecipeIngredient } from "../../domain";
+import type { RecipeIngredient } from "../../domain";
 import {
-  CreateRecipeFormData,
+  type CreateRecipeFormData,
   RecipeForm,
 } from "../components/recipes/RecipeForm";
 import { createRecipe } from "../../domain/api";

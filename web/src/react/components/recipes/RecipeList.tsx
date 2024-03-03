@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Recipe } from "../../../domain";
+import type { Recipe } from "../../../domain";
 import { Icon } from "../icon/Icon";
 import { formatIngredient } from "./utils";
 import { deleteRecipe, recipesApiUrl } from "../../../domain/api";

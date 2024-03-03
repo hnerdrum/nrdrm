@@ -1,7 +1,7 @@
 import { useForm } from "react-hook-form";
 import { useSWRConfig } from "swr";
 import { useState } from "react";
-import { RequestResult, postRequest } from "../../domain/api";
+import { postRequest, type RequestResult } from "../../domain/api";
 
 export const meApiUrl = `/api/v1/me`;
 
