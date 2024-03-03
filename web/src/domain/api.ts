@@ -1,5 +1,5 @@
-import { config } from "../../../config";
-import { Ingredient, Recipe, RecipeIngredient } from "../../domain";
+import { config } from "../../config";
+import { Ingredient, Recipe, RecipeIngredient } from ".";
 
 export const recipesApiUrl = `/api/v1/recipes`;
 

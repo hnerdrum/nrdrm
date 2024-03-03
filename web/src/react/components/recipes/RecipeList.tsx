@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { Recipe } from "../../domain";
+import { Recipe } from "../../../domain";
 import { Icon } from "../icon/Icon";
 import { formatIngredient } from "./utils";
-import { deleteRecipe, recipesApiUrl } from "./api";
+import { deleteRecipe, recipesApiUrl } from "../../../domain/api";
 import { useSWRConfig } from "swr";
-import { useAuth } from "../../providers/AuthProvider";
 
 type Props = {
   recipes: Recipe[];
@@ -76,7 +75,7 @@ const DeleteRecipeDialog = ({ recipe }: { recipe: Recipe }) => {
 
   const onDeleteRecipe = async () => {
     const result = await deleteRecipe(recipe.id);
-    if (result.status !== "deleted") {
+    if (result.status !== "success") {
       alert(`Recipe deletion failed with message: ${result.message}`);
       return;
     }

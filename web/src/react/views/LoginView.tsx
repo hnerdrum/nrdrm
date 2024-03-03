@@ -1,23 +1,30 @@
 import { useForm } from "react-hook-form";
-import { login, meApiUrl } from "./api";
 import { useSWRConfig } from "swr";
 import { useState } from "react";
+import { RequestResult, postRequest } from "../../domain/api";
 
-type LoginFormData = {
+export const meApiUrl = `/api/v1/me`;
+
+type LoginData = {
   email: string;
   password: string;
 };
+
+export const login = async (
+  loginData: LoginData
+): Promise<RequestResult<{ token: string }>> =>
+  postRequest("/api/v1/login", loginData);
 
 export const LoginView = () => {
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginFormData>();
+  } = useForm<LoginData>();
   const [loginError, setLoginError] = useState(undefined);
   const { mutate } = useSWRConfig();
 
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: LoginData) => {
     const result = await login(data);
 
     if (result.status === "success") {

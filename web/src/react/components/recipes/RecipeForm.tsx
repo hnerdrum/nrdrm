@@ -1,11 +1,11 @@
 import { useForm } from "react-hook-form";
-import { createIngredient, createRecipe } from "./api";
+import { createIngredient, createRecipe } from "../../../domain/api";
 import { useIngredients } from "../../hooks/useIngredients";
 import { useState } from "react";
 import { Autocomplete } from "../Autocomplete";
 import { useSearchFilter } from "../../hooks/useSearchFilter";
-import { Ingredient, Recipe, RecipeIngredient, Unit } from "../../domain";
-import { unitFromString } from "../../domain/utils";
+import { Ingredient, Recipe, RecipeIngredient, Unit } from "../../../domain";
+import { unitFromString } from "../../../domain/utils";
 import { formatIngredient } from "./utils";
 
 export type CreateRecipeFormData = {

@@ -1,13 +1,16 @@
-import { useRecipe } from "../../hooks/useRecipe";
-import { Error } from "../Error";
-import { Loading } from "../Loading";
-import { useAuth } from "../../providers/AuthProvider";
-import { Error404 } from "../404";
-import { CreateRecipeFormData, RecipeForm } from "./RecipeForm";
-import { LoadingWrap } from "../LoadingWrap";
+import { useRecipe } from "../hooks/useRecipe";
+import { Error } from "../components/Error";
+import { Loading } from "../components/Loading";
+import { useAuth } from "../providers/AuthProvider";
+import { Error404 } from "../components/404";
+import {
+  CreateRecipeFormData,
+  RecipeForm,
+} from "../components/recipes/RecipeForm";
+import { LoadingWrap } from "../components/LoadingWrap";
 import { RecipeIngredient } from "../../domain";
-import { updateRecipe } from "./api";
-import { RequestWrap } from "../RequestWrap";
+import { updateRecipe } from "../../domain/api";
+import { RequestWrap } from "../components/RequestWrap";
 
 export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
   const { isLoggedIn, isLoading: isAuthLoading } = useAuth();

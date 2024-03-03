@@ -1,6 +1,9 @@
 import { RecipeIngredient } from "../../domain";
-import { CreateRecipeFormData, RecipeForm } from "./RecipeForm";
-import { createRecipe } from "./api";
+import {
+  CreateRecipeFormData,
+  RecipeForm,
+} from "../components/recipes/RecipeForm";
+import { createRecipe } from "../../domain/api";
 
 export const NewRecipeView = () => {
   const onSubmit = async (
