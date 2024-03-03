@@ -84,6 +84,11 @@ updateRecipe pool recipeId updateRecipeInput =
           UPDATE recipe SET updated_at = ?, name = COALESCE(?, name), description = COALESCE(?, description)
           WHERE id = ?
         |] (now, updateRecipeInput.name, updateRecipeInput.description, recipeId)
+      _ <- PGSimple.execute conn
+        [sql|
+          DELETE from recipe_ingredient
+          WHERE recipe_id = ?
+        |] $ PGSimple.Only recipeId
       forM_ (getUpdateRecipeIngredientInput recipeId updateRecipeInput) $ \params ->
         PGSimple.execute conn
           [sql|
