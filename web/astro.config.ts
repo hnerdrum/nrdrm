@@ -10,7 +10,12 @@ import vercel from "@astrojs/vercel/serverless";
 
 // https://astro.build/config
 export default defineConfig({
-  integrations: [react(), tailwind()],
+  integrations: [
+    react(),
+    tailwind({
+      applyBaseStyles: false,
+    }),
+  ],
   output: "server",
   adapter: vercel(),
   server: { port: 3000 },
