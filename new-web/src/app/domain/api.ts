@@ -1,7 +1,9 @@
-import { Recipe, RecipeIngredient } from ".";
+import { Ingredient, Recipe, RecipeIngredient } from ".";
 import { config } from "../../../config";
 
 export const recipesApiUrl = `/api/v1/recipes`;
+
+export const ingredientsApiUrl = `/api/v1/ingredients`;
 
 export type RequestResult<T> = RequestSuccess<T> | RequestFailure;
 
@@ -95,7 +97,16 @@ export type CreateRecipeData = {
   ingredients: RecipeIngredient[];
 };
 
+export type CreateIngredientData = {
+  name: string;
+};
+
 export const createRecipe = async (
   recipe: CreateRecipeData
 ): Promise<RequestResult<Recipe>> =>
   postRequest<CreateRecipeData, Recipe>(recipesApiUrl, recipe);
+
+export const createIngredient = async (
+  ingredient: CreateIngredientData
+): Promise<RequestResult<Ingredient>> =>
+  postRequest(ingredientsApiUrl, ingredient);
