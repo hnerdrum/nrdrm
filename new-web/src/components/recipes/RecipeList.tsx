@@ -100,7 +100,7 @@ const RecipeMenu = ({ recipe }: { recipe: Recipe }) => {
 const DeleteRecipeButton = () => {
   return (
     <DialogTrigger asChild>
-      <DropdownMenuItem className="cursor-pointer">
+      <DropdownMenuItem className="cursor-pointer py-0">
         <Button variant="ghost">Delete recipe</Button>
       </DropdownMenuItem>
     </DialogTrigger>
@@ -110,7 +110,7 @@ const DeleteRecipeButton = () => {
 const UpdateRecipeButton = ({ recipe }: { recipe: Recipe }) => {
   const router = useRouter();
   return (
-    <DropdownMenuItem className="cursor-pointer">
+    <DropdownMenuItem className="cursor-pointer py-0">
       <Button
         variant="ghost"
         onClick={() => router.push(`/recipes/${recipe.id}`)}
