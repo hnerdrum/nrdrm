@@ -4,8 +4,8 @@ import { CreateRecipeData, createRecipe } from "../../app/domain/api";
 import { CreateRecipeFormData, RecipeForm } from "./RecipeForm";
 
 export const NewRecipeView = () => {
-  const onSubmit = async (data: CreateRecipeFormData) => {
-    const result = await createRecipe({ ...data, ingredients: [] });
+  const onSubmit = async (data: CreateRecipeData) => {
+    const result = await createRecipe(data);
 
     if (result.status === "success") {
       window.location.href = "/recipes";
