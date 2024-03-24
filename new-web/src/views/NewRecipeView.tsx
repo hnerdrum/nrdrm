@@ -1,7 +1,10 @@
 "use client";
 
-import { CreateRecipeData, createRecipe } from "../../app/domain/api";
-import { CreateRecipeFormData, RecipeForm } from "./RecipeForm";
+import { CreateRecipeData, createRecipe } from "../app/domain/api";
+import {
+  CreateRecipeFormData,
+  RecipeForm,
+} from "../components/recipes/RecipeForm";
 
 export const NewRecipeView = () => {
   const onSubmit = async (data: CreateRecipeData) => {
