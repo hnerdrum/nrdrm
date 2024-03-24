@@ -180,66 +180,70 @@ export const RecipeForm = ({
             </FormItem>
           )}
         />
-        <div className="flex space-x-2">
-          <div className="flex-1 flex-col space-y-2">
-            <Label>Ingredient name</Label>
-            <ComboboxDemo
-              options={(ingredients || []).map((i) => ({
-                label: i.name,
-                value: i.id,
-              }))}
-              selected={selectedIngredient}
-              onOptionClick={selectIngredient}
-              onOptionCreate={onCreateNewIngredient}
-            />
+        <div>
+          <div className="flex space-x-2">
+            <div className="flex-1 flex-col space-y-2">
+              <Label>Ingredient name</Label>
+              <ComboboxDemo
+                options={(ingredients || []).map((i) => ({
+                  label: i.name,
+                  value: i.id,
+                }))}
+                selected={selectedIngredient}
+                onOptionClick={selectIngredient}
+                onOptionCreate={onCreateNewIngredient}
+              />
+            </div>
+            <div className="flex-1 flex-col space-y-2">
+              <Label>Ingredient amount</Label>
+              <Input
+                type="number"
+                min={0}
+                value={selectedAmount}
+                onChange={(e) => handleAmountInputChange(e.target.value)}
+              />
+            </div>
+            <div className="flex-1 flex-col space-y-2">
+              <Label>Ingredient unit</Label>
+              <Select
+                value={selectedUnit}
+                onValueChange={(value) =>
+                  setSelectedUnit(unitFromString(value))
+                }
+              >
+                <SelectTrigger className="flex-grow">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="G">g</SelectItem>
+                  <SelectItem value="Ml">ml</SelectItem>
+                  <SelectItem value="Tbsp">tbsp</SelectItem>
+                  <SelectItem value="Tsp">tsp</SelectItem>
+                  <SelectItem value="Qty">qty</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col justify-end min-w-16">
+              <Button onClick={handleAddIngredient}>Add</Button>
+            </div>
           </div>
-          <div className="flex-1 flex-col space-y-2">
-            <Label>Ingredient amount</Label>
-            <Input
-              type="number"
-              min={0}
-              value={selectedAmount}
-              onChange={(e) => handleAmountInputChange(e.target.value)}
-            />
+          {showIngredientError && (
+            <p className="text-destructive text-sm mt-2">
+              You must specify ingredient name, amount and unit to add it to the
+              recipe
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2 px-2 pb-2 mt-4">
+            {recipeIngredients.map((ingredient) => (
+              <Badge
+                key={ingredient.id}
+                onClick={() => handleRemoveIngredient(ingredient)}
+                className="cursor-pointer text-xs"
+              >
+                {formatIngredient(ingredient)}
+              </Badge>
+            ))}
           </div>
-          <div className="flex-1 flex-col space-y-2">
-            <Label>Ingredient unit</Label>
-            <Select
-              value={selectedUnit}
-              onValueChange={(value) => setSelectedUnit(unitFromString(value))}
-            >
-              <SelectTrigger className="flex-grow">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="G">g</SelectItem>
-                <SelectItem value="Ml">ml</SelectItem>
-                <SelectItem value="Tbsp">tbsp</SelectItem>
-                <SelectItem value="Tsp">tsp</SelectItem>
-                <SelectItem value="Qty">qty</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col justify-end min-w-16">
-            <Button onClick={handleAddIngredient}>Add</Button>
-          </div>
-        </div>
-        {showIngredientError && (
-          <p className="text-destructive text-sm mt-2">
-            You must specify ingredient name, amount and unit to add it to the
-            recipe
-          </p>
-        )}
-        <div className="flex flex-wrap gap-2 px-2 pb-2 mt-0">
-          {recipeIngredients.map((ingredient) => (
-            <Badge
-              key={ingredient.id}
-              onClick={() => handleRemoveIngredient(ingredient)}
-              className="cursor-pointer text-xs"
-            >
-              {formatIngredient(ingredient)}
-            </Badge>
-          ))}
         </div>
         <Button type="submit">Submit</Button>
       </form>
