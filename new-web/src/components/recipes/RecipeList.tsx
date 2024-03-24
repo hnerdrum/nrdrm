@@ -30,17 +30,24 @@ const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
       value={recipe.id}
       className="shadow border border-hsla(204, 100%, 10%, 0.18) rounded-md px-8 mb-4"
     >
-      <AccordionTrigger className="hover:no-underline text-lg">
+      <AccordionTrigger
+        withChevron={false}
+        className="hover:no-underline text-lg"
+      >
         {recipe.name}
       </AccordionTrigger>
       <AccordionContent>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col">
           {recipe.description}
-          <div className="flex flex-wrap gap-2">
-            {recipe.ingredients.map((ingredient) => (
-              <Badge key={ingredient.id}>{formatIngredient(ingredient)}</Badge>
-            ))}
-          </div>
+          {recipe.ingredients.length && (
+            <div className="flex flex-wrap gap-2 pt-4">
+              {recipe.ingredients.map((ingredient) => (
+                <Badge key={ingredient.id}>
+                  {formatIngredient(ingredient)}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
       </AccordionContent>
     </AccordionItem>
