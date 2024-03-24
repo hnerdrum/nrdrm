@@ -31,6 +31,7 @@ import { Label } from "@radix-ui/react-dropdown-menu";
 import { Input } from "postcss";
 import { Button } from "../ui/button";
 import { useAuth } from "../../providers/AuthProvider";
+import { useRouter } from "next/navigation";
 
 type Props = {
   recipes: Recipe[];
@@ -87,15 +88,36 @@ const RecipeMenu = ({ recipe }: { recipe: Recipe }) => {
           <Ellipsis />
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          <DialogTrigger asChild>
-            <DropdownMenuItem className="cursor-pointer">
-              <Button variant="ghost">Delete recipe</Button>
-            </DropdownMenuItem>
-          </DialogTrigger>
+          <DeleteRecipeButton />
+          <UpdateRecipeButton recipe={recipe} />
         </DropdownMenuContent>
       </DropdownMenu>
       <DeleteRecipeDialog recipe={recipe} />
     </Dialog>
+  );
+};
+
+const DeleteRecipeButton = () => {
+  return (
+    <DialogTrigger asChild>
+      <DropdownMenuItem className="cursor-pointer">
+        <Button variant="ghost">Delete recipe</Button>
+      </DropdownMenuItem>
+    </DialogTrigger>
+  );
+};
+
+const UpdateRecipeButton = ({ recipe }: { recipe: Recipe }) => {
+  const router = useRouter();
+  return (
+    <DropdownMenuItem className="cursor-pointer">
+      <Button
+        variant="ghost"
+        onClick={() => router.push(`/recipes/${recipe.id}`)}
+      >
+        Update recipe
+      </Button>
+    </DropdownMenuItem>
   );
 };
 

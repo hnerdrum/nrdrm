@@ -28,17 +28,13 @@ export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
       isError={!!error}
       errorComponent={<Error text="Could not show recipe." />}
     >
-      <div className="flex flex-col gap-4 w-full lg:w-1/2 lg:px-0 px-8 mx-auto mt-8">
-        <h1 className="text-3xl font-bold">Update recipe</h1>
-        <RecipeForm recipe={recipe} onSubmit={onSubmit} />
-      </div>
-      {/* {!isLoggedIn && <Error404 />}
+      {!isLoggedIn && <Error404 />}
       {isLoggedIn && (
         <div className="flex flex-col gap-4 w-full lg:w-1/2 lg:px-0 px-8 mx-auto mt-8">
-          <h1 className="text-3xl font-bold text-gray-200">Update recipe</h1>
+          <h1 className="text-3xl font-bold">Update recipe</h1>
           <RecipeForm recipe={recipe} onSubmit={onSubmit} />
         </div>
-      )} */}
+      )}
     </RequestWrap>
   );
 };
