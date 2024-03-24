@@ -1,6 +1,4 @@
-import { useState } from "react";
 import { formatIngredient } from "./utils";
-import { useSWRConfig } from "swr";
 import { Recipe } from "../../app/domain";
 import {
   Accordion,
@@ -9,6 +7,29 @@ import {
   AccordionTrigger,
 } from "../ui/accordion";
 import { Badge } from "../ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { Ellipsis } from "lucide-react";
+import { useSWRConfig } from "swr";
+import { deleteRecipe, recipesApiUrl } from "../../app/domain/api";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../ui/dialog";
+import { Label } from "@radix-ui/react-dropdown-menu";
+import { Input } from "postcss";
+import { Button } from "../ui/button";
 
 type Props = {
   recipes: Recipe[];
@@ -34,7 +55,8 @@ const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
         withChevron={false}
         className="hover:no-underline text-lg"
       >
-        {recipe.name}
+        <div>{recipe.name}</div>
+        <RecipeMenu recipe={recipe} />
       </AccordionTrigger>
       <AccordionContent>
         <div className="flex flex-col">
@@ -51,5 +73,54 @@ const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
         </div>
       </AccordionContent>
     </AccordionItem>
+  );
+};
+
+const RecipeMenu = ({ recipe }: { recipe: Recipe }) => {
+  return (
+    <Dialog>
+      <DropdownMenu>
+        <DropdownMenuTrigger>
+          <Ellipsis />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DialogTrigger asChild>
+            <DropdownMenuItem className="cursor-pointer">
+              <Button variant="ghost">Delete recipe</Button>
+            </DropdownMenuItem>
+          </DialogTrigger>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DeleteRecipeDialog recipe={recipe} />
+    </Dialog>
+  );
+};
+
+const DeleteRecipeDialog = ({ recipe }: { recipe: Recipe }) => {
+  const { mutate } = useSWRConfig();
+
+  const onDeleteRecipe = async () => {
+    const result = await deleteRecipe(recipe.id);
+    if (result.status !== "success") {
+      alert(`Recipe deletion failed with message: ${result.message}`);
+      return;
+    }
+    mutate(recipesApiUrl);
+  };
+
+  return (
+    <DialogContent className="sm:max-w-[425px]">
+      <DialogHeader>
+        <DialogTitle>Delete recipe</DialogTitle>
+        <DialogDescription className="py-4">
+          Are you sure you want to delete recipe &quot;{recipe.name}&quot;?
+        </DialogDescription>
+      </DialogHeader>
+      <DialogFooter>
+        <Button type="submit" variant="destructive" onClick={onDeleteRecipe}>
+          Confirm
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 };
