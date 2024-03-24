@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { CreateRecipeData, createRecipe } from "../app/domain/api";
 import {
   CreateRecipeFormData,
@@ -7,11 +8,13 @@ import {
 } from "../components/recipes/RecipeForm";
 
 export const NewRecipeView = () => {
+  const router = useRouter();
+
   const onSubmit = async (data: CreateRecipeData) => {
     const result = await createRecipe(data);
 
     if (result.status === "success") {
-      window.location.href = "/recipes";
+      router.push(`/recipes`);
     } else {
       alert(`Recipe creation failed with message: ${result.message}`);
     }

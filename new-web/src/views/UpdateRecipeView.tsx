@@ -7,8 +7,10 @@ import { Error404 } from "../components/ui/404";
 import { useRecipe } from "../app/hooks/useRecipe";
 import { useAuth } from "../providers/AuthProvider";
 import { RecipeForm } from "../components/recipes/RecipeForm";
+import { useRouter } from "next/navigation";
 
 export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
+  const router = useRouter();
   const { isLoggedIn, isLoading: isAuthLoading } = useAuth();
   const { recipe, isLoading, error } = useRecipe({ recipeId });
 
@@ -16,7 +18,7 @@ export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
     const result = await updateRecipe({ id: recipeId, recipe: data });
 
     if (result.status === "success") {
-      window.location.href = "/recipes";
+      router.push(`/recipes`);
     } else {
       alert(`Recipe update failed with message: ${result.message}`);
     }
