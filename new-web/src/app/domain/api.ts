@@ -106,6 +106,18 @@ export const createRecipe = async (
 ): Promise<RequestResult<Recipe>> =>
   postRequest<CreateRecipeData, Recipe>(recipesApiUrl, recipe);
 
+export const updateRecipe = async ({
+  id,
+  recipe,
+}: {
+  id: string;
+  recipe: CreateRecipeData;
+}): Promise<RequestResult<Recipe>> =>
+  putRequest(`${recipesApiUrl}/${id}`, recipe);
+
+export const deleteRecipe = async (recipeId: string) =>
+  deleteRequest(`${recipesApiUrl}/${recipeId}`);
+
 export const createIngredient = async (
   ingredient: CreateIngredientData
 ): Promise<RequestResult<Ingredient>> =>
