@@ -65,7 +65,7 @@ const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
       <AccordionContent>
         <div className="flex flex-col">
           {recipe.description}
-          {recipe.ingredients.length && (
+          {!!recipe.ingredients.length && (
             <div className="flex flex-wrap gap-2 pt-4">
               {recipe.ingredients.map((ingredient) => (
                 <Badge key={ingredient.id}>
