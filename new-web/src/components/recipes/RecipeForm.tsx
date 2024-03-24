@@ -41,7 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { RecipeIngredient, Unit } from "../../app/domain";
+import { Recipe, RecipeIngredient, Unit } from "../../app/domain";
 import { unitFromString } from "../../app/domain/utils";
 import { formatIngredient } from "./utils";
 import { Badge } from "../ui/badge";
@@ -58,8 +58,10 @@ const createRecipeSchema = z.object({
 export type CreateRecipeFormData = z.infer<typeof createRecipeSchema>;
 
 export const RecipeForm = ({
+  recipe,
   onSubmit,
 }: {
+  recipe?: Recipe;
   onSubmit: (
     data: CreateRecipeFormData & { ingredients: RecipeIngredient[] }
   ) => Promise<void>;
@@ -69,8 +71,8 @@ export const RecipeForm = ({
   const form = useForm<CreateRecipeFormData>({
     resolver: zodResolver(createRecipeSchema),
     defaultValues: {
-      name: "",
-      description: "",
+      name: recipe?.name ?? "",
+      description: recipe?.description ?? "",
     },
   });
 
@@ -78,7 +80,7 @@ export const RecipeForm = ({
 
   const [recipeIngredients, setRecipeIngredients] = useState<
     RecipeIngredient[]
-  >([]);
+  >(recipe?.ingredients ?? []);
   const [selectedIngredient, setSelectedIngredient] = useState<{
     value: string;
     label: string;
