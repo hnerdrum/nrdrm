@@ -5,6 +5,7 @@ import { Button } from "../ui/button";
 import { Error } from "../ui/error";
 import { RequestWrap } from "../ui/request-wrap";
 import { NoRecipes } from "./NoRecipes";
+import { RecipeList } from "./RecipeList";
 
 export const RecipesView = () => {
   const { recipes, isLoading, error } = useRecipes();
@@ -24,6 +25,7 @@ export const RecipesView = () => {
             </Button>
           </div>
           {!recipes.length && <NoRecipes />}
+          {!!recipes.length && <RecipeList recipes={recipes} />}
         </div>
       )}
     </RequestWrap>
