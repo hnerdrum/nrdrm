@@ -30,6 +30,7 @@ import {
 import { Label } from "@radix-ui/react-dropdown-menu";
 import { Input } from "postcss";
 import { Button } from "../ui/button";
+import { useAuth } from "../../providers/AuthProvider";
 
 type Props = {
   recipes: Recipe[];
@@ -46,6 +47,8 @@ export const RecipeList = ({ recipes }: Props) => {
 };
 
 const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
+  const { isLoggedIn } = useAuth();
+
   return (
     <AccordionItem
       value={recipe.id}
@@ -56,7 +59,7 @@ const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
         className="hover:no-underline text-lg"
       >
         <div>{recipe.name}</div>
-        <RecipeMenu recipe={recipe} />
+        {isLoggedIn && <RecipeMenu recipe={recipe} />}
       </AccordionTrigger>
       <AccordionContent>
         <div className="flex flex-col">
