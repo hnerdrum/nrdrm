@@ -1,10 +1,10 @@
 "use client";
 
-import { Roboto_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../providers/AuthProvider";
 
-const robotoMono = Roboto_Mono({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"] });
 
 export default function RootLayout({
   children,
@@ -13,7 +13,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={robotoMono.className}>
+      <body className={inter.className}>
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
