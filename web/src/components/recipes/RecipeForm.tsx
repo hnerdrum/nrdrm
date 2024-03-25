@@ -277,7 +277,7 @@ export const ComboboxDemo = <T extends { label: string; value: string }>({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-[200px] justify-between"
+          className="w-full justify-between"
         >
           {selected
             ? options.find((option) => option.value === selected.value)?.label
