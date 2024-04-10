@@ -1,39 +1,45 @@
 import gleam/hackney
-import gleam/http.{Get}
 import gleam/http/request
+import gleam/list
+import gleam/result
+import gleam/string
 import gleam/string_builder
 import wisp.{type Request, type Response}
 import app/web
+import config/services.{type ServiceConfig}
 
 pub fn handle_request(req: Request) -> Response {
   use _req <- web.middleware(req)
 
-  case wisp.path_segments(req) {
-    [] -> hello_world(req)
+  let services = services.load_service_config()
 
-    ["recipes"] -> recipes(req)
+  case wisp.path_segments(req) {
+
+    [service_name] -> {
+      case find_service(services, service_name) {
+        Ok(service) -> handle_service_request(service, req)
+        Error(_) -> wisp.not_found()
+      }
+    }
 
     _ -> wisp.not_found()
   }
 }
 
-fn hello_world(req: Request) -> Response {
-  use <- wisp.require_method(req, Get)
-
-  let body = string_builder.from_string("Hello, world!")
-
-  wisp.json_response(body, 200)
+fn find_service(services: List(ServiceConfig), name: String) -> Result(ServiceConfig, String) {
+  result.map_error(list.find(services, fn(service) { service.name == name }), fn(_) { "Service not found"})
 }
 
-fn recipes(req: Request) -> Response {
-  use <- wisp.require_method(req, Get)
-
-  let url = "https://api.nrdrm.dev/api/v1/recipes"
-
+fn handle_service_request(service: ServiceConfig, req: Request) -> Response {
+  let url = find_service_url(service, req)
   forward_request(url)
 }
 
-
+// TODO: fix how we do this
+fn find_service_url(service: ServiceConfig, req: Request) -> String {
+  let path = string.slice(req.path, 1, string.length(req.path))
+  service.base_url <> "/" <> string.slice(path, string.length(service.name), string.length(path))
+}
 
 fn forward_request(url: String) -> Response {
   case request.to(url) {
