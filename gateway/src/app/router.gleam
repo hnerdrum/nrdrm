@@ -1,7 +1,6 @@
 import gleam/hackney
 import gleam/http/request
 import gleam/list
-import gleam/result
 import gleam/string
 import gleam/string_builder
 import wisp.{type Request, type Response}
@@ -26,8 +25,8 @@ pub fn handle_request(req: Request) -> Response {
   }
 }
 
-fn find_service(services: List(ServiceConfig), name: String) -> Result(ServiceConfig, String) {
-  result.map_error(list.find(services, fn(service) { service.name == name }), fn(_) { "Service not found"})
+fn find_service(services: List(ServiceConfig), name: String) -> Result(ServiceConfig, Nil) {
+  list.find(services, fn(service) { service.name == name })
 }
 
 fn handle_service_request(service: ServiceConfig, req: Request) -> Response {
