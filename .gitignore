@@ -4,3 +4,5 @@ node_modules
 .hspec-failures
 .DS_Store
 *.cabal
+
+**/build/*
