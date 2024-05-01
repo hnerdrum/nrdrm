@@ -34,7 +34,7 @@ fn forward_request(url: String) -> Response {
   wisp.log_info("Forwarding request to URL: " <> url)
 
   case request.to(url) {
-    Ok(req) -> forward(req)
+    Ok(req) -> send(req)
     Error(_) -> {
       wisp.log_error("Server error when trying to create a request to URL " <> url)
       wisp.internal_server_error()
@@ -43,7 +43,7 @@ fn forward_request(url: String) -> Response {
 
 }
 
-fn forward(request: request.Request(String)) -> Response {
+fn send(request: request.Request(String)) -> Response {
   case hackney.send(request) {
     Ok(response) -> wisp.json_response(string_builder.from_string(response.body), response.status)
     Error(_) -> {
