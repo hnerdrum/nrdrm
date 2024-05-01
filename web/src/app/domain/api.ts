@@ -1,7 +1,7 @@
 import { Ingredient, Recipe, RecipeIngredient } from ".";
 import { config } from "../../../config";
 
-export const recipesApiUrl = `/api/v1/recipes`;
+export const recipesApiUrl = `/api/v1`;
 
 export const ingredientsApiUrl = `/api/v1/ingredients`;
 
