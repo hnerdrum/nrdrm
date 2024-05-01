@@ -27,11 +27,11 @@ import Servant
 
 type API =
   "api" :> "v1" :> (
-       "recipes" :> Get '[JSON] [Recipe]
-  :<|> "recipes" :> Capture "recipeId" UUID :> Get '[JSON] Recipe
-  :<|> "recipes" :> ReqBody '[JSON] CreateRecipeInput :> PostCreated '[JSON] Recipe
-  :<|> "recipes" :> Capture "recipeId" UUID :> ReqBody '[JSON] UpdateRecipeInput :> Header CookieHeader Text :> Put '[JSON] Recipe
-  :<|> "recipes" :> Capture "recipeId" UUID :> Header CookieHeader Text :> DeleteNoContent
+       Get '[JSON] [Recipe]
+  :<|> Capture "recipeId" UUID :> Get '[JSON] Recipe
+  :<|> ReqBody '[JSON] CreateRecipeInput :> PostCreated '[JSON] Recipe
+  :<|> Capture "recipeId" UUID :> ReqBody '[JSON] UpdateRecipeInput :> Header CookieHeader Text :> Put '[JSON] Recipe
+  :<|> Capture "recipeId" UUID :> Header CookieHeader Text :> DeleteNoContent
 
   :<|> "ingredients" :> Get '[JSON] [Ingredient]
   :<|> "ingredients" :> Capture "ingredientId" UUID :> Get '[JSON] Ingredient
