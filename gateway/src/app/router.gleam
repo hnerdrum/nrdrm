@@ -1,7 +1,6 @@
 import gleam/hackney
 import gleam/http/request
 import gleam/list
-import gleam/option.{type Option, None, Some}
 import gleam/string
 import gleam/string_builder
 import wisp.{type Request, type Response}
@@ -15,9 +14,9 @@ pub fn handle_request(req: Request) -> Response {
 
   case wisp.path_segments(req) {
 
-    [service_name, .._] -> {
+    [service_name, ..path_segments] -> {
       case find_service(services, service_name) {
-        Ok(service) -> handle_service_request(service, req)
+        Ok(service) -> forward_request(services.create_url(service, string.join(path_segments, "/")))
         Error(_) -> wisp.not_found()
       }
     }
@@ -28,20 +27,6 @@ pub fn handle_request(req: Request) -> Response {
 
 fn find_service(services: List(ServiceConfig), name: String) -> Result(ServiceConfig, Nil) {
   list.find(services, fn(service) { service.name == name })
-}
-
-fn handle_service_request(service: ServiceConfig, req: Request) -> Response {
-  case resolve_service_url(service, req) {
-    Some(url) -> forward_request(url)
-    None -> wisp.not_found()
-  }
-}
-
-fn resolve_service_url(service: ServiceConfig, req: Request) -> Option(String) {
-  case wisp.path_segments(req) {
-    [prefix, ..path_segments] if prefix == service.name -> Some(services.create_url(service, string.join(path_segments, "/")) )
-    _ -> None
-  }
 }
 
 fn forward_request(url: String) -> Response {
