@@ -13,14 +13,15 @@ pub fn handle_request(req: Request) -> Response {
   let services = services.load_service_config()
 
   case wisp.path_segments(req) {
-
     [service_name, ..path_segments] -> {
       case find_service(services, service_name) {
         Ok(service) -> forward_request(services.create_url(service, string.join(path_segments, "/")))
-        Error(_) -> wisp.not_found()
+        Error(_) -> {
+          wisp.log_warning("No service found for request path: " <> req.path)
+          wisp.not_found()
+        }
       }
     }
-
     _ -> wisp.not_found()
   }
 }
@@ -30,9 +31,14 @@ fn find_service(services: List(ServiceConfig), name: String) -> Result(ServiceCo
 }
 
 fn forward_request(url: String) -> Response {
+  wisp.log_info("Forwarding request to URL: " <> url)
+
   case request.to(url) {
-    Ok(res) -> forward(res)
-    Error(_) -> wisp.internal_server_error()
+    Ok(req) -> forward(req)
+    Error(_) -> {
+      wisp.log_error("Server error when trying to create a request to URL " <> url)
+      wisp.internal_server_error()
+    }
   }
 
 }
@@ -40,6 +46,9 @@ fn forward_request(url: String) -> Response {
 fn forward(request: request.Request(String)) -> Response {
   case hackney.send(request) {
     Ok(response) -> wisp.json_response(string_builder.from_string(response.body), response.status)
-    Error(_) -> wisp.internal_server_error()
+    Error(_) -> {
+      wisp.log_error("Server error when trying to create a request to URL " <> request.path)
+      wisp.internal_server_error()
+    }
   }
 }
