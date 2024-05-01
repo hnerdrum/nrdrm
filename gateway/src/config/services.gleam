@@ -7,6 +7,10 @@ pub fn load_service_config() {
   services
 }
 
+pub fn create_url(service: ServiceConfig, path: String) -> String {
+  service.base_url <> "/" <> path
+}
+
 const services = [
-  ServiceConfig("recipes", "https://api.nrdrm.dev/api/v1/recipes"),
+  ServiceConfig("recipes", "https://recipes.api.nrdrm.dev/api/v1"),
 ]
