@@ -13,7 +13,10 @@ pub fn handle_request(req: Request) -> Response {
   let services = services.load_service_config()
 
   case wisp.path_segments(req) {
-    ["health"] -> wisp.ok()
+    ["health"] -> {
+      list.each(services, fn(service) { forward_request(services.create_url(service, "health")) })
+      wisp.ok()
+    }
 
     [service_name, ..path_segments] -> {
       case find_service(services, service_name) {
