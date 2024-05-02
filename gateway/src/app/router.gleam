@@ -13,6 +13,8 @@ pub fn handle_request(req: Request) -> Response {
   let services = services.load_service_config()
 
   case wisp.path_segments(req) {
+    ["health"] -> wisp.ok()
+
     [service_name, ..path_segments] -> {
       case find_service(services, service_name) {
         Ok(service) -> forward_request(services.create_url(service, string.join(path_segments, "/")))
@@ -22,6 +24,7 @@ pub fn handle_request(req: Request) -> Response {
         }
       }
     }
+
     _ -> wisp.not_found()
   }
 }
