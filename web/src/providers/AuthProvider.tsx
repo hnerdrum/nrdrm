@@ -3,7 +3,7 @@ import { config } from "../../config";
 import { UserSettings } from "../app/domain";
 import useSWR from "swr";
 
-export const meApiUrl = `/api/v1/me`;
+export const meApiUrl = `/recipes/me`;
 
 type AuthData = {
   isLoggedIn: boolean;

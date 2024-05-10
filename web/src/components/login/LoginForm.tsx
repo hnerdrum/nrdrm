@@ -31,7 +31,7 @@ type LoginData = z.infer<typeof loginSchema>;
 export const login = async (
   loginData: LoginData
 ): Promise<RequestResult<{ token: string }>> =>
-  postRequest("/api/v1/login", loginData);
+  postRequest("/recipes/login", loginData);
 
 export const LoginForm = () => {
   const router = useRouter();
