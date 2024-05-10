@@ -5,7 +5,7 @@ import gleam/result
 import config/env.{type Environment, Dev}
 
 pub type Config {
-  Config(port: Int, secret_key_base: String, env: Environment)
+  Config(port: Int, secret_key_base: String, env: Environment, allowed_origin: String)
 }
 
 pub fn load_config() -> Config {
@@ -13,9 +13,10 @@ pub fn load_config() -> Config {
 
   let assert Ok(port) = result.flatten(result.map(get_env("PORT"), parse_int))
   let assert Ok(secret_key_base) = get_env("SECRET_KEY_BASE")
+  let assert Ok(allowed_origin) = get_env("ALLOWED_ORIGIN")
   let env = get_environment()
 
-  Config(port, secret_key_base, env)
+  Config(port, secret_key_base, env, allowed_origin)
 }
 
 fn get_environment() -> Environment {
