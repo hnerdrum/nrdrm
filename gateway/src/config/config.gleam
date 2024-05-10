@@ -2,29 +2,20 @@ import dotenv_gleam
 import gleam/erlang/os
 import gleam/int
 import gleam/result
-import config/env.{type Environment, Dev, Prod}
+import config/env.{type Environment, Dev}
 
 pub type Config {
   Config(port: Int, secret_key_base: String, env: Environment)
 }
 
 pub fn load_config() -> Config {
-  let env = load_env()
+  dotenv_gleam.config()
 
   let assert Ok(port) = result.flatten(result.map(get_env("PORT"), parse_int))
   let assert Ok(secret_key_base) = get_env("SECRET_KEY_BASE")
+  let env = get_environment()
 
   Config(port, secret_key_base, env)
-}
-
-fn load_env() -> Environment {
-  case get_environment() {
-    Dev -> {
-      dotenv_gleam.config()
-      Dev
-    }
-    Prod -> Prod
-  }
 }
 
 fn get_environment() -> Environment {
