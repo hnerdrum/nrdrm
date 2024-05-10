@@ -20,6 +20,8 @@ gleam_erlang = "~> 0.25"
 gleam_http = "~> 3.6"
 gleam_hackney = "~> 1.2"
 gleam_json = "~> 1.0"
+dotenv_gleam = "~> 1.0"
+simplifile = "~> 1.7"
 
 [dev-dependencies]
 gleeunit = "~> 1.0"
