@@ -1,7 +1,7 @@
 import app/web.{Context}
 import app/router
 import config/config
-import config/services
+import config/service
 import gleam/erlang/process
 import mist
 import wisp
@@ -10,7 +10,7 @@ pub fn main() {
   wisp.configure_logger()
 
   let config = config.load_config()
-  let assert Ok(services) = services.load_services(config.env)
+  let assert Ok(services) = service.load_services(config.env)
   let ctx = Context(services)
 
   let assert Ok(_) =

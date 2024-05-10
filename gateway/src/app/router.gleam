@@ -5,7 +5,7 @@ import gleam/string
 import gleam/string_builder
 import wisp.{type Request, type Response}
 import app/web.{type Context}
-import config/services.{type ServiceConfig}
+import config/service.{type Service}
 
 pub fn handle_request(req: Request, ctx: Context) -> Response {
   use _req <- web.middleware(req)
@@ -14,13 +14,13 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 
   case wisp.path_segments(req) {
     ["health"] -> {
-      list.each(services, fn(service) { forward_request(services.create_url(service, "health")) })
+      list.each(services, fn(service) { forward_request(service.create_url(service, "health")) })
       wisp.ok()
     }
 
     [service_name, ..path_segments] -> {
       case find_service(services, service_name) {
-        Ok(service) -> forward_request(services.create_url(service, string.join(path_segments, "/")))
+        Ok(service) -> forward_request(service.create_url(service, string.join(path_segments, "/")))
         Error(_) -> {
           wisp.log_warning("No service found for request path: " <> req.path)
           wisp.not_found()
@@ -32,7 +32,7 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
   }
 }
 
-fn find_service(services: List(ServiceConfig), name: String) -> Result(ServiceConfig, Nil) {
+fn find_service(services: List(Service), name: String) -> Result(Service, Nil) {
   list.find(services, fn(service) { service.name == name })
 }
 

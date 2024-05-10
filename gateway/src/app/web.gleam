@@ -1,8 +1,8 @@
-import config/services.{type ServiceConfig}
+import config/service.{type Service}
 import wisp
 
 pub type Context {
-  Context(services: List(ServiceConfig))
+  Context(services: List(Service))
 }
 
 pub fn middleware(
