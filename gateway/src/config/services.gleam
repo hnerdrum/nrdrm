@@ -9,7 +9,7 @@ pub type ServiceConfig {
 }
 
 pub fn load_services(env: Environment) -> Result(List(ServiceConfig), String) {
-  let config_path = "src/config/services-" <> env.to_string(env) <> ".json"
+  let config_path = "services-" <> env.to_string(env) <> ".json"
 
   let contents = simplifile.read(config_path)
     |> result.map_error(fn(_) { "Config file not found" })
