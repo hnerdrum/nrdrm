@@ -4,13 +4,13 @@ import gleam/list
 import gleam/string
 import gleam/string_builder
 import wisp.{type Request, type Response}
-import app/web
+import app/web.{type Context}
 import config/services.{type ServiceConfig}
 
-pub fn handle_request(req: Request) -> Response {
+pub fn handle_request(req: Request, ctx: Context) -> Response {
   use _req <- web.middleware(req)
 
-  let services = services.load_service_config()
+  let services = ctx.services
 
   case wisp.path_segments(req) {
     ["health"] -> {

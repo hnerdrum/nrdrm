@@ -1,4 +1,9 @@
+import config/services.{type ServiceConfig}
 import wisp
+
+pub type Context {
+  Context(services: List(ServiceConfig))
+}
 
 pub fn middleware(
   req: wisp.Request,
