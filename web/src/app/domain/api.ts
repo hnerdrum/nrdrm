@@ -1,9 +1,9 @@
 import { Ingredient, Recipe, RecipeIngredient } from ".";
 import { config } from "../../../config";
 
-export const recipesApiUrl = `/api/v1`;
+export const recipesApiUrl = `/recipes`;
 
-export const ingredientsApiUrl = `/api/v1/ingredients`;
+export const ingredientsApiUrl = `/recipes/ingredients`;
 
 export type RequestResult<T> = RequestSuccess<T> | RequestFailure;
 
