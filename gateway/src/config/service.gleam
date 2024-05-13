@@ -1,15 +1,36 @@
 import config/env.{type Environment}
-import gleam/dynamic.{field, list, string}
+import gleam/dynamic
+import gleam/list
 import gleam/json
 import gleam/result
 import simplifile
 
 pub type Service {
-  Service(name: String, base_url: String)
+  Service(name: String, base_url: String, request: RequestConfig, response: ResponseConfig)
+}
+
+pub type RequestConfig {
+  RequestConfig(forward_headers: List(String))
+}
+
+pub type ResponseConfig {
+  ResponseConfig(forward_headers: List(String))
 }
 
 pub fn create_url(service: Service, path: String) -> String {
   service.base_url <> "/" <> path
+}
+
+pub fn find(services: List(Service), name: String) -> Result(Service, Nil) {
+  list.find(services, fn(service) { service.name == name })
+}
+
+pub fn find_request_forward_header(service: Service, header_key: String) -> Result(String, Nil) {
+  list.find(service.request.forward_headers, fn(header) { header == header_key })
+}
+
+pub fn find_response_forward_header(service: Service, header_key: String) -> Result(String, Nil) {
+  list.find(service.response.forward_headers, fn(header) { header == header_key })
 }
 
 pub fn load_services(env: Environment) -> Result(List(Service), String) {
@@ -22,9 +43,17 @@ pub fn load_services(env: Environment) -> Result(List(Service), String) {
 }
 
 fn services_from_json(json_string: String) -> Result(List(Service), String) {
-  result.map_error(json.decode(from: json_string, using: list(service_decoder())), fn(_) { "Unable to parse JSON string into service" })
+  result.map_error(json.decode(from: json_string, using: dynamic.list(service_decoder())), fn(_) { "Unable to parse JSON string into service" })
 }
 
 fn service_decoder() {
-  dynamic.decode2(Service, field("name", of: string), field("base_url", of: string))
+  dynamic.decode4(Service, dynamic.field("name", of: dynamic.string), dynamic.field("base_url", of: dynamic.string), dynamic.field("request", of: service_request_decoder()), dynamic.field("response", of: service_response_decoder()))
+}
+
+fn service_request_decoder() {
+  dynamic.decode1(RequestConfig, dynamic.field("forward_headers", of: dynamic.list(dynamic.string)))
+}
+
+fn service_response_decoder() {
+  dynamic.decode1(ResponseConfig, dynamic.field("forward_headers", of: dynamic.list(dynamic.string)))
 }
