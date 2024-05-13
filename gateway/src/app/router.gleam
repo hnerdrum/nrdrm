@@ -1,7 +1,5 @@
-import gleam/dynamic
-import gleam/hackney
 import gleam/http/request
-import gleam/io
+import gleam/httpc
 import gleam/list
 import gleam/string
 import gleam/string_builder
@@ -54,10 +52,9 @@ fn forward_request(url: String, input_req: Request) -> Response {
 }
 
 fn send(request: request.Request(String)) -> Response {
-  case hackney.send(request) {
+  case httpc.send(request) {
     Ok(response) -> wisp.json_response(string_builder.from_string(response.body), response.status)
-    Error(err) -> {
-      handle_error(err)
+    Error(_) -> {
       let url = request.host <> request.path
       wisp.log_error("Server error when trying to send a request to: " <> url)
       wisp.internal_server_error()
@@ -65,28 +62,21 @@ fn send(request: request.Request(String)) -> Response {
   }
 }
 
-fn handle_error(error: hackney.Error) -> Nil {
-  case error {
-    hackney.InvalidUtf8Response -> wisp.log_error("Invalid UTF8 response")
-    hackney.Other(data) -> wisp.log_error("Hackney error type: " <> dynamic.classify(data))
-  }
-}
-
-fn map_request(input_req: Request, forward_req: request.Request(String), body: String) -> request.Request(String) {
-  set_headers(
-    input_req,
+fn map_request(input: Request, output: request.Request(String), body: String) -> request.Request(String) {
+  set_request_headers(
+    input,
     request.set_body(
       request.set_method(
-        forward_req,
-        input_req.method
+        output,
+        input.method
       ),
       body
     )
   )
 }
 
-fn set_headers(input_req: Request, forward_req: request.Request(String)) -> request.Request(String) {
-  list.fold(input_req.headers, forward_req, fn(req, header) {
+fn set_request_headers(input: Request, output: request.Request(String)) -> request.Request(String) {
+  list.fold(input.headers, output, fn(req, header) {
     case string.lowercase(header.0) {
       "content-type" -> request.set_header(req, "content-type", header.1)
       _ -> req
