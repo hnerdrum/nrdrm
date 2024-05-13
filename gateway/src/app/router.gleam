@@ -1,4 +1,5 @@
 import gleam/http/request
+import gleam/http/response
 import gleam/httpc
 import gleam/list
 import gleam/string
@@ -53,7 +54,7 @@ fn forward_request(url: String, input_req: Request) -> Response {
 
 fn send(request: request.Request(String)) -> Response {
   case httpc.send(request) {
-    Ok(response) -> wisp.json_response(string_builder.from_string(response.body), response.status)
+    Ok(response) -> map_response(response)
     Error(_) -> {
       let url = request.host <> request.path
       wisp.log_error("Server error when trying to send a request to: " <> url)
@@ -80,6 +81,20 @@ fn set_request_headers(input: Request, output: request.Request(String)) -> reque
     case string.lowercase(header.0) {
       "content-type" -> request.set_header(req, "content-type", header.1)
       _ -> req
+    }
+  })
+}
+
+fn map_response(input: response.Response(String)) -> Response {
+  let json_response = wisp.json_response(string_builder.from_string(input.body), input.status)
+  set_response_headers(input, json_response)
+}
+
+fn set_response_headers(input: response.Response(String), output: Response) -> Response {
+  list.fold(input.headers, output, fn(res, header) {
+    case string.lowercase(header.0) {
+      "set-cookie" -> response.set_header(res, "set-cookie", header.1)
+      _ -> res
     }
   })
 }
