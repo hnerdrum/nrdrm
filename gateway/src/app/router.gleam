@@ -80,6 +80,7 @@ fn set_request_headers(input: Request, output: request.Request(String)) -> reque
   list.fold(input.headers, output, fn(req, header) {
     case string.lowercase(header.0) {
       "content-type" -> request.set_header(req, "content-type", header.1)
+      "cookie" -> request.set_header(req, "cookie", header.1)
       _ -> req
     }
   })
