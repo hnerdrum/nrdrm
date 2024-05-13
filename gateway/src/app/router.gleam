@@ -60,39 +60,31 @@ fn send(service: Service, request: request.Request(String)) -> Response {
   }
 }
 
-fn map_request(service: Service, input: Request, output: request.Request(String), body: String) -> request.Request(String) {
-  set_request_headers(
-    service,
-    input,
-    request.set_body(
-      request.set_method(
-        output,
-        input.method
-      ),
-      body
-    )
-  )
+fn map_request(service: Service, from: Request, to: request.Request(String), body: String) -> request.Request(String) {
+  request.set_method(to, from.method)
+    |> request.set_body(body)
+    |> set_request_headers(from, service)
 }
 
-fn set_request_headers(service: Service, input: Request, output: request.Request(String)) -> request.Request(String) {
-  let forward_headers = list.filter(input.headers, fn(header) {
+fn set_request_headers(to: request.Request(String), from: Request, service: Service) -> request.Request(String) {
+  let forward_headers = list.filter(from.headers, fn(header) {
     list.contains(service.request.forward_headers, header.0)
   })
-  list.fold(forward_headers, output, fn(req, header) {
+  list.fold(forward_headers, to, fn(req, header) {
     request.set_header(req, header.0, header.1)
   })
 }
 
-fn map_response(service: Service, input: response.Response(String)) -> Response {
-  let json_response = wisp.json_response(string_builder.from_string(input.body), input.status)
-  set_response_headers(service, input, json_response)
+fn map_response(service: Service, from: response.Response(String)) -> Response {
+  let json_response = wisp.json_response(string_builder.from_string(from.body), from.status)
+  set_response_headers(service, from, json_response)
 }
 
-fn set_response_headers(service: Service, input: response.Response(String), output: Response) -> Response {
-  let forward_headers = list.filter(input.headers, fn(header) {
+fn set_response_headers(service: Service, from: response.Response(String), to: Response) -> Response {
+  let forward_headers = list.filter(from.headers, fn(header) {
     list.contains(service.response.forward_headers, header.0)
   })
-  list.fold(forward_headers, output, fn(res, header) {
+  list.fold(forward_headers, to, fn(res, header) {
     response.set_header(res, header.0, header.1)
   })
 }
