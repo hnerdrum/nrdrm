@@ -1,6 +1,12 @@
 [
   {
     "name": "recipes",
-    "base_url": "https://recipes.api.nrdrm.dev/api/v1"
+    "base_url": "https://recipes.api.nrdrm.dev/api/v1",
+    "request": {
+      "forward_headers": ["content-type", "cookie"]
+    },
+    "response": {
+      "forward_headers": ["set-cookie"]
+    }
   }
 ]
