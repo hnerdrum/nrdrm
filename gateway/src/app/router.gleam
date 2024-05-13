@@ -1,3 +1,4 @@
+import gleam/dynamic
 import gleam/hackney
 import gleam/http/request
 import gleam/io
@@ -55,7 +56,8 @@ fn forward_request(url: String, input_req: Request) -> Response {
 fn send(request: request.Request(String)) -> Response {
   case hackney.send(request) {
     Ok(response) -> wisp.json_response(string_builder.from_string(response.body), response.status)
-    Error(_) -> {
+    Error(err) -> {
+      handle_error(err)
       let url = request.host <> request.path
       wisp.log_error("Server error when trying to send a request to: " <> url)
       wisp.internal_server_error()
