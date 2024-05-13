@@ -15,13 +15,13 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 
   case wisp.path_segments(req) {
     ["health"] -> {
-      list.each(services, fn(service) { forward_request(service.create_url(service, "health"), req) })
+      list.each(services, fn(service) { forward_request(service, "health", req) })
       wisp.ok()
     }
 
     [service_name, ..path_segments] -> {
-      case find_service(services, service_name) {
-        Ok(service) -> forward_request(service.create_url(service, string.join(path_segments, "/")), req)
+      case service.find(services, service_name) {
+        Ok(service) -> forward_request(service, string.join(path_segments, "/"), req)
         Error(_) -> {
           wisp.log_warning("No service found for request path: " <> req.path)
           wisp.not_found()
@@ -33,17 +33,14 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
   }
 }
 
-fn find_service(services: List(Service), name: String) -> Result(Service, Nil) {
-  list.find(services, fn(service) { service.name == name })
-}
-
-fn forward_request(url: String, input_req: Request) -> Response {
+fn forward_request(service: Service, path: String, wisp_request: Request) -> Response {
+  let url = service.create_url(service, path)
   wisp.log_info("Forwarding request to URL: " <> url)
 
-  use body <- wisp.require_string_body(input_req)
+  use body <- wisp.require_string_body(wisp_request)
 
   case request.to(url) {
-    Ok(req) -> send(map_request(input_req, req, body))
+    Ok(req) -> send(service, map_request(service, wisp_request, req, body))
     Error(_) -> {
       wisp.log_error("Server error when trying to create a request to: " <> url)
       wisp.internal_server_error()
@@ -52,9 +49,9 @@ fn forward_request(url: String, input_req: Request) -> Response {
 
 }
 
-fn send(request: request.Request(String)) -> Response {
+fn send(service: Service, request: request.Request(String)) -> Response {
   case httpc.send(request) {
-    Ok(response) -> map_response(response)
+    Ok(response) -> map_response(service, response)
     Error(_) -> {
       let url = request.host <> request.path
       wisp.log_error("Server error when trying to send a request to: " <> url)
@@ -63,8 +60,9 @@ fn send(request: request.Request(String)) -> Response {
   }
 }
 
-fn map_request(input: Request, output: request.Request(String), body: String) -> request.Request(String) {
+fn map_request(service: Service, input: Request, output: request.Request(String), body: String) -> request.Request(String) {
   set_request_headers(
+    service,
     input,
     request.set_body(
       request.set_method(
@@ -76,26 +74,25 @@ fn map_request(input: Request, output: request.Request(String), body: String) ->
   )
 }
 
-fn set_request_headers(input: Request, output: request.Request(String)) -> request.Request(String) {
-  list.fold(input.headers, output, fn(req, header) {
-    case string.lowercase(header.0) {
-      "content-type" -> request.set_header(req, "content-type", header.1)
-      "cookie" -> request.set_header(req, "cookie", header.1)
-      _ -> req
-    }
+fn set_request_headers(service: Service, input: Request, output: request.Request(String)) -> request.Request(String) {
+  let forward_headers = list.filter(input.headers, fn(header) {
+    list.contains(service.request.forward_headers, header.0)
+  })
+  list.fold(forward_headers, output, fn(req, header) {
+    request.set_header(req, header.0, header.1)
   })
 }
 
-fn map_response(input: response.Response(String)) -> Response {
+fn map_response(service: Service, input: response.Response(String)) -> Response {
   let json_response = wisp.json_response(string_builder.from_string(input.body), input.status)
-  set_response_headers(input, json_response)
+  set_response_headers(service, input, json_response)
 }
 
-fn set_response_headers(input: response.Response(String), output: Response) -> Response {
-  list.fold(input.headers, output, fn(res, header) {
-    case string.lowercase(header.0) {
-      "set-cookie" -> response.set_header(res, "set-cookie", header.1)
-      _ -> res
-    }
+fn set_response_headers(service: Service, input: response.Response(String), output: Response) -> Response {
+  let forward_headers = list.filter(input.headers, fn(header) {
+    list.contains(service.response.forward_headers, header.0)
+  })
+  list.fold(forward_headers, output, fn(res, header) {
+    response.set_header(res, header.0, header.1)
   })
 }
