@@ -11,12 +11,12 @@
     "security": {
       "auth": [
         {
-          "path": "/recipes/*",
-          "methods": ["PUT", "DELETE"]
+          "path": "*",
+          "methods": ["put", "delete"]
         },
         {
-          "path": "/recipes/*/ingredients",
-          "methods": ["PUT", "DELETE"]
+          "path": "ingredients/*",
+          "methods": ["put", "delete"]
         }
       ]
     }
