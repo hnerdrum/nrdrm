@@ -8,7 +8,6 @@ pub fn glob_match_path(pattern: String, path: String) -> Bool {
   case pattern_parts, path_parts {
     [], [] -> True
     [""], [""] -> True
-    ["*"], _ -> True
     [], _ -> False
     _, [] -> False
     [pattern_head, ..pattern_tail], [path_head, ..path_tail] -> {

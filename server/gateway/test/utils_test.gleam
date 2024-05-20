@@ -27,11 +27,16 @@ pub fn glob_match_path_nested_case_test() {
 }
 
 pub fn glob_match_path_wildcard_test() {
-  utils.glob_match_path("/test/*", "/test/testy/test")
+  utils.glob_match_path("/test/*", "/test/testy")
   |> should.equal(True)
 }
 
 pub fn glob_match_path_nested_wildcard_test() {
-utils.glob_match_path("/test/*/testy", "/test/hello/testy")
+  utils.glob_match_path("/test/*/testy", "/test/hello/testy")
   |> should.equal(True)
+}
+
+pub fn glob_match_path_wildcard_not_propagate_test() {
+  utils.glob_match_path("/test/*", "/test/hello/testy")
+  |> should.equal(False)
 }
