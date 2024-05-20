@@ -18,7 +18,7 @@ export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
     const result = await updateRecipe({ id: recipeId, recipe: data });
 
     if (result.status === "success") {
-      router.push(`/recipes`);
+      router.push(`/`);
     } else {
       alert(`Recipe update failed with message: ${result.message}`);
     }

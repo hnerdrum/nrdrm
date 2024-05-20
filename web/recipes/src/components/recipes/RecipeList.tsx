@@ -111,10 +111,7 @@ const UpdateRecipeButton = ({ recipe }: { recipe: Recipe }) => {
   const router = useRouter();
   return (
     <DropdownMenuItem className="cursor-pointer py-0">
-      <Button
-        variant="ghost"
-        onClick={() => router.push(`/recipes/${recipe.id}`)}
-      >
+      <Button variant="ghost" onClick={() => router.push(`/${recipe.id}`)}>
         Update recipe
       </Button>
     </DropdownMenuItem>

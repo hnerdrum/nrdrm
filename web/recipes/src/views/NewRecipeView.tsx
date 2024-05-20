@@ -14,7 +14,7 @@ export const NewRecipeView = () => {
     const result = await createRecipe(data);
 
     if (result.status === "success") {
-      router.push(`/recipes`);
+      router.push(`/`);
     } else {
       alert(`Recipe creation failed with message: ${result.message}`);
     }

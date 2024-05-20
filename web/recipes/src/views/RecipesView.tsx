@@ -21,7 +21,7 @@ export const RecipesView = () => {
           <div className="flex items-center justify-between mt-8">
             <h1 className="text-3xl font-bold">Recipes</h1>
             <Button>
-              <a href="/recipes/new">Add recipe</a>
+              <a href="/new">Add recipe</a>
             </Button>
           </div>
           {!recipes.length && <NoRecipes />}
