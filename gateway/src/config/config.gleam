@@ -2,10 +2,11 @@ import dotenv_gleam
 import gleam/erlang/os
 import gleam/int
 import gleam/result
+import gleam/string
 import config/env.{type Environment, Dev, Prod}
 
 pub type Config {
-  Config(port: Int, secret_key_base: String, env: Environment, allowed_origin: String)
+  Config(port: Int, secret_key_base: String, env: Environment, allowed_origins: List(String))
 }
 
 pub fn load_config() -> Config {
@@ -13,9 +14,9 @@ pub fn load_config() -> Config {
 
   let assert Ok(port) = result.flatten(result.map(get_env("PORT"), parse_int))
   let assert Ok(secret_key_base) = get_env("SECRET_KEY_BASE")
-  let assert Ok(allowed_origin) = get_env("ALLOWED_ORIGIN")
+  let assert Ok(allowed_origins) = result.map(get_env("ALLOWED_ORIGINS"), parse_origins)
 
-  Config(port, secret_key_base, env, allowed_origin)
+  Config(port, secret_key_base, env, allowed_origins)
 }
 
 fn load_env() -> Environment {
@@ -41,6 +42,10 @@ fn handle_result(result: Result(a, b), next_fn: fn(a) -> Result(c, b)) -> Result
 
 fn parse_int(str: String) -> Result(Int, String) {
   result.map_error(int.base_parse(str, 10), fn(_) { "Could not parse string " <> str <> " to int"})
+}
+
+fn parse_origins(str: String) -> List(String) {
+  string.split(str, ",")
 }
 
 fn get_env(name: String) -> Result(String, String) {
