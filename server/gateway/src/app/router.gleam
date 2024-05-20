@@ -44,7 +44,7 @@ fn check_auth(service: Service, path: String, request: Request) -> Nil {
 
   let should_auth = list.any(service.security.auth, fn(auth) {
     utils.glob_match_path(auth.path, path) &&
-    list.contains(auth.methods, method)
+    list.contains(auth.methods, string.lowercase(method))
   })
 
   case should_auth {
