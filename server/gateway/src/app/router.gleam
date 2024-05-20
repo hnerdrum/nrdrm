@@ -1,3 +1,4 @@
+import gleam/http
 import gleam/http/request
 import gleam/http/response
 import gleam/httpc
@@ -7,6 +8,7 @@ import gleam/string_builder
 import wisp.{type Request, type Response}
 import app/web.{type Context}
 import config/service.{type Service}
+import utils
 
 pub fn handle_request(req: Request, ctx: Context) -> Response {
   use _req <- web.middleware(req, ctx)
@@ -21,7 +23,11 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
 
     [service_name, ..path_segments] -> {
       case service.find(services, service_name) {
-        Ok(service) -> forward_request(service, string.join(path_segments, "/"), req)
+        Ok(service) -> {
+          let path = string.join(path_segments, "/")
+          check_auth(service, path, req)
+          forward_request(service, path, req)
+        }
         Error(_) -> {
           wisp.log_warning("No service found for request path: " <> req.path)
           wisp.not_found()
@@ -30,6 +36,20 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
     }
 
     _ -> wisp.not_found()
+  }
+}
+
+fn check_auth(service: Service, path: String, request: Request) -> Nil {
+  let method = http.method_to_string(request.method)
+
+  let should_auth = list.any(service.security.auth, fn(auth) {
+    utils.glob_match_path(auth.path, path) &&
+    list.contains(auth.methods, method)
+  })
+
+  case should_auth {
+    True -> wisp.log_info("Path " <> path <> " with method " <> method <> " for service " <> service.name <> " requires authorization")
+    False -> Nil
   }
 }
 
