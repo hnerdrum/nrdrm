@@ -7,6 +7,18 @@
     },
     "response": {
       "forward_headers": ["set-cookie"]
+    },
+    "security": {
+      "auth": [
+        {
+          "path": "/recipes/*",
+          "methods": ["PUT", "DELETE"]
+        },
+        {
+          "path": "/recipes/*/ingredients",
+          "methods": ["PUT", "DELETE"]
+        }
+      ]
     }
   }
 ]
