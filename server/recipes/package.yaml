@@ -1,4 +1,4 @@
-name: server
+name: recipes
 version: 0.1.0.0
 github: "hnerdrum/nrdrm"
 license: BSD3
@@ -59,7 +59,7 @@ executables:
       - -with-rtsopts=-N
     dependencies:
       - base
-      - server
+      - recipes
 
 tests:
   server-test:
@@ -71,7 +71,7 @@ tests:
       - -with-rtsopts=-N
     dependencies:
       - base
-      - server
+      - recipes
       - hspec
       - hspec-wai
       - hspec-wai-json
