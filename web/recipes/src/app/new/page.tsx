@@ -1,4 +1,4 @@
-import { NewRecipeView } from "../../../views/NewRecipeView";
+import { NewRecipeView } from "../../views/NewRecipeView";
 
 const NewRecipePage = () => <NewRecipeView />;
 
