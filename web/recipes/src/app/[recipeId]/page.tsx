@@ -1,4 +1,4 @@
-import { UpdateRecipeView } from "../../../views/UpdateRecipeView";
+import { UpdateRecipeView } from "../../views/UpdateRecipeView";
 
 const UpdateRecipePage = ({ params }: { params: { recipeId: string } }) => {
   return <UpdateRecipeView recipeId={params.recipeId} />;
