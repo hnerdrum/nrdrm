@@ -70,8 +70,8 @@ fn set_request_headers(to: request.Request(String), from: Request, service: Serv
   let forward_headers = list.filter(from.headers, fn(header) {
     list.contains(service.request.forward_headers, header.0)
   })
-  list.fold(forward_headers, to, fn(req, header) {
-    request.set_header(req, header.0, header.1)
+  list.fold(forward_headers, to, fn(acc, header) {
+    request.set_header(acc, header.0, header.1)
   })
 }
 
@@ -84,7 +84,7 @@ fn set_response_headers(service: Service, from: response.Response(String), to: R
   let forward_headers = list.filter(from.headers, fn(header) {
     list.contains(service.response.forward_headers, header.0)
   })
-  list.fold(forward_headers, to, fn(res, header) {
-    response.set_header(res, header.0, header.1)
+  list.fold(forward_headers, to, fn(acc, header) {
+    response.set_header(acc, header.0, header.1)
   })
 }
