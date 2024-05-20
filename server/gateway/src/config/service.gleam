@@ -6,7 +6,13 @@ import gleam/result
 import simplifile
 
 pub type Service {
-  Service(name: String, base_url: String, request: RequestConfig, response: ResponseConfig)
+  Service(
+    name: String,
+    base_url: String,
+    request: RequestConfig,
+    response: ResponseConfig,
+    security: SecurityConfig
+  )
 }
 
 pub type RequestConfig {
@@ -15,6 +21,14 @@ pub type RequestConfig {
 
 pub type ResponseConfig {
   ResponseConfig(forward_headers: List(String))
+}
+
+pub type SecurityConfig {
+  SecurityConfig(auth: List(AuthConfig))
+}
+
+pub type AuthConfig {
+  AuthConfig(path: String, methods: List(String))
 }
 
 pub fn create_url(service: Service, path: String) -> String {
@@ -47,7 +61,7 @@ fn services_from_json(json_string: String) -> Result(List(Service), String) {
 }
 
 fn service_decoder() {
-  dynamic.decode4(Service, dynamic.field("name", of: dynamic.string), dynamic.field("base_url", of: dynamic.string), dynamic.field("request", of: service_request_decoder()), dynamic.field("response", of: service_response_decoder()))
+  dynamic.decode5(Service, dynamic.field("name", of: dynamic.string), dynamic.field("base_url", of: dynamic.string), dynamic.field("request", of: service_request_decoder()), dynamic.field("response", of: service_response_decoder()), dynamic.field("security", of: service_security_decoer()))
 }
 
 fn service_request_decoder() {
@@ -56,4 +70,12 @@ fn service_request_decoder() {
 
 fn service_response_decoder() {
   dynamic.decode1(ResponseConfig, dynamic.field("forward_headers", of: dynamic.list(dynamic.string)))
+}
+
+fn service_security_decoer() {
+  dynamic.decode1(SecurityConfig, dynamic.field("auth", of: dynamic.list(security_auth_decoder())))
+}
+
+fn security_auth_decoder() {
+  dynamic.decode2(AuthConfig, dynamic.field("path", of: dynamic.string), dynamic.field("methods", of: dynamic.list(dynamic.string)))
 }
