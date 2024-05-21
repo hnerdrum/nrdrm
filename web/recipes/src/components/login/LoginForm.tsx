@@ -50,7 +50,7 @@ export const LoginForm = () => {
 
     if (result.status === "success") {
       mutate(meApiUrl);
-      router.push(`/recipes`);
+      router.push(`/`);
     } else {
       setLoginError("Failed");
     }
