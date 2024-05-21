@@ -1,6 +1,5 @@
 "use client";
 
-import { CreateRecipeData, updateRecipe } from "../app/domain/api";
 import { RequestWrap } from "../components/ui/request-wrap";
 import { Error } from "../components/ui/error";
 import { Error404 } from "../components/ui/404";
@@ -8,6 +7,7 @@ import { useRecipe } from "../app/hooks/useRecipe";
 import { useAuth } from "../providers/AuthProvider";
 import { RecipeForm } from "../components/recipes/RecipeForm";
 import { useRouter } from "next/navigation";
+import { CreateRecipeData, RecipeApi } from "../app/api/recipe";
 
 export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
   const router = useRouter();
@@ -15,7 +15,7 @@ export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
   const { recipe, isLoading, error } = useRecipe({ recipeId });
 
   const onSubmit = async (data: CreateRecipeData) => {
-    const result = await updateRecipe({ id: recipeId, recipe: data });
+    const result = await RecipeApi.update({ id: recipeId, data });
 
     if (result.status === "success") {
       router.push(`/`);

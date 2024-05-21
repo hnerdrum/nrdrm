@@ -1,9 +1,4 @@
-import { Ingredient, Recipe, RecipeIngredient } from ".";
 import { config } from "../../../config";
-
-export const recipesApiUrl = `/recipes`;
-
-export const ingredientsApiUrl = `/recipes/ingredients`;
 
 export type RequestResult<T> = RequestSuccess<T> | RequestFailure;
 
@@ -91,35 +86,3 @@ export const deleteRequest = async (
     };
   }
 };
-
-export type CreateRecipeData = {
-  name: string;
-  description: string;
-  ingredients: RecipeIngredient[];
-};
-
-export type CreateIngredientData = {
-  name: string;
-};
-
-export const createRecipe = async (
-  recipe: CreateRecipeData
-): Promise<RequestResult<Recipe>> =>
-  postRequest<CreateRecipeData, Recipe>(recipesApiUrl, recipe);
-
-export const updateRecipe = async ({
-  id,
-  recipe,
-}: {
-  id: string;
-  recipe: CreateRecipeData;
-}): Promise<RequestResult<Recipe>> =>
-  putRequest(`${recipesApiUrl}/${id}`, recipe);
-
-export const deleteRecipe = async (recipeId: string) =>
-  deleteRequest(`${recipesApiUrl}/${recipeId}`);
-
-export const createIngredient = async (
-  ingredient: CreateIngredientData
-): Promise<RequestResult<Ingredient>> =>
-  postRequest(ingredientsApiUrl, ingredient);

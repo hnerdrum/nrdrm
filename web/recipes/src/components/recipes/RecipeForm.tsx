@@ -31,7 +31,6 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 import React from "react";
 import { useIngredients } from "../../app/hooks/useIngredients";
-import { createIngredient, ingredientsApiUrl } from "../../app/domain/api";
 import { useSWRConfig } from "swr";
 import { Label } from "../ui/label";
 import {
@@ -45,6 +44,7 @@ import { Recipe, RecipeIngredient, Unit } from "../../app/domain";
 import { unitFromString } from "../../app/domain/utils";
 import { formatIngredient } from "./utils";
 import { Badge } from "../ui/badge";
+import { IngredientApi } from "../../app/api/ingredient";
 
 const createRecipeSchema = z.object({
   name: z.string().min(1, {
@@ -97,9 +97,9 @@ export const RecipeForm = ({
     onSubmit({ ...data, ingredients: recipeIngredients });
 
   const onCreateNewIngredient = async (name: string) => {
-    const result = await createIngredient({ name });
+    const result = await IngredientApi.create({ name });
     if (result.status === "success") {
-      mutate(ingredientsApiUrl);
+      mutate(IngredientApi.baseUrl);
       result.data &&
         selectIngredient({ value: result.data.id, label: result.data.name });
     } else {
