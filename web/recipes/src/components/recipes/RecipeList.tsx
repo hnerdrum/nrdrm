@@ -1,5 +1,4 @@
 import { formatIngredient } from "./utils";
-import { Recipe } from "../../app/domain";
 import {
   Accordion,
   AccordionContent,
@@ -11,8 +10,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Ellipsis } from "lucide-react";
@@ -26,12 +23,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../ui/dialog";
-import { Label } from "@radix-ui/react-dropdown-menu";
-import { Input } from "postcss";
 import { Button } from "../ui/button";
 import { useAuth } from "../../providers/AuthProvider";
 import { useRouter } from "next/navigation";
-import { RecipeApi } from "../../app/api/recipe";
+import { RecipeApi } from "../../api/recipe";
+import { Recipe } from "../../domain";
 
 type Props = {
   recipes: Recipe[];

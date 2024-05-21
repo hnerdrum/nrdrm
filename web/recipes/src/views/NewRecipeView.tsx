@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { RecipeForm } from "../components/recipes/RecipeForm";
-import { CreateRecipeData, RecipeApi } from "../app/api/recipe";
+import { CreateRecipeData, RecipeApi } from "../api/recipe";
 
 export const NewRecipeView = () => {
   const router = useRouter();

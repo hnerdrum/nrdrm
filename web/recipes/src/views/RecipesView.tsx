@@ -1,11 +1,11 @@
 "use client";
 
-import { useRecipes } from "../app/hooks/useRecipes";
 import { Button } from "../components/ui/button";
 import { Error } from "../components/ui/error";
 import { RequestWrap } from "../components/ui/request-wrap";
 import { NoRecipes } from "../components/recipes/NoRecipes";
 import { RecipeList } from "../components/recipes/RecipeList";
+import { useRecipes } from "../hooks/useRecipes";
 
 export const RecipesView = () => {
   const { recipes, isLoading, error } = useRecipes();

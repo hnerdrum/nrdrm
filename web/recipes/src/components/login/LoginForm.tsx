@@ -14,8 +14,8 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { RequestResult, postRequest } from "../../app/api";
-import { RecipeApi } from "../../app/api/recipe";
+import { RequestResult, postRequest } from "../../api";
+import { RecipeApi } from "../../api/recipe";
 
 const loginSchema = z.object({
   email: z.string().min(1, {

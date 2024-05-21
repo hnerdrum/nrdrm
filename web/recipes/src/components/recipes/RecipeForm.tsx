@@ -30,7 +30,6 @@ import {
 import { Check, ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 import React from "react";
-import { useIngredients } from "../../app/hooks/useIngredients";
 import { useSWRConfig } from "swr";
 import { Label } from "../ui/label";
 import {
@@ -40,11 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Recipe, RecipeIngredient, Unit } from "../../app/domain";
-import { unitFromString } from "../../app/domain/utils";
 import { formatIngredient } from "./utils";
 import { Badge } from "../ui/badge";
-import { IngredientApi } from "../../app/api/ingredient";
+import { IngredientApi } from "../../api/ingredient";
+import { Recipe, RecipeIngredient, Unit } from "../../domain";
+import { unitFromString } from "../../domain/utils";
+import { useIngredients } from "../../hooks/useIngredients";
 
 const createRecipeSchema = z.object({
   name: z.string().min(1, {
