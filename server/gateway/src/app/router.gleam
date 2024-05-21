@@ -43,7 +43,7 @@ fn check_auth(service: Service, path: String, request: Request) -> Nil {
   let method = http.method_to_string(request.method)
 
   let should_auth = list.any(service.security.auth, fn(auth) {
-    utils.glob_match_path(auth.path, path) &&
+    utils.glob_match(auth.path, path, "/") &&
     list.contains(auth.methods, string.lowercase(method))
   })
 
