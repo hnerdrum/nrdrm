@@ -17,7 +17,6 @@ import {
 } from "../ui/dropdown-menu";
 import { Ellipsis } from "lucide-react";
 import { useSWRConfig } from "swr";
-import { deleteRecipe, recipesApiUrl } from "../../app/domain/api";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +31,7 @@ import { Input } from "postcss";
 import { Button } from "../ui/button";
 import { useAuth } from "../../providers/AuthProvider";
 import { useRouter } from "next/navigation";
+import { RecipeApi } from "../../app/api/recipe";
 
 type Props = {
   recipes: Recipe[];
@@ -122,12 +122,12 @@ const DeleteRecipeDialog = ({ recipe }: { recipe: Recipe }) => {
   const { mutate } = useSWRConfig();
 
   const onDeleteRecipe = async () => {
-    const result = await deleteRecipe(recipe.id);
+    const result = await RecipeApi.delete(recipe.id);
     if (result.status !== "success") {
       alert(`Recipe deletion failed with message: ${result.message}`);
       return;
     }
-    mutate(recipesApiUrl);
+    mutate(RecipeApi.baseUrl);
   };
 
   return (

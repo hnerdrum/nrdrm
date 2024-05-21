@@ -2,8 +2,7 @@ import { createContext, useContext, useMemo } from "react";
 import { config } from "../../config";
 import { UserSettings } from "../app/domain";
 import useSWR from "swr";
-
-export const meApiUrl = `/recipes/me`;
+import { RecipeApi } from "../app/api/recipe";
 
 type AuthData = {
   isLoggedIn: boolean;
@@ -27,7 +26,7 @@ const defaultData: AuthData = {
 export const AuthContext = createContext<AuthData>(defaultData);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { data, isLoading } = useSWR(meApiUrl, fetcher);
+  const { data, isLoading } = useSWR(`${RecipeApi.baseUrl}/me`, fetcher);
 
   const AuthProviderValue = useMemo(
     () => ({

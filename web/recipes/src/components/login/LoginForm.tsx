@@ -1,9 +1,7 @@
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { RequestResult, postRequest } from "../../app/domain/api";
 import { useState } from "react";
 import { useSWRConfig } from "swr";
-import { meApiUrl } from "../../providers/AuthProvider";
 import {
   Form,
   FormControl,
@@ -16,6 +14,8 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { RequestResult, postRequest } from "../../app/api";
+import { RecipeApi } from "../../app/api/recipe";
 
 const loginSchema = z.object({
   email: z.string().min(1, {
@@ -31,7 +31,7 @@ type LoginData = z.infer<typeof loginSchema>;
 export const login = async (
   loginData: LoginData
 ): Promise<RequestResult<{ token: string }>> =>
-  postRequest("/recipes/login", loginData);
+  postRequest(`${RecipeApi.baseUrl}/login}`, loginData);
 
 export const LoginForm = () => {
   const router = useRouter();
@@ -49,7 +49,7 @@ export const LoginForm = () => {
     const result = await login(data);
 
     if (result.status === "success") {
-      mutate(meApiUrl);
+      mutate(`${RecipeApi.baseUrl}/me`);
       router.push(`/`);
     } else {
       setLoginError("Failed");
