@@ -3,11 +3,11 @@
 import { RequestWrap } from "../components/ui/request-wrap";
 import { Error } from "../components/ui/error";
 import { Error404 } from "../components/ui/404";
-import { useRecipe } from "../app/hooks/useRecipe";
 import { useAuth } from "../providers/AuthProvider";
 import { RecipeForm } from "../components/recipes/RecipeForm";
 import { useRouter } from "next/navigation";
-import { CreateRecipeData, RecipeApi } from "../app/api/recipe";
+import { CreateRecipeData, RecipeApi } from "../api/recipe";
+import { useRecipe } from "../hooks/useRecipe";
 
 export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
   const router = useRouter();
