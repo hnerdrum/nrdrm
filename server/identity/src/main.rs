@@ -1,7 +1,8 @@
 mod config;
 use config::load_config;
+mod domain;
 mod router;
-use router::init_router;
+use router::main::init_router;
 
 #[tokio::main]
 async fn main() {
