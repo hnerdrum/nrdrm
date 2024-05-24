@@ -11,5 +11,7 @@ async fn main() {
     let app = init_router();
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await.unwrap();
 
+    tracing_subscriber::fmt::init();
+
     axum::serve(listener, app).await.unwrap();
 }
