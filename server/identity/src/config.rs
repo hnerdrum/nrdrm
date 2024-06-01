@@ -23,13 +23,15 @@ impl FromStr for Environment {
 #[derive(Debug)]
 pub struct Config {
   pub env: Environment,
-  pub port: String
+  pub port: String,
+  pub database_url: String,
 }
 
 pub fn load_config() -> Config {
   let env = load_env();
   let port = env::var("PORT").unwrap_or("8081".to_string());
-  Config { env: env, port: port}
+  let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+  Config { env: env, port: port, database_url: database_url}
 }
 
 fn load_env() -> Environment {

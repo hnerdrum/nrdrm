@@ -7,7 +7,10 @@ edition = "2021"
 
 [dependencies]
 axum = "0.7.5"
-diesel = "2.1.6"
+bcrypt = "0.15.1"
+chrono = "0.4.38"
+deadpool-diesel = { version = "0.6.1", features = ["postgres"] }
+diesel = { version = "2.1.6", features = ["postgres", "postgres_backend", "uuid", "serde_json", "chrono"] }
 dotenvy = "0.15.7"
 serde = { version = "1.0.202", features = ["derive"] }
 tokio = { version = "1.37.0", features = ["rt-multi-thread"] }
