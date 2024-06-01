@@ -1,12 +1,16 @@
 use crate::domain::model::{login_user, Auth, UserSettings, LoginInput, LoginError};
-use crate::database::user_account::find_all;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::{Router, routing::{get, post}, Json, extract::State};
+use axum::{Router, routing::post, Json, extract::State};
 use deadpool_diesel::postgres::Pool;
+use sha2::{Sha256, Digest};
+use base64::{Engine, engine::general_purpose::STANDARD}; // For standard Base64
+use std::fmt::Write;
+use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::compression::CompressionLayer;
 use tower_http::trace::TraceLayer;
-use uuid::Uuid;
+
+const AUTH_COOKIE_NAME: &str = "nrdrm-login";
 
 #[derive(Clone)]
 pub struct AppState {
@@ -34,23 +38,37 @@ pub fn init_router(state: AppState) -> Router {
   Router::new()
     .nest("/api/v1",
       Router::new()
-        .route("/me", get(me_handler))
         .route("/login", post(login_handler))
     )
     .layer(TraceLayer::new_for_http())
     .layer(CompressionLayer::new())
+    .layer(CookieManagerLayer::new())
     .with_state(state)
 }
 
-async fn me_handler(State(state): State<AppState>) -> Json<UserSettings> {
-  let db = state.db;
-  let users = find_all(&db).await;
-  println!("users are here: {:?}", users);
-  Json(UserSettings { auth: Some(Auth { user_id: Uuid::new_v4() }) })
-}
-
-async fn login_handler (State(state): State<AppState>, Json(input): Json<LoginInput>) -> Result<Json<UserSettings>, LoginError> {
+async fn login_handler (cookies: Cookies, State(state): State<AppState>, Json(input): Json<LoginInput>) -> Result<Json<UserSettings>, LoginError> {
   login_user(state.db, input)
     .await
-    .map(|user| Json(user))
+    .map(|user| { handle_valid_user(user, cookies) })
+}
+
+fn handle_valid_user(user: UserSettings, cookies: Cookies) -> Json<UserSettings> {
+   user.auth.clone().inspect(|auth| {
+     cookies.add(Cookie::new(AUTH_COOKIE_NAME, generate_token(auth.clone())));
+   });
+  Json(user)
+}
+
+fn generate_token(auth: Auth) -> String {
+  let mut hasher = Sha256::new();
+
+  let mut input_data = String::new();
+  write!(input_data, "{}", auth.user_id).expect("Failed to write user ID");
+  input_data.push_str(&auth.email);
+
+  hasher.update(input_data.as_bytes());
+  let result = hasher.finalize();
+
+  // Encode the hash result as Base64
+  STANDARD.encode(result)
 }
