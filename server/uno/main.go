@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"nrdrm/uno/config"
 	"nrdrm/uno/routes"
 
 	"github.com/gin-gonic/gin"
@@ -9,5 +11,8 @@ import (
 func main() {
   router := gin.Default()
 	routes.RegisterRoutes(router)	
-	router.Run(":8080")
+
+	config := config.LoadConfig()
+
+	router.Run(fmt.Sprint(":", config.Port))
 }
