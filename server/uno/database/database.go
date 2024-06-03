@@ -16,7 +16,8 @@ func Connect(url string) *gorm.DB {
 
 	log.Println("Database connection established")
 	log.Println("Running database migrations...")
-	db.AutoMigrate(&models.Player{})
-	
+
+	db.AutoMigrate(&models.Player{}, &models.Game{}, &models.Round{}, &models.RoundScore{})
+
 	return db
 }
