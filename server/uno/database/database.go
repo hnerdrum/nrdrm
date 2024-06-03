@@ -2,7 +2,6 @@ package database
 
 import (
 	"log"
-	"nrdrm/uno/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -17,7 +16,7 @@ func Connect(url string) *gorm.DB {
 	log.Println("Database connection established")
 	log.Println("Running database migrations...")
 
-	db.AutoMigrate(&models.Player{}, &models.Game{}, &models.Round{}, &models.RoundScore{})
+	db.AutoMigrate(&Player{}, &Game{}, &Round{}, &RoundScore{})
 
 	return db
 }

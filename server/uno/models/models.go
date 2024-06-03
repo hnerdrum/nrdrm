@@ -1,6 +1,8 @@
 package models
 
 import (
+	"nrdrm/uno/database"
+
 	"gorm.io/gorm"
 )
 
@@ -11,7 +13,7 @@ func GetAllPlayers(db *gorm.DB) ([]Player, error) {
 }
 
 func CreatePlayer(db *gorm.DB, name string) (Player, error) {
-	player := Player { Name: name }
+	player := database.Player { Name: name }
 	result := db.Create(&player)
 	return player, result.Error
 }
