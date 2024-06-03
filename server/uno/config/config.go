@@ -10,6 +10,7 @@ import (
 
 type Config struct {
 	Port int
+	DatabaseUrl string
 }
 
 func LoadConfig() Config {
@@ -19,8 +20,9 @@ func LoadConfig() Config {
   }
 
 	port := ParseInt(LoadEnvVar("PORT"))
+	databaseUrl := LoadEnvVar("DATABASE_URL")
 
-	return Config { Port: port }
+	return Config { Port: port, DatabaseUrl: databaseUrl }
 }
 
 func LoadEnvVar(name string) string {

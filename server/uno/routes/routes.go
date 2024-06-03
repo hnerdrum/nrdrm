@@ -1,13 +1,11 @@
 package routes
 
 import (
-	"net/http"
+	"nrdrm/uno/controllers"
 
 	"github.com/gin-gonic/gin"
 )
 
 func RegisterRoutes(router *gin.Engine) {
-	router.GET("/", func(c *gin.Context) {
-    c.JSON(http.StatusOK, "Hello, world!")
-  })
+	router.GET("/players", controllers.GetAllPlayers)
 }
