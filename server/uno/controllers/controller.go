@@ -2,14 +2,14 @@ package controllers
 
 import (
 	"net/http"
+	"nrdrm/uno/database"
 	"nrdrm/uno/models"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-func getDB(c *gin.Context) *gorm.DB {
-	return c.MustGet("db").(*gorm.DB)
+func getDB(c *gin.Context) database.DBClient {
+	return c.MustGet("db").(database.DBClient)
 }
 
 func GetAllPlayers(c *gin.Context) {
@@ -42,4 +42,27 @@ func CreatePlayer(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, player)
+}
+
+type CreateGameInput struct {
+	Title     string    `json:"title" binding:"required"`
+  PlayerIDs []uint    `json:"player_ids" binding:"required"`
+}
+
+func CreateGame (c *gin.Context) {
+	var input CreateGameInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	db := getDB(c)
+
+	game, err := models.CreateGame(db, input.Title, input.PlayerIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, game)
 }

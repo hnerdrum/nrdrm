@@ -7,7 +7,9 @@ import (
 	"gorm.io/gorm"
 )
 
-func Connect(url string) *gorm.DB {
+type DBClient = *gorm.DB
+
+func Connect(url string) DBClient {
 	db, err := gorm.Open(postgres.Open(url))
 	if err != nil {
 			log.Fatalf("Failed to connect to database: %v", err)
