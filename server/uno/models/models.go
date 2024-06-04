@@ -37,6 +37,24 @@ func CreatePlayer(db database.DBClient, name string) (Player, error) {
 	return fromDbPlayer(player), result.Error
 }
 
+func GetAllGames(db database.DBClient) ([]Game, error) {
+	var dbGames []database.Game
+	result := db.Preload("Players").Find(&dbGames)
+
+	games := []Game{}
+	for _, game := range dbGames {
+		games = append(games, fromDbGame(game))
+	}
+
+	return games, result.Error
+}
+
+func GetGameById(db database.DBClient, id uint) (Game, error) {
+	var dbGame database.Game
+	result := db.Preload("Players").First(&dbGame, id)
+	return fromDbGame(dbGame), result.Error
+}
+
 func CreateGame(db database.DBClient, title string, playerIds []uint) (Game, error) {
 	dbPlayers, err := GetPlayersByID(db, playerIds)
 
@@ -53,12 +71,6 @@ func GetPlayersByID(db database.DBClient, playerIds []uint) ([]database.Player, 
 	var dbPlayers []database.Player
 	result := db.Where("id IN ?", playerIds).Find(&dbPlayers)
 	return dbPlayers, result.Error
-}
-
-func GetPlayerByID(db database.DBClient, id uint) (database.Player, error) {
-	var dbPlayer database.Player
-	result := db.First(&dbPlayer, id)
-	return dbPlayer, result.Error
 }
 
 func fromDbGame(game database.Game) Game {
