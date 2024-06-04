@@ -9,4 +9,5 @@ import (
 func RegisterRoutes(router *gin.Engine) {
 	router.GET("/players", controllers.GetAllPlayers)
 	router.POST("/players", controllers.CreatePlayer)
+	router.POST("/games", controllers.CreateGame)
 }

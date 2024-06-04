@@ -2,25 +2,79 @@ package models
 
 import (
 	"nrdrm/uno/database"
-
-	"gorm.io/gorm"
+	"time"
 )
 
-type Player struct {
-	ID   uint `json:"id"`
-	Name string `json:"name"`
+type Game struct {
+	ID        uint       `json:"id"`
+	Title     string     `json:"title"`
+	StartTime time.Time  `json:"start_time"`
+	EndTime   *time.Time `json:"end_time,omitempty"`
+	WinnerID  *uint      `json:"winner_id,omitempty"`
+	Players   []Player   `json:"players"`
 }
 
-func GetAllPlayers(db *gorm.DB) ([]Player, error) {
-	var players []Player
-  result := db.Find(&players)
+type Player struct {
+	ID   uint    `json:"id"`
+	Name string  `json:"name"`
+}
+
+func GetAllPlayers(db database.DBClient) ([]Player, error) {
+	var dbPlayers []database.Player
+  result := db.Find(&dbPlayers)
+
+	players := []Player{}
+	for _, player := range dbPlayers {
+		players = append(players, fromDbPlayer(player))
+	}
+
   return players, result.Error
 }
 
-func CreatePlayer(db *gorm.DB, name string) (Player, error) {
+func CreatePlayer(db database.DBClient, name string) (Player, error) {
 	player := database.Player { Name: name }
 	result := db.Create(&player)
 	return fromDbPlayer(player), result.Error
+}
+
+func CreateGame(db database.DBClient, title string, playerIds []uint) (Game, error) {
+	dbPlayers, err := GetPlayersByID(db, playerIds)
+
+	if err != nil {
+		return Game{}, err
+	}
+
+	game := database.Game { Title: title, Players: dbPlayers, StartTime: time.Now() }
+	result := db.Create(&game)
+	return fromDbGame(game), result.Error
+}
+
+func GetPlayersByID(db database.DBClient, playerIds []uint) ([]database.Player, error) {
+	var dbPlayers []database.Player
+	result := db.Where("id IN ?", playerIds).Find(&dbPlayers)
+	return dbPlayers, result.Error
+}
+
+func GetPlayerByID(db database.DBClient, id uint) (database.Player, error) {
+	var dbPlayer database.Player
+	result := db.First(&dbPlayer, id)
+	return dbPlayer, result.Error
+}
+
+func fromDbGame(game database.Game) Game {
+	players := []Player{}
+	for _, player := range game.Players {
+		players = append(players, fromDbPlayer(player))
+	}
+
+	return Game {
+		ID: game.ID,
+		Title: game.Title,
+		StartTime: game.StartTime,
+		EndTime: game.EndTime,
+		WinnerID: game.WinnerID,
+		Players: players,
+	}
 }
 
 func fromDbPlayer(player database.Player) Player {
