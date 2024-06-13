@@ -1,16 +1,19 @@
 <script lang="ts">
   import * as Card from "$lib/components/ui/card";
+  import { Button } from "$lib/components/ui/button";
+
+  export let data;
 </script>
 
-<Card.Root>
-  <Card.Header>
-    <Card.Title>Card Title</Card.Title>
-    <Card.Description>Card Description</Card.Description>
-  </Card.Header>
-  <Card.Content>
-    <p>Card Content</p>
-  </Card.Content>
-  <Card.Footer>
-    <p>Card Footer</p>
-  </Card.Footer>
-</Card.Root>
+<div>
+  {#each data.games as game}
+    <Card.Root class="mb-2">
+      <Card.Header>
+        <Card.Title>{game.title}</Card.Title>
+      </Card.Header>
+      <Card.Content>
+        <Button>Se mer</Button>
+      </Card.Content>
+    </Card.Root>
+  {/each}
+</div>
