@@ -2,6 +2,19 @@
 	import '../globals.css';
 </script>
 
-<slot></slot><slot></slot>
+<style>
+  .container {
+    max-width: 390px;
+    padding: 16px;
+  }
 
-<style></style>
+  @media (min-width: 768px) {
+    .container {
+      padding: 2rem;
+    }
+  }
+</style>
+
+<div class="container">
+  <slot></slot>
+</div>
