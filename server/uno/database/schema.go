@@ -13,7 +13,7 @@ type Game struct {
 	EndTime   *time.Time `json:"end_time,omitempty"`
 	WinnerID  *uint      `json:"winner_id,omitempty"`
 	Winner    *Player    `json:"winner" gorm:"foreignKey:WinnerID;references:ID"`
-	Players   []Player  `gorm:"many2many:game_players;" json:"players"`
+	Players   []Player   `gorm:"many2many:game_players;" json:"players"`
 	Rounds    []Round    `json:"rounds"`
 }
 
@@ -36,14 +36,13 @@ type RoundScore struct {
   Round     Round     `json:"round" gorm:"foreignKey:RoundID;references:ID"`
   PlayerID  uint      `json:"player_id"`
   Player    Player    `json:"player" gorm:"foreignKey:PlayerID;references:ID"`
-  Score     int       `json:"score"`
-  Rank      int       `json:"rank"`
+  CardsLeft int       `json:"cards_left"`
 }
 
 type Player struct {
-	ID   uint `gorm:"primaryKey" json:"id"`
+	ID   uint            `gorm:"primaryKey" json:"id"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	Name      string     `json:"name"`
-	Games     []Game    `gorm:"many2many:game_players;" json:"games"`
+	Games     []Game     `gorm:"many2many:game_players;" json:"games"`
 }

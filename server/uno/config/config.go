@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -11,6 +12,7 @@ import (
 type Config struct {
 	Port int
 	DatabaseUrl string
+	AllowedOrigins []string
 }
 
 func LoadConfig() Config {
@@ -21,8 +23,9 @@ func LoadConfig() Config {
 
 	port := ParseInt(LoadEnvVar("PORT"))
 	databaseUrl := LoadEnvVar("DATABASE_URL")
+	allowedOrigins := strings.Split(LoadEnvVar("ALLOWED_ORIGINS"), ",")
 
-	return Config { Port: port, DatabaseUrl: databaseUrl }
+	return Config { Port: port, DatabaseUrl: databaseUrl, AllowedOrigins: allowedOrigins }
 }
 
 func LoadEnvVar(name string) string {
