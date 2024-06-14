@@ -16,4 +16,10 @@
       </Card.Content>
     </Card.Root>
   {/each}
+  {#if data.games.length === 0}
+  <div class="flex flex-col items-center justify-center gap-4">
+  <h1 class="font-bold">Ingen spill finnes enda</h1>
+    <Button href="/new">Lag spill</Button>
+  </div>
+  {/if}
 </div>

@@ -1,5 +1,7 @@
 import { PUBLIC_SERVER_URL } from '$env/static/public';
 
+const ssr = false;
+
 export async function load({ fetch }) {
 	const res = await fetch(`${PUBLIC_SERVER_URL}/games`, {
 		headers: {
