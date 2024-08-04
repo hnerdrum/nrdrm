@@ -1,62 +1,61 @@
 module API.Server
-    (
-     server
-     , api
-    ) where
+  ( server,
+    api,
+  )
+where
 
-import API.Auth (meHandler, loginUserHandler)
+import API.Auth (loginUserHandler, meHandler)
 import API.Health (healthHandler)
-import API.Ingredient (getAllIngredientsHandler, getIngredientHandler, createIngredientHandler, updateIngredientHandler, deleteIngredientHandler)
-import API.Recipe (getAllRecipesHandler, getRecipeHandler, createRecipeHandler, updateRecipeHandler, deleteRecipeHandler)
+import API.Ingredient (createIngredientHandler, deleteIngredientHandler, getAllIngredientsHandler, getIngredientHandler, updateIngredientHandler)
+import API.Recipe (createRecipeHandler, deleteRecipeHandler, getAllRecipesHandler, getRecipeHandler, updateRecipeHandler)
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
-import Data.Text ( Text )
-import Data.UUID ( UUID )
-import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
-import Database.Ingredient (CreateIngredientInput(..), UpdateIngredientInput(..))
-import Domain.Auth (LoginInput(..), UserSettings(..))
-import Domain.Ingredient (Ingredient(..))
-import Domain.Recipe (Recipe(..))
-import Domain.User (User(..))
-import Http.Headers (SetCookieHeader, CookieHeader)
+import Data.Text (Text)
+import Data.UUID (UUID)
+import Database.Ingredient (CreateIngredientInput (..), UpdateIngredientInput (..))
+import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
+import Domain.Auth (LoginInput (..), UserSettings (..))
+import Domain.Ingredient (Ingredient (..))
+import Domain.Recipe (Recipe (..))
+import Domain.User (User (..))
+import Http.Headers (CookieHeader, SetCookieHeader)
 import Servant
-    ( Header,
-      Handler,
-      hoistServer,
-      Proxy(..),
-      type (:<|>)(..),
-      Capture,
-      JSON,
-      PlainText,
-      ReqBody,
-      type (:>),
-      DeleteNoContent,
-      Get,
-      Post,
-      PostCreated,
-      Put,
-      HasServer(ServerT),
-      Server )
+  ( Capture,
+    DeleteNoContent,
+    Get,
+    Handler,
+    HasServer (ServerT),
+    Header,
+    JSON,
+    PlainText,
+    Post,
+    PostCreated,
+    Proxy (..),
+    Put,
+    ReqBody,
+    Server,
+    hoistServer,
+    type (:<|>) (..),
+    type (:>),
+  )
 
 type API =
-  "api" :> "v1" :> (
-       Get '[JSON] [Recipe]
-  :<|> Capture "recipeId" UUID :> Get '[JSON] Recipe
-  :<|> ReqBody '[JSON] CreateRecipeInput :> PostCreated '[JSON] Recipe
-  :<|> Capture "recipeId" UUID :> ReqBody '[JSON] UpdateRecipeInput :> Header CookieHeader Text :> Put '[JSON] Recipe
-  :<|> Capture "recipeId" UUID :> Header CookieHeader Text :> DeleteNoContent
-
-  :<|> "ingredients" :> Get '[JSON] [Ingredient]
-  :<|> "ingredients" :> Capture "ingredientId" UUID :> Get '[JSON] Ingredient
-  :<|> "ingredients" :> ReqBody '[JSON] CreateIngredientInput :> PostCreated '[JSON] Ingredient
-  :<|> "ingredients" :> Capture "ingredientId" UUID :> ReqBody '[JSON] UpdateIngredientInput :> Put '[JSON] Ingredient
-  :<|> "ingredients" :> Capture "ingredientId" UUID :> DeleteNoContent
-
-  :<|> "me" :> Header CookieHeader Text :> Get '[JSON] UserSettings
-  :<|> "login" :> ReqBody '[JSON] LoginInput :> Post '[JSON] (SetCookieHeader User)
-
-  :<|> "health" :> Get '[PlainText] Text
-  )
+  "api"
+    :> "v1"
+    :> ( Get '[JSON] [Recipe]
+           :<|> Capture "recipeId" UUID :> Get '[JSON] Recipe
+           :<|> ReqBody '[JSON] CreateRecipeInput :> PostCreated '[JSON] Recipe
+           :<|> Capture "recipeId" UUID :> ReqBody '[JSON] UpdateRecipeInput :> Header CookieHeader Text :> Put '[JSON] Recipe
+           :<|> Capture "recipeId" UUID :> Header CookieHeader Text :> DeleteNoContent
+           :<|> "ingredients" :> Get '[JSON] [Ingredient]
+           :<|> "ingredients" :> Capture "ingredientId" UUID :> Get '[JSON] Ingredient
+           :<|> "ingredients" :> ReqBody '[JSON] CreateIngredientInput :> PostCreated '[JSON] Ingredient
+           :<|> "ingredients" :> Capture "ingredientId" UUID :> ReqBody '[JSON] UpdateIngredientInput :> Put '[JSON] Ingredient
+           :<|> "ingredients" :> Capture "ingredientId" UUID :> DeleteNoContent
+           :<|> "me" :> Header CookieHeader Text :> Get '[JSON] UserSettings
+           :<|> "login" :> ReqBody '[JSON] LoginInput :> Post '[JSON] (SetCookieHeader User)
+           :<|> "health" :> Get '[PlainText] Text
+       )
 
 server :: AppContext -> Server API
 server appContext = hoistServer api (runAppM appContext) apiHandlers
@@ -69,19 +68,16 @@ runAppM appContext appAction = runReaderT appAction appContext
 
 apiHandlers :: ServerT API AppM
 apiHandlers =
-         getAllRecipesHandler
+  getAllRecipesHandler
     :<|> getRecipeHandler
     :<|> createRecipeHandler
     :<|> updateRecipeHandler
     :<|> deleteRecipeHandler
-
     :<|> getAllIngredientsHandler
     :<|> getIngredientHandler
     :<|> createIngredientHandler
     :<|> updateIngredientHandler
     :<|> deleteIngredientHandler
-
     :<|> meHandler
     :<|> loginUserHandler
-
     :<|> healthHandler

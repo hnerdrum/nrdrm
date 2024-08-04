@@ -1,20 +1,21 @@
 module API.Ingredient
-  ( getAllIngredientsHandler
-  , getIngredientHandler
-  , createIngredientHandler
-  , updateIngredientHandler
-  , deleteIngredientHandler
-  ) where
+  ( getAllIngredientsHandler,
+    getIngredientHandler,
+    createIngredientHandler,
+    updateIngredientHandler,
+    deleteIngredientHandler,
+  )
+where
 
 import API.Errors (handleError)
 import API.Utils (resolveEitherAppResult)
-import App (AppContext(..), AppM)
+import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.Text ( pack )
-import Data.UUID ( UUID )
-import Database.Ingredient (CreateIngredientInput(..), UpdateIngredientInput(..))
-import Domain.Ingredient (Ingredient(..), getAllIngredients, getIngredient, createIngredient, updateIngredient, deleteIngredient)
-import Servant ( NoContent(..) )
+import Data.Text (pack)
+import Data.UUID (UUID)
+import Database.Ingredient (CreateIngredientInput (..), UpdateIngredientInput (..))
+import Domain.Ingredient (Ingredient (..), createIngredient, deleteIngredient, getAllIngredients, getIngredient, updateIngredient)
+import Servant (NoContent (..))
 
 getAllIngredientsHandler :: AppM [Ingredient]
 getAllIngredientsHandler = do

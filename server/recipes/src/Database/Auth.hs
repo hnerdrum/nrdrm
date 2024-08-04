@@ -1,28 +1,32 @@
 module Database.Auth
-(
-   DbAuthToken(..)
- , AuthTokenStatus(..)
-) where
+  ( DbAuthToken (..),
+    AuthTokenStatus (..),
+  )
+where
 
-import Data.Maybe ( isNothing )
-import Data.Text ( Text )
-import Data.Time ( UTCTime )
-import Data.UUID ( UUID )
+import Data.Maybe (isNothing)
+import Data.Text (Text)
+import Data.Time (UTCTime)
+import Data.UUID (UUID)
 import Database.PostgreSQL.Simple.FromField
-    ( ResultError(ConversionFailed, UnexpectedNull),
-      FromField(..),
-      returnError )
+  ( FromField (..),
+    ResultError (ConversionFailed, UnexpectedNull),
+    returnError,
+  )
+import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import Database.PostgreSQL.Simple.ToField
-    ( Action(Escape), ToField(..) )
-import Database.PostgreSQL.Simple.FromRow ( FromRow(..), field )
+  ( Action (Escape),
+    ToField (..),
+  )
 
 data DbAuthToken = DbAuthToken
-  { id         :: UUID
-  , createdAt  :: UTCTime
-  , updatedAt  :: UTCTime
-  , value      :: Text
-  , userId     :: UUID
-  } deriving (Show)
+  { id :: UUID,
+    createdAt :: UTCTime,
+    updatedAt :: UTCTime,
+    value :: Text,
+    userId :: UUID
+  }
+  deriving (Show)
 
 instance FromRow DbAuthToken where
   fromRow = DbAuthToken <$> field <*> field <*> field <*> field <*> field
@@ -31,13 +35,13 @@ data AuthTokenStatus = NORMAL | WITHDRAWN | EXPIRED deriving (Show)
 
 instance FromField AuthTokenStatus where
   fromField f bs
-    | isNothing bs             = returnError UnexpectedNull f ""
-    | bs == Just "NORMAL"      = pure NORMAL
-    | bs == Just "WITHDRAWN"   = pure WITHDRAWN
-    | bs == Just "EXPIRED"     = pure EXPIRED
-    | otherwise                = returnError ConversionFailed f ""
+    | isNothing bs = returnError UnexpectedNull f ""
+    | bs == Just "NORMAL" = pure NORMAL
+    | bs == Just "WITHDRAWN" = pure WITHDRAWN
+    | bs == Just "EXPIRED" = pure EXPIRED
+    | otherwise = returnError ConversionFailed f ""
 
 instance ToField AuthTokenStatus where
-    toField NORMAL   = Escape "NORMAL"
-    toField WITHDRAWN = Escape "WITHDRAWN"
-    toField EXPIRED  = Escape "EXPIRED"
+  toField NORMAL = Escape "NORMAL"
+  toField WITHDRAWN = Escape "WITHDRAWN"
+  toField EXPIRED = Escape "EXPIRED"

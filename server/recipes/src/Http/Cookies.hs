@@ -1,9 +1,9 @@
 module Http.Cookies
-(
-  getCookie
-, authCookie
-, authCookieName
-) where
+  ( getCookie,
+    authCookie,
+    authCookieName,
+  )
+where
 
 import qualified Data.Text as T hiding (map)
 
@@ -26,7 +26,7 @@ parseCookies cookieHeader = map parseCookie (splitCookie cookieHeader)
 
 parseCookie :: T.Text -> (T.Text, T.Text)
 parseCookie cookie = case T.breakOn "=" cookie of
-    (key, val) -> (T.strip key, T.strip $ T.drop 1 val)
+  (key, val) -> (T.strip key, T.strip $ T.drop 1 val)
 
 splitCookie :: T.Text -> [T.Text]
 splitCookie = T.splitOn ";" . T.strip

@@ -1,21 +1,22 @@
 module API.Recipe
-    ( getAllRecipesHandler
-    , getRecipeHandler
-    , createRecipeHandler
-    , updateRecipeHandler
-    , deleteRecipeHandler
-    ) where
+  ( getAllRecipesHandler,
+    getRecipeHandler,
+    createRecipeHandler,
+    updateRecipeHandler,
+    deleteRecipeHandler,
+  )
+where
 
 import API.Auth (authMiddleware)
 import API.Errors (handleError)
 import API.Utils (resolveEitherAppResult)
-import App (AppContext(..), AppM)
+import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.UUID ( UUID )
-import Data.Text ( Text, pack )
-import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
-import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, createRecipe, updateRecipe, deleteRecipe)
-import Servant ( NoContent(..) )
+import Data.Text (Text, pack)
+import Data.UUID (UUID)
+import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
+import Domain.Recipe (Recipe (..), createRecipe, deleteRecipe, getAllRecipes, getRecipe, updateRecipe)
+import Servant (NoContent (..))
 
 getAllRecipesHandler :: AppM [Recipe]
 getAllRecipesHandler = do

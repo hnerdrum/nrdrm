@@ -1,35 +1,36 @@
 module Logger
-    (
-      initializeLogEnv
-    , loggingMiddleware
-    , logInfo
-    , logWarn
-    , logError
-    ) where
+  ( initializeLogEnv,
+    loggingMiddleware,
+    logInfo,
+    logWarn,
+    logError,
+  )
+where
 
 import Data.Text
 import Katip
-    ( LogEnv,
-      Namespace,
-      Severity(ErrorS, InfoS, WarningS),
-      defaultScribeSettings,
-      initLogEnv,
-      logMsg,
-      logStr,
-      permitItem,
-      registerScribe,
-      runKatipT,
-      mkHandleScribe,
-      Verbosity(V2),
-      ColorStrategy(ColorIfTerminal) )
+  ( ColorStrategy (ColorIfTerminal),
+    LogEnv,
+    Namespace,
+    Severity (ErrorS, InfoS, WarningS),
+    Verbosity (V2),
+    defaultScribeSettings,
+    initLogEnv,
+    logMsg,
+    logStr,
+    mkHandleScribe,
+    permitItem,
+    registerScribe,
+    runKatipT,
+  )
 import Network.Wai (Middleware, rawPathInfo, requestMethod)
 import System.IO (stdout)
 
 initializeLogEnv :: IO LogEnv
 initializeLogEnv = do
-    logEnv <- initLogEnv "recipes" "production"
-    jsonScribe <- mkHandleScribe ColorIfTerminal stdout (permitItem InfoS) V2
-    registerScribe "stdout" jsonScribe defaultScribeSettings logEnv
+  logEnv <- initLogEnv "recipes" "production"
+  jsonScribe <- mkHandleScribe ColorIfTerminal stdout (permitItem InfoS) V2
+  registerScribe "stdout" jsonScribe defaultScribeSettings logEnv
 
 loggingMiddleware :: LogEnv -> Middleware
 loggingMiddleware logEnv app req res = do
