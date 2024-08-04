@@ -11,12 +11,13 @@ import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.Pool (Pool)
 import qualified Database.PostgreSQL.Simple as PGSimple
-import Data.Text
+import Data.Text ( Text )
 import Domain.Auth (LoginInput(..), UserSettings(..), Auth(..), loginUser, generateToken, upsertUserAuthToken, getAuthToken)
 import Domain.User (User(..))
 import Http.Cookies (getCookie, authCookie, authCookieName)
 import Http.Headers (SetCookieHeader)
 import Servant
+    ( addHeader, err401, throwError, ServerError(errBody) )
 
 meHandler :: Maybe Text -> AppM UserSettings
 meHandler maybeCookies = do

@@ -4,7 +4,12 @@ module Database.Migrations
     ) where
 
 import Database.PostgreSQL.Simple
+    ( Connection, connectPostgreSQL, withTransaction )
 import Database.PostgreSQL.Simple.Migration.V1Compat
+    ( MigrationResult,
+      MigrationCommand(MigrationDirectory, MigrationInitialization),
+      runMigration,
+      MigrationContext(MigrationContext) )
 import qualified Data.ByteString.Char8 as B8
 
 initializeMigrations :: Connection -> IO (MigrationResult String)

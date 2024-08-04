@@ -3,10 +3,10 @@ module Database.User
   DbUser(..)
 ) where
 
-import Data.Text
-import Data.Time
-import Data.UUID
-import Database.PostgreSQL.Simple.FromRow
+import Data.Text ( Text )
+import Data.Time ( UTCTime )
+import Data.UUID ( UUID )
+import Database.PostgreSQL.Simple.FromRow ( FromRow(..), field )
 
 data DbUser = DbUser
   { id                :: UUID

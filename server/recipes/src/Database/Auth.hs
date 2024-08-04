@@ -4,13 +4,17 @@ module Database.Auth
  , AuthTokenStatus(..)
 ) where
 
-import Data.Maybe
-import Data.Text
-import Data.Time
-import Data.UUID
+import Data.Maybe ( isNothing )
+import Data.Text ( Text )
+import Data.Time ( UTCTime )
+import Data.UUID ( UUID )
 import Database.PostgreSQL.Simple.FromField
+    ( ResultError(ConversionFailed, UnexpectedNull),
+      FromField(..),
+      returnError )
 import Database.PostgreSQL.Simple.ToField
-import Database.PostgreSQL.Simple.FromRow
+    ( Action(Escape), ToField(..) )
+import Database.PostgreSQL.Simple.FromRow ( FromRow(..), field )
 
 data DbAuthToken = DbAuthToken
   { id         :: UUID

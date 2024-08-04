@@ -3,7 +3,7 @@ module Lib
       startApp
     ) where
 
-import API.Server
+import API.Server ( api, server )
 import App (AppContext(..))
 import qualified Config
 import Control.Monad.Reader (liftIO)
@@ -12,8 +12,8 @@ import Database.Migrations (runDbMigrations)
 import Data.Text (pack)
 import Http.Cors (corsMiddleware)
 import Logger (initializeLogEnv, loggingMiddleware, logInfo)
-import Network.Wai.Handler.Warp
-import Servant
+import Network.Wai.Handler.Warp ( run )
+import Servant ( serve )
 
 startApp :: IO ()
 startApp = do

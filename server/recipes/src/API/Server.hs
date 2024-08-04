@@ -10,8 +10,8 @@ import API.Ingredient (getAllIngredientsHandler, getIngredientHandler, createIng
 import API.Recipe (getAllRecipesHandler, getRecipeHandler, createRecipeHandler, updateRecipeHandler, deleteRecipeHandler)
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
-import Data.Text
-import Data.UUID
+import Data.Text ( Text )
+import Data.UUID ( UUID )
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
 import Database.Ingredient (CreateIngredientInput(..), UpdateIngredientInput(..))
 import Domain.Auth (LoginInput(..), UserSettings(..))
@@ -20,6 +20,23 @@ import Domain.Recipe (Recipe(..))
 import Domain.User (User(..))
 import Http.Headers (SetCookieHeader, CookieHeader)
 import Servant
+    ( Header,
+      Handler,
+      hoistServer,
+      Proxy(..),
+      type (:<|>)(..),
+      Capture,
+      JSON,
+      PlainText,
+      ReqBody,
+      type (:>),
+      DeleteNoContent,
+      Get,
+      Post,
+      PostCreated,
+      Put,
+      HasServer(ServerT),
+      Server )
 
 type API =
   "api" :> "v1" :> (

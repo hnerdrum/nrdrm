@@ -11,11 +11,11 @@ import API.Errors (handleError)
 import API.Utils (resolveEitherAppResult)
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.UUID
-import Data.Text
+import Data.UUID ( UUID )
+import Data.Text ( Text, pack )
 import Database.Recipe (CreateRecipeInput(..), UpdateRecipeInput(..))
 import Domain.Recipe (Recipe(..), getAllRecipes, getRecipe, createRecipe, updateRecipe, deleteRecipe)
-import Servant
+import Servant ( NoContent(..) )
 
 getAllRecipesHandler :: AppM [Recipe]
 getAllRecipesHandler = do

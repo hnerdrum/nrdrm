@@ -7,7 +7,7 @@ module Domain.Errors
     ) where
 
 import API.Errors (ToServantError (toServerError))
-import Servant
+import Servant ( err401, err404, err409, ServerError(errBody) )
 
 data RecipeError = RecipeNotFound | MultipleRecipesFound
   deriving (Eq, Show)
