@@ -62,7 +62,7 @@ executables:
       - recipes
 
 tests:
-  server-test:
+  recipes-test:
     main: Spec.hs
     source-dirs: test
     ghc-options:
