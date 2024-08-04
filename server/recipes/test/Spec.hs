@@ -9,4 +9,4 @@ spec :: Spec
 spec = do
     describe "Test" $ do
       it "Should test something" $ do
-        2 `shouldBe` 2
+        (2 :: Integer) `shouldBe` (2 :: Integer)

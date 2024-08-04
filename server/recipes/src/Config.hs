@@ -1,11 +1,10 @@
 module Config
     (
       AppConfig(..)
-    , loadConfig  
+    , loadConfig
     ) where
 
 import System.Environment (lookupEnv)
-import Control.Monad (join)
 import Configuration.Dotenv (loadFile, defaultConfig)
 import Data.List.Split (splitOn)
 import Data.Maybe (fromMaybe)
@@ -33,7 +32,7 @@ loadConfig = do
     }
 
 parsePort :: Maybe String -> Maybe Int
-parsePort = join . fmap readMaybe
+parsePort = (readMaybe =<<)
 
 parseAllowedOrigins :: Maybe String -> [String]
 parseAllowedOrigins Nothing = []

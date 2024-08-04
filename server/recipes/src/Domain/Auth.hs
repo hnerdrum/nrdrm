@@ -62,10 +62,10 @@ instance FromJSON LoginInput where
 loginUser :: Pool PGSimple.Connection -> LoginInput -> IO (Either UserError User)
 loginUser pool loginInput = do
   eitherUser <- liftIO $ getUserByEmail pool loginInput.email
-  return $ eitherUser >>= (validateUserLogin loginInput)
+  return $ eitherUser >>= validateUserLogin loginInput
 
 validateUserLogin :: LoginInput -> DbUser -> Either UserError User
-validateUserLogin loginInput user = fmap fromDbUser $ validateUserPassword user loginInput.password
+validateUserLogin loginInput user = fromDbUser <$> validateUserPassword user loginInput.password
 
 validateUserPassword :: DbUser -> Text -> Either UserError DbUser
 validateUserPassword user inputPassword
@@ -83,18 +83,18 @@ upsertUserAuthToken pool user token =
            VALUES (?, ?, ?)
            ON CONFLICT (value, user_id)
            DO UPDATE SET status = EXCLUDED.status, updated_at = ?
-         |] $ (token, NORMAL, user.id, now)
+         |] (token, NORMAL, user.id, now)
       return ()
 
 getAuthToken :: Pool PGSimple.Connection -> Text -> IO (Either AuthTokenError Auth)
-getAuthToken pool value =
+getAuthToken pool val =
   withResource pool $ \conn -> do
     authTokens <- PGSimple.query conn
       [sql|
-        SELECT id, created_at, updated_at, value, user_id
+        SELECT id, created_at, updated_at, val, user_id
         FROM auth_token
-        WHERE value = ? AND status = ?
-      |] $ (value, NORMAL)
+        WHERE val = ? AND status = ?
+      |] (val, NORMAL)
     return $ mapAuthTokenResult authTokens
 
 mapAuthTokenResult :: [DbAuthToken] -> Either AuthTokenError Auth
@@ -109,7 +109,7 @@ generateToken user = do
         hashedBytes :: Digest SHA256
         hashedBytes = hash input
         encodedToken = B64.encode (BS.pack (show hashedBytes))
-    return $ pack $ BS.unpack $ encodedToken
+    return $ pack $ BS.unpack encodedToken
   where
     userIdBytes = BS.pack $ show user.id
     emailBytes = TE.encodeUtf8 user.email

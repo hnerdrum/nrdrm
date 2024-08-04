@@ -36,7 +36,7 @@ handleValidUser pool user = do
   token <- liftIO $ generateToken user
   _ <- liftIO $ upsertUserAuthToken pool user token
   let cookieHeader = addHeader $ authCookie token
-  return $ cookieHeader $ user
+  return $ cookieHeader user
 
 authMiddleware :: (a -> AppM b) -> a -> Maybe Text -> AppM b
 authMiddleware action input maybeCookies = do
@@ -46,7 +46,7 @@ authMiddleware action input maybeCookies = do
 
 validateAuth :: Pool PGSimple.Connection -> Maybe Text -> AppM (Maybe Auth)
 validateAuth pool maybeCookies = do
-  maybeCookie <- getCookie authCookieName <$> return maybeCookies
+  let maybeCookie = getCookie authCookieName maybeCookies
   maybe (return Nothing) (getAuthFromCookie pool) maybeCookie
 
 getAuthFromCookie :: Pool PGSimple.Connection -> Text -> AppM (Maybe Auth)

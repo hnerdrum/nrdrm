@@ -30,4 +30,4 @@ startApp = do
 
   liftIO $ logInfo logEnv "app" $ "Starting " <> appName <> " app on port " <> (pack . show) port
 
-  run port $ corsMiddleware (Config.allowedOrigins config) $ (loggingMiddleware logEnv) $ serve api $ server appContext
+  run port $ corsMiddleware (Config.allowedOrigins config) $ loggingMiddleware logEnv $ serve api $ server appContext
