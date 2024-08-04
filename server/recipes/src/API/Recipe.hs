@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds       #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 module API.Recipe
     ( getAllRecipesHandler
     , getRecipeHandler

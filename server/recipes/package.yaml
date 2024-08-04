@@ -48,6 +48,15 @@ ghc-options:
 
 library:
   source-dirs: src
+  default-extensions:
+    - DataKinds
+    - DuplicateRecordFields
+    - OverloadedRecordDot
+    - OverloadedStrings
+    - QuasiQuotes
+    - TemplateHaskell
+    - TypeFamilies
+    - TypeOperators
 
 executables:
   server-exe:

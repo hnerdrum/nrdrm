@@ -1,7 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-
 module Http.Headers
   (
     SetCookieHeader
