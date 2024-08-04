@@ -1,16 +1,20 @@
 module Database.Migrations
-    (
-      runDbMigrations
-    ) where
+  ( runDbMigrations,
+  )
+where
 
-import Database.PostgreSQL.Simple
-    ( Connection, connectPostgreSQL, withTransaction )
-import Database.PostgreSQL.Simple.Migration.V1Compat
-    ( MigrationResult,
-      MigrationCommand(MigrationDirectory, MigrationInitialization),
-      runMigration,
-      MigrationContext(MigrationContext) )
 import qualified Data.ByteString.Char8 as B8
+import Database.PostgreSQL.Simple
+  ( Connection,
+    connectPostgreSQL,
+    withTransaction,
+  )
+import Database.PostgreSQL.Simple.Migration.V1Compat
+  ( MigrationCommand (MigrationDirectory, MigrationInitialization),
+    MigrationContext (MigrationContext),
+    MigrationResult,
+    runMigration,
+  )
 
 initializeMigrations :: Connection -> IO (MigrationResult String)
 initializeMigrations conn = runMigration $ MigrationContext MigrationInitialization True conn

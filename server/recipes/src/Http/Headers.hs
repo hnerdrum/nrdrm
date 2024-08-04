@@ -1,13 +1,13 @@
 module Http.Headers
-  (
-    SetCookieHeader
-  , CookieHeader
-  ) where
+  ( SetCookieHeader,
+    CookieHeader,
+  )
+where
 
-import Data.Text ( Text )
-import Servant ( Headers, Header )
+import Data.Text (Text)
+import Servant (Header, Headers)
 
-type SetCookieHeader v = Headers '[ Header SetCookieHeaderName Text ] v
+type SetCookieHeader v = Headers '[Header SetCookieHeaderName Text] v
 
 type family SetCookieHeaderName where
   SetCookieHeaderName = "Set-Cookie"

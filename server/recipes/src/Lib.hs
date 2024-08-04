@@ -1,19 +1,19 @@
 module Lib
-    (
-      startApp
-    ) where
+  ( startApp,
+  )
+where
 
-import API.Server ( api, server )
-import App (AppContext(..))
+import API.Server (api, server)
+import App (AppContext (..))
 import qualified Config
 import Control.Monad.Reader (liftIO)
+import Data.Text (pack)
 import Database.Connection (createConnection)
 import Database.Migrations (runDbMigrations)
-import Data.Text (pack)
 import Http.Cors (corsMiddleware)
-import Logger (initializeLogEnv, loggingMiddleware, logInfo)
-import Network.Wai.Handler.Warp ( run )
-import Servant ( serve )
+import Logger (initializeLogEnv, logInfo, loggingMiddleware)
+import Network.Wai.Handler.Warp (run)
+import Servant (serve)
 
 startApp :: IO ()
 startApp = do
