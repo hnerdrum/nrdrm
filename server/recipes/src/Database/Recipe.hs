@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Database.Recipe
 (
   DbRecipeIngredient(..)
@@ -10,12 +12,12 @@ module Database.Recipe
 , getUpdateRecipeIngredientInput
 ) where
 
-import Data.Aeson
-import Data.Text hiding (map)
-import Data.Time
-import Data.UUID
+import Data.Aeson ( FromJSON(parseJSON), (.:), (.:?), withObject )
+import Data.Text ( Text )
+import Data.Time ( UTCTime )
+import Data.UUID ( UUID )
 import Database.Ingredient (Unit(..), unitToString)
-import Database.PostgreSQL.Simple.FromRow
+import Database.PostgreSQL.Simple.FromRow ( FromRow(..), field )
 
 data DbRecipeIngredient = DbRecipeIngredient
   { dbRecipeId :: UUID

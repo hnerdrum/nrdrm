@@ -10,11 +10,11 @@ import API.Errors (handleError)
 import API.Utils (resolveEitherAppResult)
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.Text
-import Data.UUID
+import Data.Text ( pack )
+import Data.UUID ( UUID )
 import Database.Ingredient (CreateIngredientInput(..), UpdateIngredientInput(..))
 import Domain.Ingredient (Ingredient(..), getAllIngredients, getIngredient, createIngredient, updateIngredient, deleteIngredient)
-import Servant
+import Servant ( NoContent(..) )
 
 getAllIngredientsHandler :: AppM [Ingredient]
 getAllIngredientsHandler = do

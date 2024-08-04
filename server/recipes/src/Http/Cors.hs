@@ -5,6 +5,9 @@ module Http.Cors
 
 import Data.ByteString.Char8 (pack)
 import Network.Wai.Middleware.Cors
+    ( CorsResourcePolicy(corsOrigins, corsRequestHeaders, corsMethods),
+      cors,
+      simpleCorsResourcePolicy )
 import Network.Wai (Middleware)
 
 corsMiddleware :: [String] -> Middleware

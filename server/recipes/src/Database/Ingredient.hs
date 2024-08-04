@@ -8,13 +8,16 @@ module Database.Ingredient
 ) where
 
 import Data.Aeson
-import Data.Aeson.TH
-import Data.Maybe
-import Data.Text
-import Data.Time
-import Data.UUID
+import Data.Aeson.TH ( deriveJSON )
+import Data.Maybe ( isNothing )
+import Data.Text ( Text )
+import Data.Time ( UTCTime )
+import Data.UUID ( UUID )
 import Database.PostgreSQL.Simple.FromField
-import Database.PostgreSQL.Simple.FromRow
+    ( ResultError(ConversionFailed, UnexpectedNull),
+      FromField(..),
+      returnError )
+import Database.PostgreSQL.Simple.FromRow ( FromRow(..), field )
 
 data Unit = G | Ml | Tsp | Tbsp | Qty deriving (Show)
 

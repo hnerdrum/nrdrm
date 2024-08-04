@@ -7,10 +7,10 @@ module API.Errors
 
 import App (AppContext(..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.Text
+import Data.Text ( Text )
 import Katip (Namespace)
 import Logger (logError)
-import Servant
+import Servant ( throwError, ServerError )
 
 class ToServantError a where
   toServerError :: a -> ServerError

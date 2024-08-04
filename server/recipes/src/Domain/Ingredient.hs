@@ -1,3 +1,6 @@
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Domain.Ingredient
     (
       Ingredient(..),
@@ -11,10 +14,10 @@ module Domain.Ingredient
     ) where
 
 import Data.Aeson
-import Data.Aeson.TH
-import Data.Text hiding (map, head, null, filter, length, zip)
-import Data.Time
-import Data.UUID hiding (null)
+import Data.Aeson.TH ( deriveJSON )
+import Data.Text ( Text )
+import Data.Time ( getCurrentTime )
+import Data.UUID ( UUID )
 import qualified Data.UUID.V4 as V4
 import Data.Pool (Pool, withResource)
 import qualified Database.PostgreSQL.Simple as PGSimple

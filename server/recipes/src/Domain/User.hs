@@ -1,3 +1,6 @@
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Domain.User
 (
   User(..)

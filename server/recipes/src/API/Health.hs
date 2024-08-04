@@ -4,7 +4,7 @@ module API.Health
   ) where
 
 import App (AppM)
-import Data.Text
+import Data.Text ( Text )
 
 healthHandler :: AppM Text
 healthHandler = return "OK"

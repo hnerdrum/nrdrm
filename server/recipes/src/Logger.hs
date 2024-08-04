@@ -9,6 +9,19 @@ module Logger
 
 import Data.Text
 import Katip
+    ( LogEnv,
+      Namespace,
+      Severity(ErrorS, InfoS, WarningS),
+      defaultScribeSettings,
+      initLogEnv,
+      logMsg,
+      logStr,
+      permitItem,
+      registerScribe,
+      runKatipT,
+      mkHandleScribe,
+      Verbosity(V2),
+      ColorStrategy(ColorIfTerminal) )
 import Network.Wai (Middleware, rawPathInfo, requestMethod)
 import System.IO (stdout)
 

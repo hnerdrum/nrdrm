@@ -4,8 +4,8 @@ module Http.Headers
   , CookieHeader
   ) where
 
-import Data.Text
-import Servant
+import Data.Text ( Text )
+import Servant ( Headers, Header )
 
 type SetCookieHeader v = Headers '[ Header SetCookieHeaderName Text ] v
 

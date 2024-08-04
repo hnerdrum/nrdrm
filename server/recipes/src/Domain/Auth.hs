@@ -1,3 +1,8 @@
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use newtype instead of data" #-}
+
 module Domain.Auth
 (
   LoginInput(..)
