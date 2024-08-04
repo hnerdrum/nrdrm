@@ -35,7 +35,7 @@ loggingMiddleware :: LogEnv -> Middleware
 loggingMiddleware logEnv app req res = do
   let method = requestMethod req
   logInfo logEnv "api" $ (pack . show) method <> " " <> (pack . show) (rawPathInfo req)
-  app req $ res
+  app req res
 
 logInfo :: LogEnv -> Namespace -> Text -> IO ()
 logInfo = logWithSeverity InfoS
