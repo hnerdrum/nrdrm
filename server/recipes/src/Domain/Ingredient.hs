@@ -24,7 +24,7 @@ import Database.Ingredient (CreateIngredientInput (..), DbIngredient (..), Unit 
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.Recipe (DbRecipeIngredient (..))
-import Domain.Errors (IngredientError (..))
+import Domain.Errors (DomainError (..))
 
 data RecipeIngredient = RecipeIngredient
   { id :: UUID,
@@ -50,11 +50,11 @@ getAllIngredients pool =
     dbIngredients <- PGSimple.query_ conn "SELECT * from ingredient"
     return $ map fromDbIngredient dbIngredients
 
-getIngredient :: Pool PGSimple.Connection -> UUID -> IO (Either IngredientError Ingredient)
+getIngredient :: Pool PGSimple.Connection -> UUID -> IO (Either DomainError Ingredient)
 getIngredient pool ingredientId =
   withResource pool $ \conn -> getIngredientById conn ingredientId
 
-createIngredient :: Pool PGSimple.Connection -> CreateIngredientInput -> IO (Either IngredientError Ingredient)
+createIngredient :: Pool PGSimple.Connection -> CreateIngredientInput -> IO (Either DomainError Ingredient)
 createIngredient pool ingredient =
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
@@ -69,7 +69,7 @@ createIngredient pool ingredient =
           (ingredientId, ingredient.name)
       getIngredientById conn ingredientId
 
-updateIngredient :: Pool PGSimple.Connection -> UUID -> UpdateIngredientInput -> IO (Either IngredientError Ingredient)
+updateIngredient :: Pool PGSimple.Connection -> UUID -> UpdateIngredientInput -> IO (Either DomainError Ingredient)
 updateIngredient pool ingredientId ingredient =
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
@@ -97,7 +97,7 @@ deleteIngredient pool ingredientId =
         $ PGSimple.Only ingredientId
     return ()
 
-getIngredientById :: PGSimple.Connection -> UUID -> IO (Either IngredientError Ingredient)
+getIngredientById :: PGSimple.Connection -> UUID -> IO (Either DomainError Ingredient)
 getIngredientById conn ingredientId = do
   dbIngredients <-
     PGSimple.query
@@ -110,11 +110,11 @@ getIngredientById conn ingredientId = do
       $ PGSimple.Only ingredientId
   return $ reduceDbIngredients dbIngredients
 
-reduceDbIngredients :: [DbIngredient] -> Either IngredientError Ingredient
+reduceDbIngredients :: [DbIngredient] -> Either DomainError Ingredient
 reduceDbIngredients dbIngredients
-  | null dbIngredients = Left IngredientNotFound
+  | null dbIngredients = Left (NotFoundError "Ingredient could not be found")
   | length dbIngredients == 1 = Right $ fromDbIngredient (head dbIngredients)
-  | otherwise = Left MultipleIngredientsFound
+  | otherwise = Left (MultipleEntitiesError "Found multiple ingredients with matching ID")
 
 fromDbIngredient :: DbIngredient -> Ingredient
 fromDbIngredient dbIngredient =

@@ -8,7 +8,7 @@ module API.Recipe
 where
 
 import API.Auth (authMiddleware)
-import API.Errors (handleError)
+import API.Errors (handleError, withErrorHandling)
 import API.Utils (resolveEitherAppResult)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)

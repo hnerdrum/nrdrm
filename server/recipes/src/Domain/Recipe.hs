@@ -24,7 +24,7 @@ import qualified Data.UUID.V4 as V4
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.Recipe (CreateRecipeInput (..), DbRecipeIngredient (..), UpdateRecipeInput (..), getCreateRecipeIngredientInput, getCreateRecipeInput, getUpdateRecipeIngredientInput)
-import Domain.Errors (RecipeError (..))
+import Domain.Errors (DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..), fromDbRecipeIngredient)
 
 data Recipe = Recipe
@@ -52,11 +52,11 @@ getAllRecipes pool =
       |]
     return $ mapDbRecipeIngredients dbRecipeIngredients
 
-getRecipe :: Pool PGSimple.Connection -> UUID -> IO (Either RecipeError Recipe)
+getRecipe :: Pool PGSimple.Connection -> UUID -> IO (Either DomainError Recipe)
 getRecipe pool recipeId =
   withResource pool $ \conn -> getRecipeById conn recipeId
 
-createRecipe :: Pool PGSimple.Connection -> CreateRecipeInput -> IO (Either RecipeError Recipe)
+createRecipe :: Pool PGSimple.Connection -> CreateRecipeInput -> IO (Either DomainError Recipe)
 createRecipe pool recipe =
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
@@ -79,7 +79,7 @@ createRecipe pool recipe =
           $ getCreateRecipeIngredientInput recipeId recipe
       getRecipeById conn recipeId
 
-updateRecipe :: Pool PGSimple.Connection -> UUID -> UpdateRecipeInput -> IO (Either RecipeError Recipe)
+updateRecipe :: Pool PGSimple.Connection -> UUID -> UpdateRecipeInput -> IO (Either DomainError Recipe)
 updateRecipe pool recipeId updateRecipeInput =
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
@@ -134,7 +134,7 @@ deleteRecipe pool recipeId =
           $ PGSimple.Only recipeId
       return ()
 
-getRecipeById :: PGSimple.Connection -> UUID -> IO (Either RecipeError Recipe)
+getRecipeById :: PGSimple.Connection -> UUID -> IO (Either DomainError Recipe)
 getRecipeById conn recipeId = do
   dbRecipeIngredients <-
     PGSimple.query
@@ -154,11 +154,11 @@ mapDbRecipeIngredients :: [DbRecipeIngredient] -> [Recipe]
 mapDbRecipeIngredients dbRecipeIngredients =
   map toRecipe $ groupById dbRecipeIngredients
 
-reduceDbRecipeIngredients :: [DbRecipeIngredient] -> Either RecipeError Recipe
+reduceDbRecipeIngredients :: [DbRecipeIngredient] -> Either DomainError Recipe
 reduceDbRecipeIngredients dbRecipeIngredients
-  | null recipeGroups = Left RecipeNotFound
+  | null recipeGroups = Left (NotFoundError "Recipe could not be found")
   | length recipeGroups == 1 = Right $ toRecipe $ head recipeGroups
-  | otherwise = Left MultipleRecipesFound
+  | otherwise = Left (MultipleEntitiesError "Found multiple recipes with matching ID")
   where
     recipeGroups = groupById dbRecipeIngredients
 
