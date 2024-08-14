@@ -52,6 +52,7 @@ library:
   default-extensions:
     - DataKinds
     - DuplicateRecordFields
+    - NamedFieldPuns
     - OverloadedRecordDot
     - OverloadedStrings
     - QuasiQuotes
