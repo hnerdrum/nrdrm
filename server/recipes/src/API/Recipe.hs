@@ -1,15 +1,14 @@
 module API.Recipe
-  ( getAllRecipesHandler,
-    getRecipeHandler,
-    createRecipeHandler,
-    updateRecipeHandler,
+  ( getAllRecipesRoute,
+    getRecipeRoute,
+    createRecipeRoute,
+    updateRecipeRoute,
     deleteRecipeHandler,
   )
 where
 
 import API.Auth (authMiddleware)
-import API.Errors (handleError, withErrorHandling)
-import API.Utils (resolveEitherAppResult)
+import API.Errors (AppError, returnApiResult, withErrorHandling)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.Text (Text, pack)
@@ -18,31 +17,40 @@ import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
 import Domain.Recipe (Recipe (..), createRecipe, deleteRecipe, getAllRecipes, getRecipe, updateRecipe)
 import Servant (NoContent (..))
 
-getAllRecipesHandler :: AppM [Recipe]
-getAllRecipesHandler = do
+getAllRecipesRoute :: AppM [Recipe]
+getAllRecipesRoute = do
   pool <- asks dbPool
   liftIO $ getAllRecipes pool
 
-getRecipeHandler :: UUID -> AppM Recipe
+getRecipeRoute :: UUID -> AppM Recipe
+getRecipeRoute = withErrorHandling . getRecipeHandler
+
+getRecipeHandler :: UUID -> AppM (Either AppError Recipe)
 getRecipeHandler recipeId = do
   pool <- asks dbPool
-  eitherRecipe <- liftIO $ getRecipe pool recipeId
-  resolveEitherAppResult (handleError "getRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
+  result <- liftIO $ getRecipe pool recipeId
+  returnApiResult result "getRecipeHandler" ("Failed to get recipe with ID: " <> (pack . show) recipeId)
 
-createRecipeHandler :: CreateRecipeInput -> AppM Recipe
+createRecipeRoute :: CreateRecipeInput -> AppM Recipe
+createRecipeRoute = withErrorHandling . createRecipeHandler
+
+createRecipeHandler :: CreateRecipeInput -> AppM (Either AppError Recipe)
 createRecipeHandler createRecipeInput = do
   pool <- asks dbPool
-  eitherRecipe <- liftIO $ createRecipe pool createRecipeInput
-  resolveEitherAppResult (handleError "createRecipeHandler" "Recipe not found") return eitherRecipe
+  result <- liftIO $ createRecipe pool createRecipeInput
+  returnApiResult result "createRecipeHandler" "Failed to create recipe"
 
-updateRecipeHandler :: UUID -> UpdateRecipeInput -> Maybe Text -> AppM Recipe
+updateRecipeRoute :: UUID -> UpdateRecipeInput -> Maybe Text -> AppM Recipe
+updateRecipeRoute recipeId input cookie = withErrorHandling (updateRecipeHandler recipeId input cookie)
+
+updateRecipeHandler :: UUID -> UpdateRecipeInput -> Maybe Text -> AppM (Either AppError Recipe)
 updateRecipeHandler = authMiddleware . updateRecipeUnsafe
 
-updateRecipeUnsafe :: UUID -> UpdateRecipeInput -> AppM Recipe
+updateRecipeUnsafe :: UUID -> UpdateRecipeInput -> AppM (Either AppError Recipe)
 updateRecipeUnsafe recipeId updateRecipeInput = do
   pool <- asks dbPool
-  eitherRecipe <- liftIO $ updateRecipe pool recipeId updateRecipeInput
-  resolveEitherAppResult (handleError "updateRecipeHandler" ("Recipe with ID: " <> (pack . show) recipeId <> " not found")) return eitherRecipe
+  result <- liftIO $ updateRecipe pool recipeId updateRecipeInput
+  returnApiResult result "updateRecipeHandler" ("Failed to update recipe with ID: " <> (pack . show) recipeId)
 
 deleteRecipeHandler :: UUID -> Maybe Text -> AppM NoContent
 deleteRecipeHandler = authMiddleware deleteRecipeUnsafe
