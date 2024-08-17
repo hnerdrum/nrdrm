@@ -1,10 +1,10 @@
 module API.Errors
-  ( ToServantError,
-    toServerError,
-    handleError,
+  ( handleError,
     withErrorHandling,
     AppError (..),
     DomainError (..),
+    returnApiResult,
+    mapApiResult,
   )
 where
 
@@ -26,12 +26,16 @@ import Servant
 
 data AppError = AppError
   { error :: DomainError,
-    message :: Text,
+    logMessage :: Text,
     namespace :: Namespace
   }
 
-class ToServantError a where
-  toServerError :: a -> ServerError
+returnApiResult :: Either DomainError a -> Namespace -> Text -> AppM (Either AppError a)
+returnApiResult result ns msg = return $ mapApiResult result ns msg
+
+mapApiResult :: Either DomainError a -> Namespace -> Text -> Either AppError a
+mapApiResult (Left err) ns msg = Left (AppError err msg ns)
+mapApiResult (Right a) _ _ = Right a
 
 handleError :: Namespace -> Text -> DomainError -> AppM a
 handleError ns msg err = do
@@ -45,7 +49,7 @@ withErrorHandling = (either handleAppError return =<<)
 handleAppError :: AppError -> AppM a
 handleAppError err = do
   logEnv <- asks appLogEnv
-  liftIO $ logError logEnv err.namespace err.message
+  liftIO $ logError logEnv err.namespace err.logMessage
   throwError (fromDomainError err.error)
 
 fromDomainError :: DomainError -> ServerError
