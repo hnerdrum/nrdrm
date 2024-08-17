@@ -6,8 +6,8 @@ where
 
 import API.Auth (loginUserHandler, meHandler)
 import API.Health (healthHandler)
-import API.Ingredient (createIngredientHandler, deleteIngredientHandler, getAllIngredientsHandler, getIngredientHandler, updateIngredientHandler)
-import API.Recipe (createRecipeHandler, deleteRecipeHandler, getAllRecipesHandler, getRecipeHandler, updateRecipeHandler)
+import API.Ingredient (createIngredientRoute, deleteIngredientRoute, getAllIngredientsRoute, getIngredientRoute, updateIngredientRoute)
+import API.Recipe (createRecipeRoute, deleteRecipeHandler, getAllRecipesRoute, getRecipeRoute, updateRecipeRoute)
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
 import Data.Text (Text)
@@ -68,16 +68,16 @@ runAppM appContext appAction = runReaderT appAction appContext
 
 apiHandlers :: ServerT API AppM
 apiHandlers =
-  getAllRecipesHandler
-    :<|> getRecipeHandler
-    :<|> createRecipeHandler
-    :<|> updateRecipeHandler
+  getAllRecipesRoute
+    :<|> getRecipeRoute
+    :<|> createRecipeRoute
+    :<|> updateRecipeRoute
     :<|> deleteRecipeHandler
-    :<|> getAllIngredientsHandler
-    :<|> getIngredientHandler
-    :<|> createIngredientHandler
-    :<|> updateIngredientHandler
-    :<|> deleteIngredientHandler
+    :<|> getAllIngredientsRoute
+    :<|> getIngredientRoute
+    :<|> createIngredientRoute
+    :<|> updateIngredientRoute
+    :<|> deleteIngredientRoute
     :<|> meHandler
     :<|> loginUserHandler
     :<|> healthHandler
