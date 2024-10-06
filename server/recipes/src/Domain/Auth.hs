@@ -31,7 +31,7 @@ import Database.Auth (AuthTokenStatus (..), DbAuthToken (..))
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.User (DbUser (..))
-import Domain.Errors (DomainError (..))
+import Domain.Errors (AppError (..), DomainError (..))
 import Domain.User (User (..), fromDbUser, getUserByEmail)
 
 type Token = Text
@@ -64,18 +64,18 @@ instance FromJSON LoginInput where
           password = passwordValue
         }
 
-loginUser :: Pool PGSimple.Connection -> LoginInput -> IO (Either DomainError User)
+loginUser :: Pool PGSimple.Connection -> LoginInput -> IO (Either AppError User)
 loginUser pool loginInput = do
   eitherUser <- liftIO $ getUserByEmail pool loginInput.email
   return $ eitherUser >>= validateUserLogin loginInput
 
-validateUserLogin :: LoginInput -> DbUser -> Either DomainError User
+validateUserLogin :: LoginInput -> DbUser -> Either AppError User
 validateUserLogin loginInput user = fromDbUser <$> validateUserPassword user loginInput.password
 
-validateUserPassword :: DbUser -> Text -> Either DomainError DbUser
+validateUserPassword :: DbUser -> Text -> Either AppError DbUser
 validateUserPassword user inputPassword
   | validatePassword (TE.encodeUtf8 user.passwordHash) (TE.encodeUtf8 inputPassword) = Right user
-  | otherwise = Left (WrongPwdError "Wrong password")
+  | otherwise = Left (AppError {error = WrongPwdError, message = "Wrong password", context = object []})
 
 upsertUserAuthToken :: Pool PGSimple.Connection -> User -> Token -> IO ()
 upsertUserAuthToken pool user token =
@@ -94,7 +94,7 @@ upsertUserAuthToken pool user token =
           (token, NORMAL, user.id, now)
       return ()
 
-getAuthToken :: Pool PGSimple.Connection -> Text -> IO (Either DomainError Auth)
+getAuthToken :: Pool PGSimple.Connection -> Text -> IO (Either AppError Auth)
 getAuthToken pool val =
   withResource pool $ \conn -> do
     authTokens <-
@@ -108,10 +108,10 @@ getAuthToken pool val =
         (val, NORMAL)
     return $ mapAuthTokenResult authTokens
 
-mapAuthTokenResult :: [DbAuthToken] -> Either DomainError Auth
-mapAuthTokenResult [] = Left (NotFoundError "Token could not be found")
+mapAuthTokenResult :: [DbAuthToken] -> Either AppError Auth
+mapAuthTokenResult [] = Left (AppError {error = NotFoundError, message = "Token could not be found", context = object []})
 mapAuthTokenResult [token] = Right $ Auth {userId = token.userId}
-mapAuthTokenResult _ = Left (MultipleEntitiesError "Found multiple auth tokens with matching value")
+mapAuthTokenResult _ = Left (AppError {error = MultipleEntitiesError, message = "Found multiple auth tokens with matching value", context = object []})
 
 generateToken :: User -> IO Token
 generateToken user = do
