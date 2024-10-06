@@ -7,11 +7,12 @@ import API.Server (api, server)
 import App (AppContext (..))
 import qualified Config
 import Control.Monad.Reader (liftIO)
+import Data.Aeson (object)
 import Data.Text (pack)
 import Database.Connection (createConnection)
 import Database.Migrations (runDbMigrations)
 import Http.Cors (corsMiddleware)
-import Logger (initializeLogEnv, logInfo, loggingMiddleware)
+import qualified Logger
 import Network.Wai.Handler.Warp (run)
 import Servant (serve)
 
@@ -23,11 +24,11 @@ startApp = do
 
   let appName = "Recipes"
   pool <- createConnection $ Config.databaseUrl config
-  logEnv <- initializeLogEnv
-  let appContext = AppContext appName pool logEnv
+
+  let appContext = AppContext appName pool
 
   let port = Config.port config
 
-  liftIO $ logInfo logEnv "app" $ "Starting " <> appName <> " app on port " <> (pack . show) port
+  liftIO $ Logger.info ("Starting " <> appName <> " app on port " <> (pack . show) port) (object [])
 
-  run port $ corsMiddleware (Config.allowedOrigins config) $ loggingMiddleware logEnv $ serve api $ server appContext
+  run port $ corsMiddleware (Config.allowedOrigins config) $ Logger.loggingMiddleware $ serve api $ server appContext

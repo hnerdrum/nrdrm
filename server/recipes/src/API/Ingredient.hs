@@ -28,7 +28,7 @@ getIngredientHandler :: UUID -> AppM (Either AppError Ingredient)
 getIngredientHandler ingredientId = do
   pool <- asks dbPool
   result <- liftIO $ getIngredient pool ingredientId
-  returnApiResult result "getIngredientHandler" ("Failed to get ingredient with ID: " <> (pack . show) ingredientId)
+  returnApiResult result ("Failed to get ingredient with ID: " <> (pack . show) ingredientId)
 
 createIngredientRoute :: CreateIngredientInput -> AppM Ingredient
 createIngredientRoute = withErrorHandling . createIngredientHandler
@@ -37,7 +37,7 @@ createIngredientHandler :: CreateIngredientInput -> AppM (Either AppError Ingred
 createIngredientHandler createIngredientInput = do
   pool <- asks dbPool
   result <- liftIO $ createIngredient pool createIngredientInput
-  returnApiResult result "createIngredientHandler" "Failed to create a new ingredient"
+  returnApiResult result "Failed to create a new ingredient"
 
 updateIngredientRoute :: UUID -> UpdateIngredientInput -> AppM Ingredient
 updateIngredientRoute ingredientId input = withErrorHandling (updateIngredientHandler ingredientId input)
@@ -46,7 +46,7 @@ updateIngredientHandler :: UUID -> UpdateIngredientInput -> AppM (Either AppErro
 updateIngredientHandler ingredientId updateIngredientInput = do
   pool <- asks dbPool
   result <- liftIO $ updateIngredient pool ingredientId updateIngredientInput
-  returnApiResult result "updateIngredientHandler" ("Failed to update ingredient with ID: " <> (pack . show) ingredientId)
+  returnApiResult result ("Failed to update ingredient with ID: " <> (pack . show) ingredientId)
 
 deleteIngredientRoute :: UUID -> AppM NoContent
 deleteIngredientRoute ingredientId = do

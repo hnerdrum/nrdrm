@@ -8,13 +8,11 @@ import Control.Monad.Reader (ReaderT)
 import Data.Pool (Pool)
 import Data.Text (Text)
 import Database.PostgreSQL.Simple (Connection)
-import Katip (LogEnv)
 import Servant (Handler)
 
 data AppContext = AppContext
   { name :: Text,
-    dbPool :: Pool Connection,
-    appLogEnv :: LogEnv
+    dbPool :: Pool Connection
   }
 
 type AppM = ReaderT AppContext Handler

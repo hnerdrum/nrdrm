@@ -29,7 +29,7 @@ getRecipeHandler :: UUID -> AppM (Either AppError Recipe)
 getRecipeHandler recipeId = do
   pool <- asks dbPool
   result <- liftIO $ getRecipe pool recipeId
-  returnApiResult result "getRecipeHandler" ("Failed to get recipe with ID: " <> (pack . show) recipeId)
+  returnApiResult result ("Failed to get recipe with ID: " <> (pack . show) recipeId)
 
 createRecipeRoute :: CreateRecipeInput -> AppM Recipe
 createRecipeRoute = withErrorHandling . createRecipeHandler
@@ -38,7 +38,7 @@ createRecipeHandler :: CreateRecipeInput -> AppM (Either AppError Recipe)
 createRecipeHandler createRecipeInput = do
   pool <- asks dbPool
   result <- liftIO $ createRecipe pool createRecipeInput
-  returnApiResult result "createRecipeHandler" "Failed to create recipe"
+  returnApiResult result "Failed to create recipe"
 
 updateRecipeRoute :: UUID -> UpdateRecipeInput -> Maybe Text -> AppM Recipe
 updateRecipeRoute recipeId input cookie = withErrorHandling (updateRecipeHandler recipeId input cookie)
@@ -50,7 +50,7 @@ updateRecipeUnsafe :: UUID -> UpdateRecipeInput -> AppM (Either AppError Recipe)
 updateRecipeUnsafe recipeId updateRecipeInput = do
   pool <- asks dbPool
   result <- liftIO $ updateRecipe pool recipeId updateRecipeInput
-  returnApiResult result "updateRecipeHandler" ("Failed to update recipe with ID: " <> (pack . show) recipeId)
+  returnApiResult result ("Failed to update recipe with ID: " <> (pack . show) recipeId)
 
 deleteRecipeHandler :: UUID -> Maybe Text -> AppM NoContent
 deleteRecipeHandler = authMiddleware deleteRecipeUnsafe
