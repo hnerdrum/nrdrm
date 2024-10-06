@@ -33,7 +33,7 @@ loginUserHandler :: LoginInput -> AppM (SetCookieHeader User)
 loginUserHandler loginInput = do
   pool <- asks dbPool
   eitherUser <- liftIO $ loginUser pool loginInput
-  resolveEitherAppResult (handleError "loginUserHandler" "Error when trying to login with email") (handleValidUser pool) eitherUser
+  resolveEitherAppResult (handleError "Error when trying to login with email") (handleValidUser pool) eitherUser
 
 handleValidUser :: Pool PGSimple.Connection -> User -> AppM (SetCookieHeader User)
 handleValidUser pool user = do

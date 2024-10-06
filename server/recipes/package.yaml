@@ -25,6 +25,7 @@ dependencies:
   - uuid
   - time
   - containers
+  - unordered-containers
   - katip
   - dotenv
   - bytestring
@@ -35,6 +36,7 @@ dependencies:
   - base64-bytestring
   - bcrypt
   - hlint
+  - monad-logger-aeson
 
 ghc-options:
   - -Wall
