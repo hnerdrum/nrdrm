@@ -17,10 +17,8 @@ data AppError = AppError
 
 data DomainError = NotFoundError | MultipleEntitiesError | WrongPwdError
 
-addErrorContext :: Value -> Either AppError a -> Either AppError a
-addErrorContext newContext (Left appError) =
-  Left appError {context = mergeValues appError.context newContext}
-addErrorContext _ (Right a) = Right a
+addErrorContext :: Value -> AppError -> AppError
+addErrorContext newContext appError = appError {context = mergeValues appError.context newContext}
 
 mergeObjects :: Object -> Object -> Object
 mergeObjects = KM.unionWith mergeValues

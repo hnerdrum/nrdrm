@@ -14,6 +14,7 @@ where
 import Control.Monad
 import Data.Aeson (object, (.=))
 import Data.Aeson.TH (defaultOptions, deriveJSON)
+import Data.Either.Combinators
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
@@ -149,7 +150,7 @@ getRecipeById conn recipeId = do
       WHERE r.id = ?
     |]
       $ PGSimple.Only recipeId
-  return $ addErrorContext (object ["recipeId" .= recipeId]) (reduceDbRecipeIngredients dbRecipeIngredients)
+  return $ mapLeft (addErrorContext (object ["recipeId" .= recipeId])) (reduceDbRecipeIngredients dbRecipeIngredients)
 
 mapDbRecipeIngredients :: [DbRecipeIngredient] -> [Recipe]
 mapDbRecipeIngredients dbRecipeIngredients =
