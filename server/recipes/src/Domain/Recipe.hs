@@ -12,6 +12,7 @@ module Domain.Recipe
 where
 
 import Control.Monad
+import Data.Aeson (object)
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
@@ -24,7 +25,7 @@ import qualified Data.UUID.V4 as V4
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.Recipe (CreateRecipeInput (..), DbRecipeIngredient (..), UpdateRecipeInput (..), getCreateRecipeIngredientInput, getCreateRecipeInput, getUpdateRecipeIngredientInput)
-import Domain.Errors (DomainError (..))
+import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..), fromDbRecipeIngredient)
 
 data Recipe = Recipe
@@ -52,11 +53,11 @@ getAllRecipes pool =
       |]
     return $ mapDbRecipeIngredients dbRecipeIngredients
 
-getRecipe :: Pool PGSimple.Connection -> UUID -> IO (Either DomainError Recipe)
+getRecipe :: Pool PGSimple.Connection -> UUID -> IO (Either AppError Recipe)
 getRecipe pool recipeId =
   withResource pool $ \conn -> getRecipeById conn recipeId
 
-createRecipe :: Pool PGSimple.Connection -> CreateRecipeInput -> IO (Either DomainError Recipe)
+createRecipe :: Pool PGSimple.Connection -> CreateRecipeInput -> IO (Either AppError Recipe)
 createRecipe pool recipe =
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
@@ -79,7 +80,7 @@ createRecipe pool recipe =
           $ getCreateRecipeIngredientInput recipeId recipe
       getRecipeById conn recipeId
 
-updateRecipe :: Pool PGSimple.Connection -> UUID -> UpdateRecipeInput -> IO (Either DomainError Recipe)
+updateRecipe :: Pool PGSimple.Connection -> UUID -> UpdateRecipeInput -> IO (Either AppError Recipe)
 updateRecipe pool recipeId updateRecipeInput =
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
@@ -134,7 +135,7 @@ deleteRecipe pool recipeId =
           $ PGSimple.Only recipeId
       return ()
 
-getRecipeById :: PGSimple.Connection -> UUID -> IO (Either DomainError Recipe)
+getRecipeById :: PGSimple.Connection -> UUID -> IO (Either AppError Recipe)
 getRecipeById conn recipeId = do
   dbRecipeIngredients <-
     PGSimple.query
@@ -154,11 +155,11 @@ mapDbRecipeIngredients :: [DbRecipeIngredient] -> [Recipe]
 mapDbRecipeIngredients dbRecipeIngredients =
   map toRecipe $ groupById dbRecipeIngredients
 
-reduceDbRecipeIngredients :: [DbRecipeIngredient] -> Either DomainError Recipe
+reduceDbRecipeIngredients :: [DbRecipeIngredient] -> Either AppError Recipe
 reduceDbRecipeIngredients dbRecipeIngredients
-  | null recipeGroups = Left (NotFoundError "Recipe could not be found")
+  | null recipeGroups = Left (AppError {error = NotFoundError, message = "Recipe could not be found", context = object []})
   | length recipeGroups == 1 = Right $ toRecipe $ head recipeGroups
-  | otherwise = Left (MultipleEntitiesError "Found multiple recipes with matching ID")
+  | otherwise = Left (AppError {error = MultipleEntitiesError, message = "Found multiple recipes with matching ID", context = object []})
   where
     recipeGroups = groupById dbRecipeIngredients
 

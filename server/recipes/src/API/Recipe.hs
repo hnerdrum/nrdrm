@@ -8,12 +8,14 @@ module API.Recipe
 where
 
 import API.Auth (authMiddleware)
-import API.Errors (AppError, returnApiResult, withErrorHandling)
+import API.Errors (withErrorHandling)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.Text (Text, pack)
+import Data.Aeson (object, (.=))
+import Data.Text
 import Data.UUID (UUID)
 import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
+import Domain.Errors (AppError, addErrorContext)
 import Domain.Recipe (Recipe (..), createRecipe, deleteRecipe, getAllRecipes, getRecipe, updateRecipe)
 import Servant (NoContent (..))
 
@@ -29,7 +31,7 @@ getRecipeHandler :: UUID -> AppM (Either AppError Recipe)
 getRecipeHandler recipeId = do
   pool <- asks dbPool
   result <- liftIO $ getRecipe pool recipeId
-  returnApiResult result ("Failed to get recipe with ID: " <> (pack . show) recipeId)
+  return $ addErrorContext (object ["recipeId" .= recipeId]) result
 
 createRecipeRoute :: CreateRecipeInput -> AppM Recipe
 createRecipeRoute = withErrorHandling . createRecipeHandler
@@ -37,8 +39,7 @@ createRecipeRoute = withErrorHandling . createRecipeHandler
 createRecipeHandler :: CreateRecipeInput -> AppM (Either AppError Recipe)
 createRecipeHandler createRecipeInput = do
   pool <- asks dbPool
-  result <- liftIO $ createRecipe pool createRecipeInput
-  returnApiResult result "Failed to create recipe"
+  liftIO $ createRecipe pool createRecipeInput
 
 updateRecipeRoute :: UUID -> UpdateRecipeInput -> Maybe Text -> AppM Recipe
 updateRecipeRoute recipeId input cookie = withErrorHandling (updateRecipeHandler recipeId input cookie)
@@ -50,7 +51,7 @@ updateRecipeUnsafe :: UUID -> UpdateRecipeInput -> AppM (Either AppError Recipe)
 updateRecipeUnsafe recipeId updateRecipeInput = do
   pool <- asks dbPool
   result <- liftIO $ updateRecipe pool recipeId updateRecipeInput
-  returnApiResult result ("Failed to update recipe with ID: " <> (pack . show) recipeId)
+  return $ addErrorContext (object ["recipeId" .= recipeId]) result
 
 deleteRecipeHandler :: UUID -> Maybe Text -> AppM NoContent
 deleteRecipeHandler = authMiddleware deleteRecipeUnsafe

@@ -5,7 +5,7 @@ module API.Auth
   )
 where
 
-import API.Errors (handleError)
+import API.Errors (handleAppError)
 import API.Utils (eitherToMaybe, resolveEitherAppResult)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
@@ -32,8 +32,8 @@ meHandler maybeCookies = do
 loginUserHandler :: LoginInput -> AppM (SetCookieHeader User)
 loginUserHandler loginInput = do
   pool <- asks dbPool
-  eitherUser <- liftIO $ loginUser pool loginInput
-  resolveEitherAppResult (handleError "Error when trying to login with email") (handleValidUser pool) eitherUser
+  result <- liftIO $ loginUser pool loginInput
+  resolveEitherAppResult handleAppError (handleValidUser pool) result
 
 handleValidUser :: Pool PGSimple.Connection -> User -> AppM (SetCookieHeader User)
 handleValidUser pool user = do

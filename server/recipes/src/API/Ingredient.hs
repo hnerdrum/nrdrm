@@ -7,12 +7,13 @@ module API.Ingredient
   )
 where
 
-import API.Errors (AppError, returnApiResult, withErrorHandling)
+import API.Errors (withErrorHandling)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.Text (pack)
+import Data.Aeson (object, (.=))
 import Data.UUID (UUID)
 import Database.Ingredient (CreateIngredientInput (..), UpdateIngredientInput (..))
+import Domain.Errors (AppError, addErrorContext)
 import Domain.Ingredient (Ingredient (..), createIngredient, deleteIngredient, getAllIngredients, getIngredient, updateIngredient)
 import Servant (NoContent (..))
 
@@ -28,7 +29,7 @@ getIngredientHandler :: UUID -> AppM (Either AppError Ingredient)
 getIngredientHandler ingredientId = do
   pool <- asks dbPool
   result <- liftIO $ getIngredient pool ingredientId
-  returnApiResult result ("Failed to get ingredient with ID: " <> (pack . show) ingredientId)
+  return $ addErrorContext (object ["ingredientId" .= ingredientId]) result
 
 createIngredientRoute :: CreateIngredientInput -> AppM Ingredient
 createIngredientRoute = withErrorHandling . createIngredientHandler
@@ -36,8 +37,7 @@ createIngredientRoute = withErrorHandling . createIngredientHandler
 createIngredientHandler :: CreateIngredientInput -> AppM (Either AppError Ingredient)
 createIngredientHandler createIngredientInput = do
   pool <- asks dbPool
-  result <- liftIO $ createIngredient pool createIngredientInput
-  returnApiResult result "Failed to create a new ingredient"
+  liftIO $ createIngredient pool createIngredientInput
 
 updateIngredientRoute :: UUID -> UpdateIngredientInput -> AppM Ingredient
 updateIngredientRoute ingredientId input = withErrorHandling (updateIngredientHandler ingredientId input)
@@ -46,7 +46,7 @@ updateIngredientHandler :: UUID -> UpdateIngredientInput -> AppM (Either AppErro
 updateIngredientHandler ingredientId updateIngredientInput = do
   pool <- asks dbPool
   result <- liftIO $ updateIngredient pool ingredientId updateIngredientInput
-  returnApiResult result ("Failed to update ingredient with ID: " <> (pack . show) ingredientId)
+  return $ addErrorContext (object ["ingredientId" .= ingredientId]) result
 
 deleteIngredientRoute :: UUID -> AppM NoContent
 deleteIngredientRoute ingredientId = do

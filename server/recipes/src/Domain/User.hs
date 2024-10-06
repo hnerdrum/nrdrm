@@ -16,7 +16,7 @@ import Data.UUID (UUID)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.User (DbUser (..))
-import Domain.Errors (DomainError (..))
+import Domain.Errors (AppError (..), DomainError (..))
 
 data User = User
   { id :: UUID,
@@ -26,7 +26,7 @@ data User = User
 
 $(deriveJSON defaultOptions ''User)
 
-getUserByEmail :: Pool PGSimple.Connection -> Text -> IO (Either DomainError DbUser)
+getUserByEmail :: Pool PGSimple.Connection -> Text -> IO (Either AppError DbUser)
 getUserByEmail pool userEmail =
   withResource pool $ \conn -> do
     dbUsers <-
@@ -39,10 +39,10 @@ getUserByEmail pool userEmail =
         $ PGSimple.Only userEmail
     return $ reduceDbUsers dbUsers
 
-reduceDbUsers :: [DbUser] -> Either DomainError DbUser
-reduceDbUsers [] = Left (NotFoundError "User could not be found")
+reduceDbUsers :: [DbUser] -> Either AppError DbUser
+reduceDbUsers [] = Left (AppError {error = NotFoundError, message = "User could not be found", context = object []})
 reduceDbUsers [dbUser] = Right dbUser
-reduceDbUsers _ = Left (MultipleEntitiesError "Found multiple users with matching email")
+reduceDbUsers _ = Left (AppError {error = MultipleEntitiesError, message = "Found multiple users with matching email", context = object []})
 
 fromDbUser :: DbUser -> User
 fromDbUser dbUser =
