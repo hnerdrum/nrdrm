@@ -33,6 +33,8 @@ RUN apt-get update && \
 # /root/.local/bin/* is the default directory where Stack places compiled binaries
 COPY --from=build /root/.local/bin/* /usr/local/bin/
 
+COPY --from=build /usr/src/app/migrations /app/migrations
+
 EXPOSE 8000
 
 CMD ["server-exe"]
