@@ -1,4 +1,3 @@
-#FROM --platform=linux/amd64 haskell:9.2.8 AS build
 FROM haskell:9.2.8 AS build
 
 WORKDIR /usr/src/app
@@ -15,7 +14,6 @@ COPY . .
 RUN stack build --copy-bins
 
 # Runtime stage
-#FROM --platform=linux/amd64 debian:bullseye-slim
 FROM debian:bullseye-slim
 
 WORKDIR /app
