@@ -27,6 +27,11 @@ export type Ingredient = {
   name: string;
 };
 
+export type User = {
+  id: string;
+  email: string;
+};
+
 export type UserSettings = {
   auth: Auth | null;
 };
