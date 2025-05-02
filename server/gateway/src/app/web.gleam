@@ -1,12 +1,9 @@
-import config/service.{type Service}
 import cors_builder as cors
 import gleam/http
 import gleam/list
 import wisp
-
-pub type Context {
-  Context(services: List(Service), allowed_origins: List(String))
-}
+import app/middleware.{auth_middleware}
+import app/context.{type Context}
 
 pub fn middleware(
   req: wisp.Request,
@@ -22,6 +19,8 @@ pub fn middleware(
   use req <- cors.wisp_handle(req, cors(ctx.allowed_origins))
 
   use req <- wisp.handle_head(req)
+
+  use req <- auth_middleware(req, ctx)
 
   handle_request(req)
 }

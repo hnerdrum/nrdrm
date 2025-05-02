@@ -1,6 +1,6 @@
 use crate::database::connection::DBClient;
 use crate::database::user_account::find_user_by_id;
-use crate::domain::model::{from_db_user_account, login_user, LoginError, LoginInput, User, UserSettings};
+use crate::domain::model::{from_db_user_account, login_user, LoginError, LoginInput, User, UserSettings, TokenValidation};
 use crate::database::auth_token::{find_auth_token, upsert_user_auth_token};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -42,6 +42,7 @@ pub fn init_router(state: AppState) -> Router {
     .nest("/api/v1",
       Router::new()
         .route("/health", get(health_handler))
+        .route("/validate-token", get(validate_token_handler))
         .route("/me", get(me_handler))
         .route("/login", post(login_handler))
     )
@@ -55,9 +56,23 @@ async fn health_handler() -> &'static str {
   "OK"
 }
 
+async fn validate_token_handler (cookies: Cookies, State(state): State<AppState>) -> Result<Json<TokenValidation>, LoginError> {
+  let db_auth_token_result = match cookies.get(AUTH_COOKIE_NAME) {
+    Some(cookie) => {
+        let value = cookie.value().to_owned();
+        find_auth_token(&state.db, value).await
+    }
+    None => Err("Auth token not found".to_string())
+  };
+
+  match db_auth_token_result {
+    Ok(_) => Ok(Json(TokenValidation { valid: true })),
+    Err(_) => Ok(Json(TokenValidation { valid: false }))
+  }
+}
+
 async fn me_handler (cookies: Cookies, State(state): State<AppState>) -> Result<Json<UserSettings>, LoginError> {
-  let token = cookies.get(AUTH_COOKIE_NAME);
-  let db_auth_token_result = match token {
+  let db_auth_token_result = match cookies.get(AUTH_COOKIE_NAME) {
     Some(cookie) => {
         let value = cookie.value().to_owned();
         find_auth_token(&state.db, value).await
