@@ -10,10 +10,9 @@ where
 import API.Errors (withErrorHandling)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.Aeson (object, (.=))
 import Data.UUID (UUID)
 import Database.Ingredient (CreateIngredientInput (..), UpdateIngredientInput (..))
-import Domain.Errors (AppError, addErrorContext)
+import Domain.Errors (AppError)
 import Domain.Ingredient (Ingredient (..), createIngredient, deleteIngredient, getAllIngredients, getIngredient, updateIngredient)
 import Servant (NoContent (..))
 
@@ -28,8 +27,7 @@ getIngredientRoute = withErrorHandling . getIngredientHandler
 getIngredientHandler :: UUID -> AppM (Either AppError Ingredient)
 getIngredientHandler ingredientId = do
   pool <- asks dbPool
-  result <- liftIO $ getIngredient pool ingredientId
-  return $ addErrorContext (object ["ingredientId" .= ingredientId]) result
+  liftIO $ getIngredient pool ingredientId
 
 createIngredientRoute :: CreateIngredientInput -> AppM Ingredient
 createIngredientRoute = withErrorHandling . createIngredientHandler
@@ -45,8 +43,7 @@ updateIngredientRoute ingredientId input = withErrorHandling (updateIngredientHa
 updateIngredientHandler :: UUID -> UpdateIngredientInput -> AppM (Either AppError Ingredient)
 updateIngredientHandler ingredientId updateIngredientInput = do
   pool <- asks dbPool
-  result <- liftIO $ updateIngredient pool ingredientId updateIngredientInput
-  return $ addErrorContext (object ["ingredientId" .= ingredientId]) result
+  liftIO $ updateIngredient pool ingredientId updateIngredientInput
 
 deleteIngredientRoute :: UUID -> AppM NoContent
 deleteIngredientRoute ingredientId = do

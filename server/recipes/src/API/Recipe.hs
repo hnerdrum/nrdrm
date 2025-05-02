@@ -11,11 +11,10 @@ import API.Auth (authMiddleware)
 import API.Errors (withErrorHandling)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.Aeson (object, (.=))
 import Data.Text
 import Data.UUID (UUID)
 import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
-import Domain.Errors (AppError, addErrorContext)
+import Domain.Errors (AppError)
 import Domain.Recipe (Recipe (..), createRecipe, deleteRecipe, getAllRecipes, getRecipe, updateRecipe)
 import Servant (NoContent (..))
 
@@ -30,8 +29,7 @@ getRecipeRoute = withErrorHandling . getRecipeHandler
 getRecipeHandler :: UUID -> AppM (Either AppError Recipe)
 getRecipeHandler recipeId = do
   pool <- asks dbPool
-  result <- liftIO $ getRecipe pool recipeId
-  return $ addErrorContext (object ["recipeId" .= recipeId]) result
+  liftIO $ getRecipe pool recipeId
 
 createRecipeRoute :: CreateRecipeInput -> AppM Recipe
 createRecipeRoute = withErrorHandling . createRecipeHandler
@@ -50,8 +48,7 @@ updateRecipeHandler = authMiddleware . updateRecipeUnsafe
 updateRecipeUnsafe :: UUID -> UpdateRecipeInput -> AppM (Either AppError Recipe)
 updateRecipeUnsafe recipeId updateRecipeInput = do
   pool <- asks dbPool
-  result <- liftIO $ updateRecipe pool recipeId updateRecipeInput
-  return $ addErrorContext (object ["recipeId" .= recipeId]) result
+  liftIO $ updateRecipe pool recipeId updateRecipeInput
 
 deleteRecipeHandler :: UUID -> Maybe Text -> AppM NoContent
 deleteRecipeHandler = authMiddleware deleteRecipeUnsafe

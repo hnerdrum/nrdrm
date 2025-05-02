@@ -15,6 +15,7 @@ where
 
 import Data.Aeson
 import Data.Aeson.TH (deriveJSON)
+import Data.Either.Combinators (mapLeft)
 import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import Data.Time (getCurrentTime)
@@ -24,7 +25,7 @@ import Database.Ingredient (CreateIngredientInput (..), DbIngredient (..), Unit 
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.Recipe (DbRecipeIngredient (..))
-import Domain.Errors (AppError (..), DomainError (..))
+import Domain.Errors (AppError (..), DomainError (..), addErrorContext)
 
 data RecipeIngredient = RecipeIngredient
   { id :: UUID,
@@ -108,7 +109,7 @@ getIngredientById conn ingredientId = do
     WHERE id = ?
   |]
       $ PGSimple.Only ingredientId
-  return $ reduceDbIngredients dbIngredients
+  return $ mapLeft (addErrorContext (object ["ingredientId" .= ingredientId])) (reduceDbIngredients dbIngredients)
 
 reduceDbIngredients :: [DbIngredient] -> Either AppError Ingredient
 reduceDbIngredients dbIngredients
