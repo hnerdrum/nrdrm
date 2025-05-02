@@ -37,6 +37,7 @@ dependencies:
   - bcrypt
   - hlint
   - monad-logger-aeson
+  - either
 
 ghc-options:
   - -Wall

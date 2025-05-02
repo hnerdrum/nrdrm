@@ -12,8 +12,9 @@ module Domain.Recipe
 where
 
 import Control.Monad
-import Data.Aeson (object)
+import Data.Aeson (object, (.=))
 import Data.Aeson.TH (defaultOptions, deriveJSON)
+import Data.Either.Combinators
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
@@ -25,7 +26,7 @@ import qualified Data.UUID.V4 as V4
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.Recipe (CreateRecipeInput (..), DbRecipeIngredient (..), UpdateRecipeInput (..), getCreateRecipeIngredientInput, getCreateRecipeInput, getUpdateRecipeIngredientInput)
-import Domain.Errors (AppError (..), DomainError (..))
+import Domain.Errors (AppError (..), DomainError (..), addErrorContext)
 import Domain.Ingredient (RecipeIngredient (..), fromDbRecipeIngredient)
 
 data Recipe = Recipe
@@ -149,7 +150,7 @@ getRecipeById conn recipeId = do
       WHERE r.id = ?
     |]
       $ PGSimple.Only recipeId
-  return $ reduceDbRecipeIngredients dbRecipeIngredients
+  return $ mapLeft (addErrorContext (object ["recipeId" .= recipeId])) (reduceDbRecipeIngredients dbRecipeIngredients)
 
 mapDbRecipeIngredients :: [DbRecipeIngredient] -> [Recipe]
 mapDbRecipeIngredients dbRecipeIngredients =
