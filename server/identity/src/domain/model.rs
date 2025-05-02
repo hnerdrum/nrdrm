@@ -5,6 +5,11 @@ use crate::database::user_account::{find_user_by_email, DbUserAccount};
 use crate::database::connection::DBClient;
 
 #[derive(Serialize)]
+pub struct TokenValidation {
+    pub valid: bool,
+}
+
+#[derive(Serialize)]
 pub struct UserSettings {
   pub auth: Option<Auth>
 }
