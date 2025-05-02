@@ -6,5 +6,9 @@ RUN cd /app \
   && gleam export erlang-shipment
 
 WORKDIR /app
+
 ENTRYPOINT ["/app/build/erlang-shipment/entrypoint.sh"]
+
+EXPOSE 8080
+
 CMD ["run"]
