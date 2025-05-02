@@ -15,16 +15,18 @@ pub struct DbUserAccount {
   pub password_hash: String,
 }
 
-pub async fn find_all(pool: &Pool)  -> Result<Vec<DbUserAccount>, String> {
+pub async fn find_user_by_id(pool: &Pool, user_id: Uuid) -> Result<DbUserAccount, String> {
   let conn = pool.get().await.map_err(|_| "Failed to get connection")?;
-
   conn.interact(move |conn| {
     let query = user_account::table.into_boxed::<diesel::pg::Pg>();
-    query.select(DbUserAccount::as_select()).load::<DbUserAccount>(conn).map_err(|_| "Failed to load users".to_string())
-  }).await.map_err(|_| "Failed to load users".to_string()).unwrap_or_else(|_| Ok(Vec::new()))
+    query
+      .filter(user_account::id.eq(user_id))
+      .select(DbUserAccount::as_select())
+      .first::<DbUserAccount>(conn).map_err(|_| "Failed to find user".to_string())
+  }).await.map_err(|_| "Failed to find user".to_string()).unwrap_or_else(|_| Err("Failed to find user".to_string()))
 }
 
-pub async fn find_by_email(pool: &Pool, email: String) -> Result<DbUserAccount, String> {
+pub async fn find_user_by_email(pool: &Pool, email: String) -> Result<DbUserAccount, String> {
   let conn = pool.get().await.map_err(|_| "Failed to get connection")?;
   conn.interact(move |conn| {
     let query = user_account::table.into_boxed::<diesel::pg::Pg>();
