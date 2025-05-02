@@ -1,6 +1,6 @@
 use crate::database::connection::DBClient;
 use crate::database::user_account::find_user_by_id;
-use crate::domain::model::{from_db_user_account, login_user, Auth, LoginError, LoginInput, User, UserSettings};
+use crate::domain::model::{from_db_user_account, login_user, LoginError, LoginInput, User, UserSettings};
 use crate::database::auth_token::{find_auth_token, upsert_user_auth_token};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -41,6 +41,7 @@ pub fn init_router(state: AppState) -> Router {
   Router::new()
     .nest("/api/v1",
       Router::new()
+        .route("/health", get(health_handler))
         .route("/me", get(me_handler))
         .route("/login", post(login_handler))
     )
@@ -48,6 +49,10 @@ pub fn init_router(state: AppState) -> Router {
     .layer(CompressionLayer::new())
     .layer(CookieManagerLayer::new())
     .with_state(state)
+}
+
+async fn health_handler() -> &'static str {
+  "OK"
 }
 
 async fn me_handler (cookies: Cookies, State(state): State<AppState>) -> Result<Json<UserSettings>, LoginError> {
