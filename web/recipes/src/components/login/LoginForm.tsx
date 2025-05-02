@@ -14,8 +14,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { RequestResult, postRequest } from "../../api";
-import { RecipeApi } from "../../api/recipe";
+import { IdentityApi } from "../../api/identity";
 
 const loginSchema = z.object({
   email: z.string().min(1, {
@@ -27,11 +26,6 @@ const loginSchema = z.object({
 });
 
 type LoginData = z.infer<typeof loginSchema>;
-
-export const login = async (
-  loginData: LoginData
-): Promise<RequestResult<{ token: string }>> =>
-  postRequest(`${RecipeApi.baseUrl}/login}`, loginData);
 
 export const LoginForm = () => {
   const router = useRouter();
@@ -46,10 +40,10 @@ export const LoginForm = () => {
   const { mutate } = useSWRConfig();
 
   const onSubmit = async (data: LoginData) => {
-    const result = await login(data);
+    const result = await IdentityApi.login(data);
 
     if (result.status === "success") {
-      mutate(`${RecipeApi.baseUrl}/me`);
+      mutate(`${IdentityApi.baseUrl}/me`);
       router.push(`/`);
     } else {
       setLoginError("Failed");
