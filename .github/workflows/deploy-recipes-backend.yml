@@ -1,11 +1,10 @@
-name: Recipes backend CI
+name: Recipes backend CD
 
 on:
-  pull_request:
+  push:
     paths:
       - "server/recipes/**"
-      - ".github/workflows/recipes-server.yml"
-  push:
+      - ".github/workflows/deploy-recipes-backend.yml"
     branches:
       - main
 
