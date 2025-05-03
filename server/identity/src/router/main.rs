@@ -72,25 +72,22 @@ async fn validate_token_handler (cookies: Cookies, State(state): State<AppState>
 }
 
 async fn me_handler (cookies: Cookies, State(state): State<AppState>) -> Result<Json<UserSettings>, LoginError> {
-  let db_auth_token_result = match cookies.get(AUTH_COOKIE_NAME) {
-    Some(cookie) => {
-        let value = cookie.value().to_owned();
-        find_auth_token(&state.db, value).await
-    }
-    None => Err("Auth cookie not found".to_string())
+  let auth_cookie = match cookies.get(AUTH_COOKIE_NAME) {
+    Some(cookie) => cookie,
+    None => return Ok(Json(UserSettings { auth: None })),
   };
 
-  let user_account_result = match db_auth_token_result {
-    Ok(db_auth_token) => {
-        match db_auth_token.user_id {
-            Some(user_id) => find_user_by_id(&state.db, user_id).await,
-            None => Err("Auth token has no associated user".to_string())
-        }
-    }
-    Err(val) => Err(val)
+  let db_auth_token = match find_auth_token(&state.db, auth_cookie.value().to_owned()).await {
+    Ok(token) => token,
+    Err(_) => return Ok(Json(UserSettings { auth: None })),
   };
 
-  match user_account_result {
+  let user_id = match db_auth_token.user_id {
+    Some(id) => id,
+    None => return Ok(Json(UserSettings { auth: None })),
+  };
+
+  match find_user_by_id(&state.db, user_id).await {
     Ok(user_account) => Ok(Json(from_db_user_account(user_account))),
     Err(_) => Ok(Json(UserSettings { auth: None })),
   }
