@@ -44,5 +44,6 @@ COPY ./docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8080
+ENV RUST_LOG=info,axum=debug,tower_http=debug
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
