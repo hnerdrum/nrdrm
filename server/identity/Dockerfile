@@ -38,7 +38,6 @@ RUN apt-get update && \
 COPY --from=builder /app/target/release/identity /app/identity
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/
 COPY --from=builder /app/migrations /app/migrations
-COPY --from=builder /app/.env /app/.env
 
 COPY ./docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh

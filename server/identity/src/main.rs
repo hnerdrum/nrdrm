@@ -18,5 +18,6 @@ async fn main() {
     let app = init_router(AppState { db: pool });
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await.unwrap();
 
+    println!("Starting server on 0.0.0.0:{port}");
     axum::serve(listener, app).await.unwrap();
 }
