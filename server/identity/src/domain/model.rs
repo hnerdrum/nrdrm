@@ -20,10 +20,9 @@ pub struct User {
   pub email: String
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Copy)]
 pub struct Auth {
   pub user_id: Uuid,
-  pub email: String
 }
 
 #[derive(Deserialize, Debug)]
@@ -61,8 +60,4 @@ fn verify_user_password(user_account: DbUserAccount, password: String) -> Result
 
 pub fn from_db_user(user_account: DbUserAccount) -> User {
   User { id: user_account.id, email: user_account.email }
-}
-
-pub fn from_db_user_account(user_account: DbUserAccount) -> UserSettings {
-  UserSettings { auth: Some(Auth { user_id: user_account.id, email: user_account.email }) }
 }

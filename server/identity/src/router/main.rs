@@ -1,8 +1,9 @@
 use crate::database::connection::DBClient;
-use crate::database::user_account::find_user_by_id;
-use crate::domain::model::{from_db_user_account, login_user, LoginError, LoginInput, User, UserSettings, TokenValidation};
-use crate::database::auth_token::{find_auth_token, upsert_user_auth_token};
+use crate::domain::model::{login_user, Auth, LoginError, LoginInput, TokenValidation, User, UserSettings};
+use crate::database::auth_token::upsert_user_auth_token;
+use super::middleware::auth_middleware;
 use axum::http::StatusCode;
+use axum::{middleware, Extension};
 use axum::response::IntoResponse;
 use axum::{Router, routing::post, routing::get, Json, extract::State};
 use deadpool_diesel::postgres::Pool;
@@ -47,6 +48,7 @@ pub fn init_router(state: AppState) -> Router {
         .route("/login", post(login_handler))
     )
     .layer(TraceLayer::new_for_http())
+    .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
     .layer(CompressionLayer::new())
     .layer(CookieManagerLayer::new())
     .with_state(state)
@@ -56,36 +58,15 @@ async fn health_handler() -> &'static str {
   "OK"
 }
 
-async fn validate_token_handler (cookies: Cookies, State(state): State<AppState>) -> Result<Json<TokenValidation>, LoginError> {
-  let db_auth_token_result = match cookies.get(AUTH_COOKIE_NAME) {
-    Some(cookie) => {
-        let value = cookie.value().to_owned();
-        find_auth_token(&state.db, value).await
-    }
-    None => Err("Auth token not found".to_string())
-  };
-
-  match db_auth_token_result {
-    Ok(_) => Ok(Json(TokenValidation { valid: true })),
-    Err(_) => Ok(Json(TokenValidation { valid: false }))
+async fn validate_token_handler (Extension(auth): Extension<Option<Auth>>) -> Result<Json<TokenValidation>, LoginError> {
+  match auth {
+    Some(_) => Ok(Json(TokenValidation { valid: true })),
+    None => Ok(Json(TokenValidation { valid: false }))
   }
 }
 
-async fn me_handler (cookies: Cookies, State(state): State<AppState>) -> Result<Json<UserSettings>, LoginError> {
-  let auth_cookie = match cookies.get(AUTH_COOKIE_NAME) {
-    Some(cookie) => cookie,
-    None => return Ok(Json(UserSettings { auth: None })),
-  };
-
-  let auth_token = match find_auth_token(&state.db, auth_cookie.value().to_owned()).await {
-    Ok(token) => token,
-    Err(_) => return Ok(Json(UserSettings { auth: None })),
-  };
-
-  match find_user_by_id(&state.db, auth_token.user_id).await {
-    Ok(user_account) => Ok(Json(from_db_user_account(user_account))),
-    Err(_) => Ok(Json(UserSettings { auth: None })),
-  }
+async fn me_handler (Extension(auth): Extension<Option<Auth>>) -> Json<UserSettings> {
+  Json(UserSettings { auth })
 }
 
 async fn login_handler(cookies: Cookies, State(state): State<AppState>, Json(input): Json<LoginInput>) -> Result<Json<User>, LoginError> {
