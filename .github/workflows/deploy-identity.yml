@@ -28,9 +28,9 @@ jobs:
         env:
           CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
           GIT_SHA: ${{ github.sha }}
-        run: docker build -t $CONTAINER_REGISTRY/nrdrm-identityt:$GIT_SHA .
+        run: docker build -t $CONTAINER_REGISTRY/nrdrm-identity:$GIT_SHA .
       - name: Push the Docker Image
         env:
           CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
           GIT_SHA: ${{ github.sha }}
-        run: docker push $CONTAINER_REGISTRY/nrdrm-identityt:$GIT_SHA
+        run: docker push $CONTAINER_REGISTRY/nrdrm-identity:$GIT_SHA
