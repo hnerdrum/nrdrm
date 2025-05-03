@@ -16,7 +16,7 @@ diesel::table! {
         updated_at -> Timestamptz,
         value -> Text,
         status -> TokenStatus,
-        user_id -> Nullable<Uuid>,
+        user_id -> Uuid,
     }
 }
 

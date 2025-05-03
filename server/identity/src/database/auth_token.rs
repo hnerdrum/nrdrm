@@ -47,7 +47,7 @@ pub struct DbAuthToken {
   pub updated_at: DateTime<Utc>,
   pub value: String,
   pub status: TokenStatus,
-  pub user_id: Option<Uuid>,
+  pub user_id: Uuid,
 }
 
 
@@ -73,7 +73,7 @@ pub async fn upsert_user_auth_token(pool: &Pool, user: User, token: String) -> R
       .values((
           auth_token::value.eq(token),
           auth_token::status.eq(TokenStatus::Normal),
-          auth_token::user_id.eq(Some(user.id))
+          auth_token::user_id.eq(user.id)
       ))
       .on_conflict((auth_token::value, auth_token::user_id))
       .do_update()
