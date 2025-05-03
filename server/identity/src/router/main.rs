@@ -77,17 +77,12 @@ async fn me_handler (cookies: Cookies, State(state): State<AppState>) -> Result<
     None => return Ok(Json(UserSettings { auth: None })),
   };
 
-  let db_auth_token = match find_auth_token(&state.db, auth_cookie.value().to_owned()).await {
+  let auth_token = match find_auth_token(&state.db, auth_cookie.value().to_owned()).await {
     Ok(token) => token,
     Err(_) => return Ok(Json(UserSettings { auth: None })),
   };
 
-  let user_id = match db_auth_token.user_id {
-    Some(id) => id,
-    None => return Ok(Json(UserSettings { auth: None })),
-  };
-
-  match find_user_by_id(&state.db, user_id).await {
+  match find_user_by_id(&state.db, auth_token.user_id).await {
     Ok(user_account) => Ok(Json(from_db_user_account(user_account))),
     Err(_) => Ok(Json(UserSettings { auth: None })),
   }
