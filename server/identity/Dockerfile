@@ -35,7 +35,7 @@ RUN apt-get update && \
     libpq5 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/identity /app/
+COPY --from=builder /app/target/release/identity /app/identity
 COPY --from=builder /usr/local/cargo/bin/diesel /usr/local/bin/
 COPY --from=builder /app/migrations /app/migrations
 COPY --from=builder /app/.env /app/.env
@@ -44,6 +44,5 @@ COPY ./docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8080
-ENV RUST_LOG=info,axum=debug,tower_http=debug
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
