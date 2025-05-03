@@ -92,7 +92,7 @@ async fn me_handler (cookies: Cookies, State(state): State<AppState>) -> Result<
 
   match user_account_result {
     Ok(user_account) => Ok(Json(from_db_user_account(user_account))),
-    Err(_) => Err(LoginError::UnknownError)
+    Err(_) => Ok(Json(UserSettings { auth: None })),
   }
 }
 
