@@ -25,7 +25,7 @@ RUN cargo build --release
 
 RUN cargo install diesel_cli --no-default-features --features postgres
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
