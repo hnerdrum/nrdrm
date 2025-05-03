@@ -3,6 +3,7 @@ import { config } from "../../config";
 import useSWR from "swr";
 import { UserSettings } from "../domain";
 import { RecipeApi } from "../api/recipe";
+import { IdentityApi } from "../api/identity";
 
 type AuthData = {
   isLoggedIn: boolean;
@@ -26,14 +27,14 @@ const defaultData: AuthData = {
 export const AuthContext = createContext<AuthData>(defaultData);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { data, isLoading } = useSWR(`${RecipeApi.baseUrl}/me`, fetcher);
+  const { data, isLoading } = useSWR(`${IdentityApi.baseUrl}/me`, fetcher);
 
   const AuthProviderValue = useMemo(
     () => ({
-      isLoggedIn: !!data?.auth?.userId,
+      isLoggedIn: !!data?.auth,
       isLoading,
     }),
-    [data?.auth?.userId, isLoading]
+    [data?.auth, isLoading]
   );
 
   return (

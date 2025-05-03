@@ -4,7 +4,6 @@ module API.Server
   )
 where
 
-import API.Auth (loginUserHandler, meHandler)
 import API.Health (healthHandler)
 import API.Ingredient (createIngredientRoute, deleteIngredientRoute, getAllIngredientsRoute, getIngredientRoute, updateIngredientRoute)
 import API.Recipe (createRecipeRoute, deleteRecipeHandler, getAllRecipesRoute, getRecipeRoute, updateRecipeRoute)
@@ -14,21 +13,16 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import Database.Ingredient (CreateIngredientInput (..), UpdateIngredientInput (..))
 import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
-import Domain.Auth (LoginInput (..), UserSettings (..))
 import Domain.Ingredient (Ingredient (..))
 import Domain.Recipe (Recipe (..))
-import Domain.User (User (..))
-import Http.Headers (CookieHeader, SetCookieHeader)
 import Servant
   ( Capture,
     DeleteNoContent,
     Get,
     Handler,
     HasServer (ServerT),
-    Header,
     JSON,
     PlainText,
-    Post,
     PostCreated,
     Proxy (..),
     Put,
@@ -45,15 +39,13 @@ type API =
     :> ( Get '[JSON] [Recipe]
            :<|> Capture "recipeId" UUID :> Get '[JSON] Recipe
            :<|> ReqBody '[JSON] CreateRecipeInput :> PostCreated '[JSON] Recipe
-           :<|> Capture "recipeId" UUID :> ReqBody '[JSON] UpdateRecipeInput :> Header CookieHeader Text :> Put '[JSON] Recipe
-           :<|> Capture "recipeId" UUID :> Header CookieHeader Text :> DeleteNoContent
+           :<|> Capture "recipeId" UUID :> ReqBody '[JSON] UpdateRecipeInput :> Put '[JSON] Recipe
+           :<|> Capture "recipeId" UUID :> DeleteNoContent
            :<|> "ingredients" :> Get '[JSON] [Ingredient]
            :<|> "ingredients" :> Capture "ingredientId" UUID :> Get '[JSON] Ingredient
            :<|> "ingredients" :> ReqBody '[JSON] CreateIngredientInput :> PostCreated '[JSON] Ingredient
            :<|> "ingredients" :> Capture "ingredientId" UUID :> ReqBody '[JSON] UpdateIngredientInput :> Put '[JSON] Ingredient
            :<|> "ingredients" :> Capture "ingredientId" UUID :> DeleteNoContent
-           :<|> "me" :> Header CookieHeader Text :> Get '[JSON] UserSettings
-           :<|> "login" :> ReqBody '[JSON] LoginInput :> Post '[JSON] (SetCookieHeader User)
            :<|> "health" :> Get '[PlainText] Text
        )
 
@@ -78,6 +70,4 @@ apiHandlers =
     :<|> createIngredientRoute
     :<|> updateIngredientRoute
     :<|> deleteIngredientRoute
-    :<|> meHandler
-    :<|> loginUserHandler
     :<|> healthHandler

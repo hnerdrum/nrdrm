@@ -29,7 +29,7 @@ pub struct Config {
 
 pub fn load_config() -> Config {
   let env = load_env();
-  let port = env::var("PORT").unwrap_or("8081".to_string());
+  let port = env::var("APP_PORT").unwrap_or("8080".to_string());
   let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
   Config { env: env, port: port, database_url: database_url}
 }

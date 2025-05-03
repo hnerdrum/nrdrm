@@ -20,5 +20,18 @@
         }
       ]
     }
+  },
+  {
+    "name": "identity",
+    "base_url": "https://identity.api.nrdrm.dev/api/v1",
+    "request": {
+      "forward_headers": ["content-type", "cookie"]
+    },
+    "response": {
+      "forward_headers": ["set-cookie"]
+    },
+    "security": {
+      "auth": []
+    }
   }
 ]
