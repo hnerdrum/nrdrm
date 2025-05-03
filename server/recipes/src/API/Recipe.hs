@@ -7,11 +7,9 @@ module API.Recipe
   )
 where
 
-import API.Auth (authMiddleware)
 import API.Errors (withErrorHandling)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
-import Data.Text
 import Data.UUID (UUID)
 import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
 import Domain.Errors (AppError)
@@ -35,26 +33,20 @@ createRecipeRoute :: CreateRecipeInput -> AppM Recipe
 createRecipeRoute = withErrorHandling . createRecipeHandler
 
 createRecipeHandler :: CreateRecipeInput -> AppM (Either AppError Recipe)
-createRecipeHandler createRecipeInput = do
+createRecipeHandler input = do
   pool <- asks dbPool
-  liftIO $ createRecipe pool createRecipeInput
+  liftIO $ createRecipe pool input
 
-updateRecipeRoute :: UUID -> UpdateRecipeInput -> Maybe Text -> AppM Recipe
-updateRecipeRoute recipeId input cookie = withErrorHandling (updateRecipeHandler recipeId input cookie)
+updateRecipeRoute :: UUID -> UpdateRecipeInput -> AppM Recipe
+updateRecipeRoute recipeId input = withErrorHandling $ updateRecipeHandler recipeId input
 
-updateRecipeHandler :: UUID -> UpdateRecipeInput -> Maybe Text -> AppM (Either AppError Recipe)
-updateRecipeHandler = authMiddleware . updateRecipeUnsafe
-
-updateRecipeUnsafe :: UUID -> UpdateRecipeInput -> AppM (Either AppError Recipe)
-updateRecipeUnsafe recipeId updateRecipeInput = do
+updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM (Either AppError Recipe)
+updateRecipeHandler recipeId input = do
   pool <- asks dbPool
-  liftIO $ updateRecipe pool recipeId updateRecipeInput
+  liftIO $ updateRecipe pool recipeId input
 
-deleteRecipeHandler :: UUID -> Maybe Text -> AppM NoContent
-deleteRecipeHandler = authMiddleware deleteRecipeUnsafe
-
-deleteRecipeUnsafe :: UUID -> AppM NoContent
-deleteRecipeUnsafe recipeId = do
+deleteRecipeHandler :: UUID -> AppM NoContent
+deleteRecipeHandler recipeId = do
   pool <- asks dbPool
   _ <- liftIO $ deleteRecipe pool recipeId
   return NoContent

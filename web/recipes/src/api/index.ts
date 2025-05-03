@@ -66,6 +66,9 @@ export const deleteRequest = async (
   try {
     const response = await fetch(`${config.baseServerUrl}${path}`, {
       method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
       credentials: "include",
     });
 

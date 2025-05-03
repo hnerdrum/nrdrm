@@ -1,4 +1,4 @@
-import app/web.{Context}
+import app/context.{Context}
 import app/router
 import config/config
 import config/service
@@ -11,7 +11,8 @@ pub fn main() {
 
   let config = config.load_config()
   let assert Ok(services) = service.load_services(config.env)
-  let ctx = Context(services, config.allowed_origins)
+  let assert Ok(identity_service) = service.find(services, "identity")
+  let ctx = Context(services, identity_service, config.allowed_origins)
 
   let assert Ok(_) =
     wisp.mist_handler(router.handle_request(_, ctx), config.secret_key_base)
