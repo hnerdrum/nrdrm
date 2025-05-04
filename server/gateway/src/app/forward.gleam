@@ -79,7 +79,7 @@ pub fn set_cookie_header(response: Response) -> Response {
         "set-cookie" -> {          
           case string.contains(header_value, "path=") {
             True -> {
-              response.set_header(acc, header_name, header_value)
+              response
             }
             False -> {
               let new_value = string.concat([header_value, "; Path=/"])
