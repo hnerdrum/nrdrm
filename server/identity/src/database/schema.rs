@@ -14,9 +14,10 @@ diesel::table! {
         id -> Uuid,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
-        value -> Text,
         status -> TokenStatus,
         user_id -> Uuid,
+        issued_at -> Timestamptz,
+        expires_at -> Timestamptz,
     }
 }
 
