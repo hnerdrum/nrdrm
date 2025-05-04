@@ -15,24 +15,18 @@ pub struct DbUserAccount {
   pub password_hash: String,
 }
 
-pub async fn find_user_by_id(pool: &Pool, user_id: Uuid) -> Result<DbUserAccount, DatabaseError> {
-  let conn = pool.get().await.map_err(|_| DatabaseError::UnknownError)?;
-  conn.interact(move |conn| {
-    let query = user_account::table.into_boxed::<diesel::pg::Pg>();
-    query
-      .filter(user_account::id.eq(user_id))
-      .select(DbUserAccount::as_select())
-      .first::<DbUserAccount>(conn).map_err(|_| DatabaseError::NotFoundError)
-  }).await.map_err(|_| DatabaseError::UnknownError).unwrap_or_else(|_| Err(DatabaseError::UnknownError))
-}
-
 pub async fn find_user_by_email(pool: &Pool, email: String) -> Result<DbUserAccount, DatabaseError> {
   let conn = pool.get().await.map_err(|_| DatabaseError::UnknownError)?;
+
   conn.interact(move |conn| {
-    let query = user_account::table.into_boxed::<diesel::pg::Pg>();
-    query
-      .filter(user_account::email.eq(email))
-      .select(DbUserAccount::as_select())
-      .first::<DbUserAccount>(conn).map_err(|_| DatabaseError::NotFoundError)
-  }).await.map_err(|_| DatabaseError::UnknownError).unwrap_or_else(|_| Err(DatabaseError::UnknownError))
+      user_account::table
+          .filter(user_account::email.eq(email))
+          .first(conn)
+          .map_err(|err| match err {
+            diesel::result::Error::NotFound => DatabaseError::NotFoundError,
+            _ => DatabaseError::UnknownError,
+        })
+  })
+  .await
+  .map_err(|_| DatabaseError::UnknownError)?
 }
