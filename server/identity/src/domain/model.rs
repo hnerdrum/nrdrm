@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 use uuid::Uuid;
 use crate::database::error::DatabaseError;
-use crate::database::user_account::{find_user_by_email, DbUserAccount};
+use crate::database::user_account::{find_user_by_email, UserAccount};
 use crate::database::connection::DBClient;
 
 use super::error::DomainError;
@@ -55,7 +55,7 @@ pub async fn login_user(db: DBClient, input: LoginInput) -> Result<User, DomainE
     .map(|user| from_db_user(user))
 }
 
-fn verify_user_password(user_account: DbUserAccount, password: String) -> Result<DbUserAccount, DomainError> {
+fn verify_user_password(user_account: UserAccount, password: String) -> Result<UserAccount, DomainError> {
   verify(password, &user_account.password_hash)
     .map_err(|_| DomainError::UnknownError)
     .and_then(|is_valid| {
@@ -68,6 +68,6 @@ fn verify_user_password(user_account: DbUserAccount, password: String) -> Result
     })
 }
 
-pub fn from_db_user(user_account: DbUserAccount) -> User {
+pub fn from_db_user(user_account: UserAccount) -> User {
   User { id: user_account.id, email: user_account.email }
 }
