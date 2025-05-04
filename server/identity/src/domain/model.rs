@@ -24,7 +24,7 @@ pub struct User {
   pub email: String
 }
 
-#[derive(Serialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub struct Auth {
   pub user_id: Uuid,
 }

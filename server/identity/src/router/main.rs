@@ -1,5 +1,6 @@
-use crate::database::connection::DBClient;
+use crate::config::Config;
 use crate::domain::error::DomainError;
+use crate::domain::jwt::create_jwt_token;
 use crate::domain::model::{login_user, Auth, LoginInput, TokenValidation, User, UserSettings};
 use crate::database::auth_token::upsert_user_auth_token;
 use super::middleware::auth_middleware;
@@ -8,19 +9,15 @@ use axum::{middleware, Extension};
 use axum::response::IntoResponse;
 use axum::{Router, routing::post, routing::get, Json, extract::State};
 use deadpool_diesel::postgres::Pool;
-use sha2::{Sha256, Digest};
-use base64::{Engine, engine::general_purpose::STANDARD};
 use tracing::error;
-use std::fmt::Write;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::compression::CompressionLayer;
 use tower_http::trace::{self, TraceLayer};
 
-const AUTH_COOKIE_NAME: &str = "nrdrm-login";
-
 #[derive(Clone)]
 pub struct AppState {
-  pub db: Pool
+  pub db: Pool,
+  pub config: Config
 }
 
 impl IntoResponse for DomainError {
@@ -80,28 +77,17 @@ async fn me_handler (Extension(auth): Extension<Option<Auth>>) -> Json<UserSetti
 
 async fn login_handler(cookies: Cookies, State(state): State<AppState>, Json(input): Json<LoginInput>) -> Result<Json<User>, DomainError> {
   let user = login_user(state.db.clone(), input).await?;
-  handle_valid_user(state.db.clone(), user, cookies).await
+  handle_valid_user(state, user, cookies).await
 }
 
-async fn handle_valid_user(db: DBClient, user: User, cookies: Cookies) -> Result<Json<User>, DomainError> {
-  let token = generate_token(user.clone());
-  upsert_user_auth_token(&db, user.clone(), token.clone()).await.map_err(|err| {
+async fn handle_valid_user(state: AppState, user: User, cookies: Cookies) -> Result<Json<User>, DomainError> {
+  let token = create_jwt_token(Auth { user_id: user.id}, state.config.auth.secret.clone())?;
+
+  upsert_user_auth_token(&state.db, user.clone(), token.clone()).await.map_err(|err| {
     error!("Encountered unexpected database error: {:?}", err);
     DomainError::UnknownError
   })?;
-  cookies.add(Cookie::new(AUTH_COOKIE_NAME, token));
+
+  cookies.add(Cookie::new(state.config.auth.cookie_name.clone(), token));
   Ok(Json(user))
-}
-
-fn generate_token(user: User) -> String {
-  let mut hasher = Sha256::new();
-
-  let mut input_data = String::new();
-  write!(input_data, "{}", user.id).expect("Failed to write user ID");
-  input_data.push_str(&user.email);
-
-  hasher.update(input_data.as_bytes());
-  let result = hasher.finalize();
-
-  STANDARD.encode(result)
 }
