@@ -4,6 +4,8 @@ use uuid::Uuid;
 use crate::database::user_account::{find_user_by_email, DbUserAccount};
 use crate::database::connection::DBClient;
 
+use super::error::DomainError;
+
 #[derive(Serialize)]
 pub struct TokenValidation {
     pub valid: bool,
@@ -31,29 +33,23 @@ pub struct LoginInput {
   password: String,
 }
 
-#[derive(Debug)]
-pub enum LoginError {
-    InvalidCredentialsError,
-    UnknownError
-}
-
-pub async fn login_user(db: DBClient, input: LoginInput) -> Result<User, LoginError> {
+pub async fn login_user(db: DBClient, input: LoginInput) -> Result<User, DomainError> {
   let user_account = find_user_by_email(&db, input.email)
   .await
-  .map_err(|_| LoginError::InvalidCredentialsError)?;
+  .map_err(|_| DomainError::InvalidCredentialsError)?;
 
   verify_user_password(user_account, input.password)
     .map(|user| from_db_user(user))
 }
 
-fn verify_user_password(user_account: DbUserAccount, password: String) -> Result<DbUserAccount, LoginError> {
+fn verify_user_password(user_account: DbUserAccount, password: String) -> Result<DbUserAccount, DomainError> {
   verify(password, &user_account.password_hash)
-    .map_err(|_| LoginError::UnknownError)
+    .map_err(|_| DomainError::UnknownError)
     .and_then(|is_valid| {
         if is_valid {
             Ok(user_account)
         } else {
-            Err(LoginError::InvalidCredentialsError)
+            Err(DomainError::InvalidCredentialsError)
         }
     })
 }
