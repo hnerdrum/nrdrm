@@ -18,7 +18,7 @@ pub fn forward_request(service: Service, path: String, wisp_request: Request) ->
   case request.to(url) {
     Ok(req) -> send_request(service, map_request(service, wisp_request, req, body))
     Error(_) -> {
-      wisp.log_error("Server error when trying to create a request to: " <> url)
+      wisp.log_error("Could not create request from URL: " <> url)
       wisp.internal_server_error()
     }
   }
@@ -32,8 +32,7 @@ pub fn send_request(service: Service, request: request.Request(String)) -> Respo
       let url = request.host <> request.path
       let err_string = dynamic.string(err)
         |> result.unwrap("Unknown error")
-      wisp.log_error("Error: " <> err_string)
-      wisp.log_error("Server error when trying to send a request to: " <> url)
+      wisp.log_error("Request to " <> url <> "got an error: " <> err_string)
       wisp.internal_server_error()
     }
   }
@@ -57,7 +56,6 @@ pub fn set_request_headers(to: request.Request(String), from: Request, service: 
 fn map_response(service: Service, from: response.Response(String)) -> Response {
   let json_response = wisp.json_response(string_builder.from_string(from.body), from.status)
   set_cookie_header(set_response_headers(service, from, json_response))
-  //json_response
 }
 
 fn set_response_headers(service: Service, from: response.Response(String), to: Response) -> Response {
