@@ -53,14 +53,18 @@ pub struct DbAuthToken {
 
 pub async fn find_auth_token(pool: &Pool, value: String) -> Result<DbAuthToken, DatabaseError> {
   let conn = pool.get().await.map_err(|_| DatabaseError::UnknownError)?;
+
   conn.interact(move |conn| {
-    let query = auth_token::table.into_boxed::<diesel::pg::Pg>();
-    query
+    auth_token::table
       .filter(auth_token::value.eq(value))
       .filter(auth_token::status.eq(TokenStatus::Normal))
-      .select(DbAuthToken::as_select())
-      .first::<DbAuthToken>(conn).map_err(|_| DatabaseError::NotFoundError)
-  }).await.map_err(|_|DatabaseError::UnknownError).unwrap_or_else(|_| Err(DatabaseError::UnknownError))
+      .first::<DbAuthToken>(conn).map_err(|err| match err {
+        diesel::result::Error::NotFound => DatabaseError::NotFoundError,
+        _ => DatabaseError::UnknownError,
+      })
+  })
+  .await
+  .map_err(|_| DatabaseError::UnknownError)?
 }
 
 pub async fn upsert_user_auth_token(pool: &Pool, user: User, token: String) -> Result<(), DatabaseError> {
