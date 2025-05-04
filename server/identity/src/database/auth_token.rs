@@ -52,7 +52,7 @@ pub struct DbAuthToken {
 
 
 pub async fn find_auth_token(pool: &Pool, value: String) -> Result<DbAuthToken, DatabaseError> {
-  let conn = pool.get().await.map_err(|_| DatabaseError::UnknownError)?;
+  let conn = pool.get().await.map_err(|_| DatabaseError::ConnectionError)?;
 
   conn.interact(move |conn| {
     auth_token::table
@@ -68,7 +68,7 @@ pub async fn find_auth_token(pool: &Pool, value: String) -> Result<DbAuthToken, 
 }
 
 pub async fn upsert_user_auth_token(pool: &Pool, user: User, token: String) -> Result<(), DatabaseError> {
-  let conn = pool.get().await.map_err(|_| DatabaseError::UnknownError)?;
+  let conn = pool.get().await.map_err(|_| DatabaseError::ConnectionError)?;
 
   let now = Utc::now();
 

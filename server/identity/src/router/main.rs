@@ -10,6 +10,7 @@ use axum::{Router, routing::post, routing::get, Json, extract::State};
 use deadpool_diesel::postgres::Pool;
 use sha2::{Sha256, Digest};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use tracing::error;
 use std::fmt::Write;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::compression::CompressionLayer;
@@ -84,7 +85,10 @@ async fn login_handler(cookies: Cookies, State(state): State<AppState>, Json(inp
 
 async fn handle_valid_user(db: DBClient, user: User, cookies: Cookies) -> Result<Json<User>, DomainError> {
   let token = generate_token(user.clone());
-  upsert_user_auth_token(&db, user.clone(), token.clone()).await.map_err(|_| DomainError::UnknownError)?;
+  upsert_user_auth_token(&db, user.clone(), token.clone()).await.map_err(|err| {
+    error!("Encountered unexpected database error: {:?}", err);
+    DomainError::UnknownError
+  })?;
   cookies.add(Cookie::new(AUTH_COOKIE_NAME, token));
   Ok(Json(user))
 }
