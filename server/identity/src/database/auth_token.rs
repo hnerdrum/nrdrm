@@ -51,6 +51,22 @@ pub struct AuthToken {
   pub issued_at: DateTime<Utc>
 }
 
+pub async fn find_auth_token_by_id(pool: &Pool, id: Uuid) -> Result<AuthToken, DatabaseError> {
+  let conn = pool.get().await.map_err(|_| DatabaseError::ConnectionError)?;
+
+  conn.interact(move |conn| {
+      auth_token::table
+          .filter(auth_token::id.eq(id))
+          .first(conn)
+          .map_err(|err| match err {
+            diesel::result::Error::NotFound => DatabaseError::NotFoundError,
+            _ => DatabaseError::UnknownError,
+        })
+  })
+  .await
+  .map_err(|_| DatabaseError::UnknownError)?
+}
+
 pub async fn create_auth_token(pool: &Pool, user: User) -> Result<AuthToken, DatabaseError> {
   let conn = pool.get().await.map_err(|_| DatabaseError::ConnectionError)?;
 
