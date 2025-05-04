@@ -68,32 +68,25 @@ fn set_response_headers(service: Service, from: response.Response(String), to: R
 }
 
 pub fn set_cookie_header(response: Response) -> Response {
-  // Find Set-Cookie headers
   let headers = response.headers
   
-  // Process each header
   let updated_response = 
     list.fold(headers, response, fn(acc, header) {
       let header_name = header.0
       let header_value = header.1
       
-      // Check if this is a Set-Cookie header
       case string.lowercase(header_name) {
         "set-cookie" -> {          
-          // Check if the cookie already has a path
           case string.contains(header_value, "path=") {
             True -> {
-              // Already has a path, keep it as is
               response.set_header(acc, header_name, header_value)
             }
             False -> {
-              // No path, add Path=/
               let new_value = string.concat([header_value, "; Path=/"])
               response.set_header(acc, header_name, new_value)
             }
           }
         }
-        // Not a Set-Cookie header, keep as is
         _ -> acc
       }
     })
