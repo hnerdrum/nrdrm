@@ -1,6 +1,8 @@
 use bcrypt::verify;
 use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 use uuid::Uuid;
+use crate::database::error::DatabaseError;
 use crate::database::user_account::{find_user_by_email, DbUserAccount};
 use crate::database::connection::DBClient;
 
@@ -34,9 +36,18 @@ pub struct LoginInput {
 }
 
 pub async fn login_user(db: DBClient, input: LoginInput) -> Result<User, DomainError> {
-  let user_account = find_user_by_email(&db, input.email)
+  let user_account = find_user_by_email(&db, input.email.clone())
   .await
-  .map_err(|_| DomainError::InvalidCredentialsError)?;
+  .map_err(|err| match err {
+    DatabaseError::NotFoundError => {
+      info!("User not found for email {}", input.email.clone());
+      DomainError::InvalidCredentialsError
+    },
+    err => {
+      error!("Encountered unexpected database error: {:?}", err);
+      DomainError::UnknownError
+    }
+  })?;
 
   verify_user_password(user_account, input.password)
     .map(|user| from_db_user(user))
@@ -49,6 +60,7 @@ fn verify_user_password(user_account: DbUserAccount, password: String) -> Result
         if is_valid {
             Ok(user_account)
         } else {
+            info!("Invalid password for user {}", user_account.email);
             Err(DomainError::InvalidCredentialsError)
         }
     })

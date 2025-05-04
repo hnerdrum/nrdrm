@@ -16,7 +16,7 @@ pub struct DbUserAccount {
 }
 
 pub async fn find_user_by_email(pool: &Pool, email: String) -> Result<DbUserAccount, DatabaseError> {
-  let conn = pool.get().await.map_err(|_| DatabaseError::UnknownError)?;
+  let conn = pool.get().await.map_err(|_| DatabaseError::ConnectionError)?;
 
   conn.interact(move |conn| {
       user_account::table
