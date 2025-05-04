@@ -5,7 +5,7 @@ use diesel::{deserialize::{self, FromSql, FromSqlRow}, expression::AsExpression,
 use uuid::Uuid;
 use crate::domain::model::User;
 
-use super::schema::{auth_token, sql_types};
+use super::{error::DatabaseError, schema::{auth_token, sql_types}};
 use deadpool_diesel::postgres::Pool;
 
 #[derive(Debug, Clone, PartialEq, AsExpression, FromSqlRow)]
@@ -51,20 +51,20 @@ pub struct DbAuthToken {
 }
 
 
-pub async fn find_auth_token(pool: &Pool, value: String) -> Result<DbAuthToken, String> {
-  let conn = pool.get().await.map_err(|_| "Failed to get connection")?;
+pub async fn find_auth_token(pool: &Pool, value: String) -> Result<DbAuthToken, DatabaseError> {
+  let conn = pool.get().await.map_err(|_| DatabaseError::UnknownError)?;
   conn.interact(move |conn| {
     let query = auth_token::table.into_boxed::<diesel::pg::Pg>();
     query
       .filter(auth_token::value.eq(value))
       .filter(auth_token::status.eq(TokenStatus::Normal))
       .select(DbAuthToken::as_select())
-      .first::<DbAuthToken>(conn).map_err(|_| "Failed to find auth token".to_string())
-  }).await.map_err(|_| "Failed to find auth token".to_string()).unwrap_or_else(|_| Err("Failed to find auth token".to_string()))
+      .first::<DbAuthToken>(conn).map_err(|_| DatabaseError::NotFoundError)
+  }).await.map_err(|_|DatabaseError::UnknownError).unwrap_or_else(|_| Err(DatabaseError::UnknownError))
 }
 
-pub async fn upsert_user_auth_token(pool: &Pool, user: User, token: String) -> Result<(), String> {
-  let conn = pool.get().await.map_err(|_| "Failed to get connection")?;
+pub async fn upsert_user_auth_token(pool: &Pool, user: User, token: String) -> Result<(), DatabaseError> {
+  let conn = pool.get().await.map_err(|_| DatabaseError::UnknownError)?;
 
   let now = Utc::now();
 
@@ -82,9 +82,9 @@ pub async fn upsert_user_auth_token(pool: &Pool, user: User, token: String) -> R
           auth_token::updated_at.eq(now)
       ))
       .execute(conn)
-      .map(|_| ()) // Convert the success usize to ()
-      .map_err(|_| "Database error: {}".to_string())
+      .map(|_| ())
+      .map_err(|_| DatabaseError::UnknownError)
     
   }).await
-  .map_err(|_| "Failed to execute database transaction".to_string())?
+  .map_err(|_| DatabaseError::UnknownError)?
 }

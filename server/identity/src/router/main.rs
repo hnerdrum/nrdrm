@@ -1,5 +1,6 @@
 use crate::database::connection::DBClient;
-use crate::domain::model::{login_user, Auth, LoginError, LoginInput, TokenValidation, User, UserSettings};
+use crate::domain::error::DomainError;
+use crate::domain::model::{login_user, Auth, LoginInput, TokenValidation, User, UserSettings};
 use crate::database::auth_token::upsert_user_auth_token;
 use super::middleware::auth_middleware;
 use axum::http::StatusCode;
@@ -21,13 +22,13 @@ pub struct AppState {
   pub db: Pool
 }
 
-impl IntoResponse for LoginError {
+impl IntoResponse for DomainError {
   fn into_response(self) -> axum::response::Response {
       let (status, error_message) = match self {
         Self::InvalidCredentialsError => (
           StatusCode::UNAUTHORIZED, "Invalid credentials"
         ),        Self::UnknownError => (
-          StatusCode::INTERNAL_SERVER_ERROR, "Unknown error"
+          StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"
         ),
       };
       (
@@ -58,7 +59,7 @@ async fn health_handler() -> &'static str {
   "OK"
 }
 
-async fn validate_token_handler (Extension(auth): Extension<Option<Auth>>) -> Result<Json<TokenValidation>, LoginError> {
+async fn validate_token_handler (Extension(auth): Extension<Option<Auth>>) -> Result<Json<TokenValidation>, DomainError> {
   match auth {
     Some(_) => Ok(Json(TokenValidation { valid: true })),
     None => Ok(Json(TokenValidation { valid: false }))
@@ -69,18 +70,14 @@ async fn me_handler (Extension(auth): Extension<Option<Auth>>) -> Json<UserSetti
   Json(UserSettings { auth })
 }
 
-async fn login_handler(cookies: Cookies, State(state): State<AppState>, Json(input): Json<LoginInput>) -> Result<Json<User>, LoginError> {
+async fn login_handler(cookies: Cookies, State(state): State<AppState>, Json(input): Json<LoginInput>) -> Result<Json<User>, DomainError> {
   let user = login_user(state.db.clone(), input).await?;
-  handle_valid_user(state.db.clone(), user, cookies)
-    .await
-    .map_err(|_| {
-      LoginError::UnknownError
-    })
+  handle_valid_user(state.db.clone(), user, cookies).await
 }
 
-async fn handle_valid_user(db: DBClient, user: User, cookies: Cookies) -> Result<Json<User>, String> {
+async fn handle_valid_user(db: DBClient, user: User, cookies: Cookies) -> Result<Json<User>, DomainError> {
   let token = generate_token(user.clone());
-  upsert_user_auth_token(&db, user.clone(), token.clone()).await?;
+  upsert_user_auth_token(&db, user.clone(), token.clone()).await.map_err(|_| DomainError::UnknownError)?;
   cookies.add(Cookie::new(AUTH_COOKIE_NAME, token));
   Ok(Json(user))
 }
@@ -95,6 +92,5 @@ fn generate_token(user: User) -> String {
   hasher.update(input_data.as_bytes());
   let result = hasher.finalize();
 
-  // Encode the hash result as Base64
   STANDARD.encode(result)
 }
