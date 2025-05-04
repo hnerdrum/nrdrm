@@ -25,13 +25,15 @@ pub struct Config {
   pub env: Environment,
   pub port: String,
   pub database_url: String,
+  pub log_level: String
 }
 
 pub fn load_config() -> Config {
   let env = load_env();
   let port = env::var("APP_PORT").unwrap_or("8080".to_string());
   let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-  Config { env: env, port: port, database_url: database_url}
+  let log_level = env::var("LOG_LEVEL").unwrap_or("tower_http=debug,axum=debug,info".to_string());
+  Config { env: env, port: port, database_url: database_url, log_level }
 }
 
 fn load_env() -> Environment {

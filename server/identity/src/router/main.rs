@@ -9,11 +9,11 @@ use axum::response::IntoResponse;
 use axum::{Router, routing::post, routing::get, Json, extract::State};
 use deadpool_diesel::postgres::Pool;
 use sha2::{Sha256, Digest};
-use base64::{Engine, engine::general_purpose::STANDARD}; // For standard Base64
+use base64::{Engine, engine::general_purpose::STANDARD};
 use std::fmt::Write;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::compression::CompressionLayer;
-use tower_http::trace::TraceLayer;
+use tower_http::trace::{self, TraceLayer};
 
 const AUTH_COOKIE_NAME: &str = "nrdrm-login";
 
@@ -48,7 +48,14 @@ pub fn init_router(state: AppState) -> Router {
         .route("/me", get(me_handler))
         .route("/login", post(login_handler))
     )
-    .layer(TraceLayer::new_for_http())
+    .layer(
+      TraceLayer::new_for_http()
+          .make_span_with(trace::DefaultMakeSpan::new()
+              .include_headers(true))
+          .on_response(trace::DefaultOnResponse::new()
+              .include_headers(true)
+              .latency_unit(tower_http::LatencyUnit::Micros))
+    )
     .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
     .layer(CompressionLayer::new())
     .layer(CookieManagerLayer::new())
