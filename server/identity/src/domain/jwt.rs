@@ -1,11 +1,10 @@
-use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::domain::error::DomainError;
+use crate::{database::auth_token::AuthToken, domain::error::DomainError};
 
-use super::model::Auth;
+use super::model::{Auth, User};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JwtClaims {
@@ -15,12 +14,11 @@ pub struct JwtClaims {
     auth: Auth
 }
 
-pub fn create_jwt_token(auth: Auth, secret: String) -> Result<String, DomainError> {
-  let now = Utc::now();
+pub fn create_jwt_token(user: User, auth_token: AuthToken, secret: String) -> Result<String, DomainError> {
   let claims = JwtClaims {
-      auth,
-      exp: (now + Duration::hours(24)).timestamp() as usize, // TODO: get from auth token
-      iat: now.timestamp() as usize,
+      auth: Auth { user_id: user.id, email: user.email, token_id: auth_token.id },
+      exp: auth_token.expires_at.timestamp() as usize,
+      iat: auth_token.issued_at.timestamp() as usize,
   };
 
   encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes()))

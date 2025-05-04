@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::domain::error::DomainError;
 use crate::domain::jwt::create_jwt_token;
 use crate::domain::model::{login_user, Auth, LoginInput, TokenValidation, User, UserSettings};
-use crate::database::auth_token::upsert_user_auth_token;
+use crate::database::auth_token::create_auth_token;
 use super::middleware::auth_middleware;
 use axum::http::StatusCode;
 use axum::{middleware, Extension};
@@ -81,12 +81,11 @@ async fn login_handler(cookies: Cookies, State(state): State<AppState>, Json(inp
 }
 
 async fn handle_valid_user(state: AppState, user: User, cookies: Cookies) -> Result<Json<User>, DomainError> {
-  let token = create_jwt_token(Auth { user_id: user.id}, state.config.auth.secret.clone())?;
-
-  upsert_user_auth_token(&state.db, user.clone(), token.clone()).await.map_err(|err| {
+  let auth_token = create_auth_token(&state.db, user.clone()).await.map_err(|err| {
     error!("Encountered unexpected database error: {:?}", err);
     DomainError::UnknownError
   })?;
+  let token = create_jwt_token(user.clone(), auth_token.clone(), state.config.auth.secret.clone())?;
 
   cookies.add(Cookie::new(state.config.auth.cookie_name.clone(), token));
   Ok(Json(user))

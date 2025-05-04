@@ -4,7 +4,7 @@ use axum::{
 
 use tower_cookies::Cookies;
 
-use crate::domain::{jwt::decode_jwt_token, model::Auth};
+use crate::domain::jwt::decode_jwt_token;
 
 use super::main::AppState;
 
@@ -17,9 +17,7 @@ pub async fn auth_middleware(
   let auth = cookies
     .get(&state.config.auth.cookie_name)
     .and_then(|cookie| {
-        decode_jwt_token(cookie.value(), state.config.auth.secret.clone())
-            .map(|token| Auth { user_id: token.user_id })
-            .ok()
+        decode_jwt_token(cookie.value(), state.config.auth.secret.clone()).ok()
     });
 
   req.extensions_mut().insert(auth);

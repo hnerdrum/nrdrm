@@ -24,9 +24,11 @@ pub struct User {
   pub email: String
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Auth {
   pub user_id: Uuid,
+  pub token_id: Uuid,
+  pub email: String,
 }
 
 #[derive(Deserialize, Debug)]
