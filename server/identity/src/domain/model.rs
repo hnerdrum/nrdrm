@@ -25,6 +25,7 @@ pub struct User {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Auth {
   pub user_id: Uuid,
   pub token_id: Uuid,
