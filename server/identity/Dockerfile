@@ -21,7 +21,8 @@ RUN mkdir -p src && \
 
 COPY . .
 
-RUN cargo build --release
+# Force a rebuild with the real source code by touching a file
+RUN touch src/main.rs && cargo build --release
 
 RUN cargo install diesel_cli --no-default-features --features postgres
 
