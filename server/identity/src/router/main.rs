@@ -1,32 +1,32 @@
-use crate::database::connection::DBClient;
-use crate::database::user_account::find_user_by_id;
-use crate::domain::model::{from_db_user_account, login_user, LoginError, LoginInput, User, UserSettings, TokenValidation};
-use crate::database::auth_token::{find_auth_token, upsert_user_auth_token};
+use crate::config::Config;
+use crate::domain::error::DomainError;
+use crate::domain::jwt::create_jwt_token;
+use crate::domain::model::{login_user, Auth, LoginInput, TokenValidation, User, UserSettings};
+use crate::database::auth_token::create_auth_token;
+use super::middleware::auth_middleware;
 use axum::http::StatusCode;
+use axum::{middleware, Extension};
 use axum::response::IntoResponse;
 use axum::{Router, routing::post, routing::get, Json, extract::State};
 use deadpool_diesel::postgres::Pool;
-use sha2::{Sha256, Digest};
-use base64::{Engine, engine::general_purpose::STANDARD}; // For standard Base64
-use std::fmt::Write;
+use tracing::error;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::compression::CompressionLayer;
-use tower_http::trace::TraceLayer;
-
-const AUTH_COOKIE_NAME: &str = "nrdrm-login";
+use tower_http::trace::{self, TraceLayer};
 
 #[derive(Clone)]
 pub struct AppState {
-  pub db: Pool
+  pub db: Pool,
+  pub config: Config
 }
 
-impl IntoResponse for LoginError {
+impl IntoResponse for DomainError {
   fn into_response(self) -> axum::response::Response {
       let (status, error_message) = match self {
         Self::InvalidCredentialsError => (
           StatusCode::UNAUTHORIZED, "Invalid credentials"
         ),        Self::UnknownError => (
-          StatusCode::INTERNAL_SERVER_ERROR, "Unknown error"
+          StatusCode::INTERNAL_SERVER_ERROR, "Internal server error"
         ),
       };
       (
@@ -46,7 +46,15 @@ pub fn init_router(state: AppState) -> Router {
         .route("/me", get(me_handler))
         .route("/login", post(login_handler))
     )
-    .layer(TraceLayer::new_for_http())
+    .layer(
+      TraceLayer::new_for_http()
+          .make_span_with(trace::DefaultMakeSpan::new()
+              .include_headers(true))
+          .on_response(trace::DefaultOnResponse::new()
+              .include_headers(true)
+              .latency_unit(tower_http::LatencyUnit::Micros))
+    )
+    .layer(middleware::from_fn_with_state(state.clone(), auth_middleware))
     .layer(CompressionLayer::new())
     .layer(CookieManagerLayer::new())
     .with_state(state)
@@ -56,72 +64,29 @@ async fn health_handler() -> &'static str {
   "OK"
 }
 
-async fn validate_token_handler (cookies: Cookies, State(state): State<AppState>) -> Result<Json<TokenValidation>, LoginError> {
-  let db_auth_token_result = match cookies.get(AUTH_COOKIE_NAME) {
-    Some(cookie) => {
-        let value = cookie.value().to_owned();
-        find_auth_token(&state.db, value).await
-    }
-    None => Err("Auth token not found".to_string())
-  };
-
-  match db_auth_token_result {
-    Ok(_) => Ok(Json(TokenValidation { valid: true })),
-    Err(_) => Ok(Json(TokenValidation { valid: false }))
+async fn validate_token_handler (Extension(auth): Extension<Option<Auth>>) -> Result<Json<TokenValidation>, DomainError> {
+  match auth {
+    Some(_) => Ok(Json(TokenValidation { valid: true })),
+    None => Ok(Json(TokenValidation { valid: false }))
   }
 }
 
-async fn me_handler (cookies: Cookies, State(state): State<AppState>) -> Result<Json<UserSettings>, LoginError> {
-  let db_auth_token_result = match cookies.get(AUTH_COOKIE_NAME) {
-    Some(cookie) => {
-        let value = cookie.value().to_owned();
-        find_auth_token(&state.db, value).await
-    }
-    None => Err("Auth cookie not found".to_string())
-  };
-
-  let user_account_result = match db_auth_token_result {
-    Ok(db_auth_token) => {
-        match db_auth_token.user_id {
-            Some(user_id) => find_user_by_id(&state.db, user_id).await,
-            None => Err("Auth token has no associated user".to_string())
-        }
-    }
-    Err(val) => Err(val)
-  };
-
-  match user_account_result {
-    Ok(user_account) => Ok(Json(from_db_user_account(user_account))),
-    Err(_) => Err(LoginError::UnknownError)
-  }
+async fn me_handler (Extension(auth): Extension<Option<Auth>>) -> Json<UserSettings> {
+  Json(UserSettings { auth })
 }
 
-async fn login_handler(cookies: Cookies, State(state): State<AppState>, Json(input): Json<LoginInput>) -> Result<Json<User>, LoginError> {
+async fn login_handler(cookies: Cookies, State(state): State<AppState>, Json(input): Json<LoginInput>) -> Result<Json<User>, DomainError> {
   let user = login_user(state.db.clone(), input).await?;
-  handle_valid_user(state.db.clone(), user, cookies)
-    .await
-    .map_err(|_| {
-      LoginError::UnknownError
-    })
+  handle_valid_user(state, user, cookies).await
 }
 
-async fn handle_valid_user(db: DBClient, user: User, cookies: Cookies) -> Result<Json<User>, String> {
-  let token = generate_token(user.clone());
-  upsert_user_auth_token(&db, user.clone(), token.clone()).await?;
-  cookies.add(Cookie::new(AUTH_COOKIE_NAME, token));
+async fn handle_valid_user(state: AppState, user: User, cookies: Cookies) -> Result<Json<User>, DomainError> {
+  let auth_token = create_auth_token(&state.db, user.clone()).await.map_err(|err| {
+    error!("Encountered unexpected database error: {:?}", err);
+    DomainError::UnknownError
+  })?;
+  let token = create_jwt_token(user.clone(), auth_token.clone(), state.config.auth.secret.clone())?;
+
+  cookies.add(Cookie::new(state.config.auth.cookie_name.clone(), token));
   Ok(Json(user))
-}
-
-fn generate_token(user: User) -> String {
-  let mut hasher = Sha256::new();
-
-  let mut input_data = String::new();
-  write!(input_data, "{}", user.id).expect("Failed to write user ID");
-  input_data.push_str(&user.email);
-
-  hasher.update(input_data.as_bytes());
-  let result = hasher.finalize();
-
-  // Encode the hash result as Base64
-  STANDARD.encode(result)
 }

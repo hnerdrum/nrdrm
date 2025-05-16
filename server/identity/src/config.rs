@@ -2,7 +2,7 @@ use dotenvy;
 use std::env;
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Environment {
   Dev,
   Prod
@@ -20,18 +20,28 @@ impl FromStr for Environment {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
   pub env: Environment,
   pub port: String,
   pub database_url: String,
+  pub log_level: String,
+  pub auth: AuthConfig
+}
+
+#[derive(Debug, Clone)]
+pub struct AuthConfig {
+  pub secret: String,
+  pub cookie_name: String
 }
 
 pub fn load_config() -> Config {
   let env = load_env();
   let port = env::var("APP_PORT").unwrap_or("8080".to_string());
   let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-  Config { env: env, port: port, database_url: database_url}
+  let log_level = env::var("LOG_LEVEL").unwrap_or("tower_http=debug,axum=debug,info".to_string());
+  let auth_secret = env::var("AUTH_SECRET").expect("AUTH_SECRET must be set");
+  Config { env: env, port: port, database_url: database_url, log_level, auth: AuthConfig { secret: auth_secret, cookie_name: "nrdrm-login".to_string() } }
 }
 
 fn load_env() -> Environment {

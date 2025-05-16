@@ -36,4 +36,4 @@ export type UserSettings = {
   auth: Auth | null;
 };
 
-export type Auth = { userId: string };
+export type Auth = { userId: string; tokenId: string; email: string };
