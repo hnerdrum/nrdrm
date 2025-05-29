@@ -5,6 +5,8 @@ import gleam/list
 import gleam/string
 import gleam/string_tree
 import config/service.{type Service}
+import gleam/bytes_tree
+import gleam/bit_array
 import wisp.{type Request, type Response}
 
 pub fn forward_request(service: Service, path: String, wisp_request: Request) -> Response {
@@ -88,4 +90,18 @@ pub fn set_cookie_header(response: Response) -> Response {
     })
     
   updated_response
+}
+
+pub fn parse_string_response(response: Response) {
+  case response.body {
+    wisp.Text(text) -> Ok(string_tree.to_string(text))
+    wisp.Bytes(bytes) -> {
+      case bit_array.to_string(bytes_tree.to_bit_array(bytes)) {
+        Ok(string) -> Ok(string)
+        Error(_) -> Error("Invalid UTF-8 binary data")
+      }
+    }
+    wisp.File(file_path) -> Error("Received file response at path: " <> file_path)
+    wisp.Empty -> Ok("")
+  }
 }
