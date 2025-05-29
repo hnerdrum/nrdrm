@@ -1,4 +1,4 @@
-name: Recipes backend CD
+name: Deploy Recipes backend
 
 on:
   push:

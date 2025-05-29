@@ -1,4 +1,4 @@
-name: Identity backend CD
+name: Deploy Identity backend
 
 on:
   pull_request:

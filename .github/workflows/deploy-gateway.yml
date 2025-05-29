@@ -1,4 +1,4 @@
-name: Gateway CD
+name: Deploy Gateway
 
 on:
   pull_request:
