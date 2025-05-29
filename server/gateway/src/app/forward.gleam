@@ -3,9 +3,7 @@ import gleam/http/response
 import gleam/httpc
 import gleam/list
 import gleam/string
-import gleam/string_builder
-import gleam/result
-import gleam/dynamic
+import gleam/string_tree
 import config/service.{type Service}
 import wisp.{type Request, type Response}
 
@@ -30,9 +28,7 @@ pub fn send_request(service: Service, request: request.Request(String)) -> Respo
     Ok(response) -> map_response(service, response)
     Error(err) -> {
       let url = request.host <> request.path
-      let err_string = dynamic.string(err)
-        |> result.unwrap("Unknown error")
-      wisp.log_error("Request to " <> url <> "got an error: " <> err_string)
+      wisp.log_error("Request to " <> url <> "got an error: " <> string.inspect(err))
       wisp.internal_server_error()
     }
   }
@@ -54,7 +50,7 @@ pub fn set_request_headers(to: request.Request(String), from: Request, service: 
 }
 
 fn map_response(service: Service, from: response.Response(String)) -> Response {
-  let json_response = wisp.json_response(string_builder.from_string(from.body), from.status)
+  let json_response = wisp.json_response(string_tree.from_string(from.body), from.status)
   set_cookie_header(set_response_headers(service, from, json_response))
 }
 
