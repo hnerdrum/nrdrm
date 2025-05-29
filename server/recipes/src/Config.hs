@@ -6,15 +6,17 @@ where
 
 import Configuration.Dotenv (defaultConfig, loadFile)
 import Control.Exception (catch)
-import Data.List.Split (splitOn)
 import Data.Maybe (fromMaybe)
+import Data.Text (Text, pack)
+import Data.Time
 import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
 
 data AppConfig = AppConfig
   { port :: Int,
     databaseUrl :: String,
-    allowedOrigins :: [String]
+    bootTime :: Text,
+    apiVersion :: Text
   }
   deriving (Show)
 
@@ -29,17 +31,17 @@ loadConfig = do
   loadEnv
   loadedPort <- lookupEnv "PORT"
   loadedDbUrl <- lookupEnv "DATABASE_URL"
-  loadedAllowedOrigins <- lookupEnv "ALLOWED_ORIGINS"
+  loadedBuildId <- lookupEnv "BUILD_ID"
+  currentTime <- getCurrentTime
+  let buildId = fromMaybe "dev" loadedBuildId
+      formattedTime = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S%QZ" currentTime
   return $
     AppConfig
       { port = fromMaybe 8000 $ parsePort loadedPort,
         databaseUrl = fromMaybe "" loadedDbUrl,
-        allowedOrigins = parseAllowedOrigins loadedAllowedOrigins
+        bootTime = pack formattedTime,
+        apiVersion = pack (take 7 buildId)
       }
 
 parsePort :: Maybe String -> Maybe Int
 parsePort = (readMaybe =<<)
-
-parseAllowedOrigins :: Maybe String -> [String]
-parseAllowedOrigins Nothing = []
-parseAllowedOrigins (Just origin) = splitOn "," origin

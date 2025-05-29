@@ -5,7 +5,7 @@ import gleam/http
 import gleam/http/request
 import gleam/http/response
 import gleam/json
-import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/httpc
 import wisp.{type Request}
 import config/service.{type Service}
@@ -66,7 +66,7 @@ fn validate_auth(identity_service: Service, incoming_request: Request) -> TokenV
 fn parse_validation_response(response: response.Response(String)) -> Result(TokenValidation, String) {
   case response.status {
     200 -> {
-      case json.decode(response.body, token_validation_decoder()) {
+      case json.parse(response.body, token_validation_decoder()) {
         Ok(validation) -> Ok(validation)
         Error(_) -> Error("Failed to parse JSON into token validator type")
       }
@@ -75,10 +75,10 @@ fn parse_validation_response(response: response.Response(String)) -> Result(Toke
   }
 }
   
-fn token_validation_decoder() -> dynamic.Decoder(TokenValidation) {
-  dynamic.decode1(
-    TokenValidation,
-    dynamic.field("valid", dynamic.bool),
+fn token_validation_decoder() -> decode.Decoder(TokenValidation) {
+  use valid <- decode.field("valid", decode.bool)
+  decode.success(
+    TokenValidation(valid),
   )
 }
 
