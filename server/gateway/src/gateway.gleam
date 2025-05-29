@@ -13,7 +13,7 @@ pub fn main() {
   let config = config.load_config()
   let assert Ok(services) = service.load_services(config.env)
   let assert Ok(identity_service) = service.find(services, "identity")
-  let ctx = Context(services, identity_service, config.allowed_origins)
+  let ctx = Context(services, identity_service, config)
 
   let assert Ok(_) =
     wisp_mist.handler(router.handle_request(_, ctx), config.secret_key_base)
