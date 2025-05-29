@@ -13,8 +13,8 @@ impl FromStr for Environment {
 
   fn from_str(s: &str) -> Result<Self, Self::Err> {
     match s {
-      "Dev" => Ok(Environment::Dev),
-      "Prod" => Ok(Environment::Prod),
+      "dev" => Ok(Environment::Dev),
+      "prod" => Ok(Environment::Prod),
       _ => Err(()),
     }
   }
