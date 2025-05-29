@@ -51,3 +51,10 @@ jobs:
               }
             }" \
             https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/$CONTAINER_ID
+      - name: Deploy Scaleway container
+        run: >
+          curl \
+            --request POST \
+            --header "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
+            --data '{}' \
+            https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/${{ secrets.RECIPES_CONTAINER_ID }}/deploy
