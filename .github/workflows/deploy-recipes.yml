@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - "server/recipes/**"
-      - ".github/workflows/deploy-recipes-backend.yml"
+      - ".github/workflows/deploy-recipes.yml"
     branches:
       - main
 
