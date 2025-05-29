@@ -12,7 +12,9 @@ import Servant (Handler)
 
 data AppContext = AppContext
   { name :: Text,
-    dbPool :: Pool Connection
+    dbPool :: Pool Connection,
+    bootTime :: Text,
+    apiVersion :: Text
   }
 
 type AppM = ReaderT AppContext Handler
