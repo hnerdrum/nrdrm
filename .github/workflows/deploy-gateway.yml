@@ -1,11 +1,10 @@
-name: Gateway CD
+name: Deploy Gateway
 
 on:
-  pull_request:
+  push:
     paths:
       - "server/gateway/**"
       - ".github/workflows/deploy-gateway.yml"
-  push:
     branches:
       - main
 
@@ -34,3 +33,29 @@ jobs:
           CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
           GIT_SHA: ${{ github.sha }}
         run: docker push $CONTAINER_REGISTRY/nrdrm-gateway:$GIT_SHA
+      - name: Update Scaleway container
+        env:
+          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+          GIT_SHA: ${{ github.sha }}
+          CONTAINER_ID: ${{ secrets.GATEWAY_CONTAINER_ID }}
+        run: >
+          curl \
+            --request PATCH \
+            --header "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
+            --data "{
+              \"redeploy\": true,
+              \"registry_image\": \"$CONTAINER_REGISTRY/nrdrm-gateway:$GIT_SHA\",
+              \"environment_variables\": {
+                \"BUILD_ID\": \"$GIT_SHA\",
+                \"ENV\": \"${{ vars.PROD_ENV }}\",
+                \"ALLOWED_ORIGINS\": \"${{ vars.ALLOWED_ORIGINS }}\"
+              }
+            }" \
+            https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/$CONTAINER_ID
+      - name: Deploy Scaleway container
+        run: >
+          curl \
+            --request POST \
+            --header "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
+            --data '{}' \
+            https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/${{ secrets.GATEWAY_CONTAINER_ID }}/deploy

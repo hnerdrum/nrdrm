@@ -16,7 +16,7 @@ pub fn middleware(
 
   use <- wisp.rescue_crashes
 
-  use req <- cors.wisp_handle(req, cors(ctx.allowed_origins))
+  use req <- cors.wisp_middleware(req, cors(ctx.config.allowed_origins))
 
   use req <- wisp.handle_head(req)
 

@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::domain::error::DomainError;
 use crate::domain::jwt::create_jwt_token;
-use crate::domain::model::{login_user, Auth, LoginInput, TokenValidation, User, UserSettings};
+use crate::domain::model::{login_user, Auth, HealthCheck, LoginInput, TokenValidation, User, UserSettings};
 use crate::database::auth_token::create_auth_token;
 use super::middleware::auth_middleware;
 use axum::http::StatusCode;
@@ -60,8 +60,8 @@ pub fn init_router(state: AppState) -> Router {
     .with_state(state)
 }
 
-async fn health_handler() -> &'static str {
-  "OK"
+async fn health_handler(State(state): State<AppState>) -> Result<Json<HealthCheck>, DomainError> {
+  Ok(Json(HealthCheck { boot_time: state.config.boot_time, api_version: state.config.api_version }))
 }
 
 async fn validate_token_handler (Extension(auth): Extension<Option<Auth>>) -> Result<Json<TokenValidation>, DomainError> {
