@@ -4,11 +4,11 @@ pub type Environment {
   Prod
 }
 
-pub fn parse_env(str: String) -> Result(Environment, String) {
+pub fn parse_env(str: String) -> Result(Environment, Nil) {
   case str {
     "dev" -> Ok(Dev)
     "prod" -> Ok(Prod)
-    _ -> Error("Could not parse string " <> str <> " into environment type")
+    _ -> Error(Nil)
   } 
 }
 

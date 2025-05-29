@@ -1,5 +1,5 @@
 import config/env.{type Environment}
-import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/list
 import gleam/json
 import gleam/result
@@ -57,25 +57,41 @@ pub fn load_services(env: Environment) -> Result(List(Service), String) {
 }
 
 fn services_from_json(json_string: String) -> Result(List(Service), String) {
-  result.map_error(json.decode(from: json_string, using: dynamic.list(service_decoder())), fn(_) { "Unable to parse JSON string into service" })
+  result.map_error(json.parse(from: json_string, using: decode.list(service_decoder())), fn(_) { "Unable to parse JSON string into service" })
 }
 
 fn service_decoder() {
-  dynamic.decode5(Service, dynamic.field("name", of: dynamic.string), dynamic.field("base_url", of: dynamic.string), dynamic.field("request", of: service_request_decoder()), dynamic.field("response", of: service_response_decoder()), dynamic.field("security", of: service_security_decoer()))
+  use name <- decode.field("name", decode.string)
+  use base_url <- decode.field("base_url", decode.string)
+  use request <- decode.field("request", service_request_decoder())
+  use response <- decode.field("response", service_response_decoder())
+  use security <- decode.field("security", service_security_decoder())
+  decode.success(Service(
+    name: name,
+    base_url: base_url,
+    request: request,
+    response: response,
+    security: security
+  ))
 }
 
 fn service_request_decoder() {
-  dynamic.decode1(RequestConfig, dynamic.field("forward_headers", of: dynamic.list(dynamic.string)))
+  use forward_headers <- decode.field("forward_headers", decode.list(decode.string))
+  decode.success(RequestConfig(forward_headers))
 }
 
 fn service_response_decoder() {
-  dynamic.decode1(ResponseConfig, dynamic.field("forward_headers", of: dynamic.list(dynamic.string)))
+  use forward_headers <- decode.field("forward_headers", decode.list(decode.string))
+  decode.success(ResponseConfig(forward_headers))
 }
 
-fn service_security_decoer() {
-  dynamic.decode1(SecurityConfig, dynamic.field("auth", of: dynamic.list(security_auth_decoder())))
+fn service_security_decoder() {
+  use auth <- decode.field("auth", decode.list(security_auth_decoder()))
+  decode.success(SecurityConfig(auth))
 }
 
 fn security_auth_decoder() {
-  dynamic.decode2(AuthConfig, dynamic.field("path", of: dynamic.string), dynamic.field("methods", of: dynamic.list(dynamic.string)))
+  use path <- decode.field("path", decode.string)
+  use methods <- decode.field("methods", decode.list(decode.string))
+  decode.success(AuthConfig(path, methods))
 }
