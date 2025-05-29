@@ -9,10 +9,10 @@ import API.Ingredient (createIngredientRoute, deleteIngredientRoute, getAllIngre
 import API.Recipe (createRecipeRoute, deleteRecipeHandler, getAllRecipesRoute, getRecipeRoute, updateRecipeRoute)
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
-import Data.Text (Text)
 import Data.UUID (UUID)
 import Database.Ingredient (CreateIngredientInput (..), UpdateIngredientInput (..))
 import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
+import Domain.Health (HealthCheck (..))
 import Domain.Ingredient (Ingredient (..))
 import Domain.Recipe (Recipe (..))
 import Servant
@@ -22,7 +22,6 @@ import Servant
     Handler,
     HasServer (ServerT),
     JSON,
-    PlainText,
     PostCreated,
     Proxy (..),
     Put,
@@ -46,7 +45,7 @@ type API =
            :<|> "ingredients" :> ReqBody '[JSON] CreateIngredientInput :> PostCreated '[JSON] Ingredient
            :<|> "ingredients" :> Capture "ingredientId" UUID :> ReqBody '[JSON] UpdateIngredientInput :> Put '[JSON] Ingredient
            :<|> "ingredients" :> Capture "ingredientId" UUID :> DeleteNoContent
-           :<|> "health" :> Get '[PlainText] Text
+           :<|> "health" :> Get '[JSON] HealthCheck
        )
 
 server :: AppContext -> Server API

@@ -24,7 +24,13 @@ startApp = do
   let appName = "Recipes"
   pool <- createConnection $ Config.databaseUrl config
 
-  let appContext = AppContext appName pool
+  let appContext =
+        AppContext
+          { name = appName,
+            dbPool = pool,
+            bootTime = Config.bootTime config,
+            apiVersion = Config.apiVersion config
+          }
 
   let port = Config.port config
 
