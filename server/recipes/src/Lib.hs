@@ -11,7 +11,6 @@ import Data.Aeson (object)
 import Data.Text (pack)
 import Database.Connection (createConnection)
 import Database.Migrations (runDbMigrations)
-import Http.Cors (corsMiddleware)
 import qualified Logger
 import Network.Wai.Handler.Warp (run)
 import Servant (serve)
@@ -31,4 +30,4 @@ startApp = do
 
   liftIO $ Logger.info ("Starting " <> appName <> " app on port " <> (pack . show) port) (object [])
 
-  run port $ corsMiddleware (Config.allowedOrigins config) $ Logger.loggingMiddleware $ serve api $ server appContext
+  run port $ Logger.loggingMiddleware $ serve api $ server appContext

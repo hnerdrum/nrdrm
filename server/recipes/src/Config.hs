@@ -6,15 +6,13 @@ where
 
 import Configuration.Dotenv (defaultConfig, loadFile)
 import Control.Exception (catch)
-import Data.List.Split (splitOn)
 import Data.Maybe (fromMaybe)
 import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
 
 data AppConfig = AppConfig
   { port :: Int,
-    databaseUrl :: String,
-    allowedOrigins :: [String]
+    databaseUrl :: String
   }
   deriving (Show)
 
@@ -29,17 +27,11 @@ loadConfig = do
   loadEnv
   loadedPort <- lookupEnv "PORT"
   loadedDbUrl <- lookupEnv "DATABASE_URL"
-  loadedAllowedOrigins <- lookupEnv "ALLOWED_ORIGINS"
   return $
     AppConfig
       { port = fromMaybe 8000 $ parsePort loadedPort,
-        databaseUrl = fromMaybe "" loadedDbUrl,
-        allowedOrigins = parseAllowedOrigins loadedAllowedOrigins
+        databaseUrl = fromMaybe "" loadedDbUrl
       }
 
 parsePort :: Maybe String -> Maybe Int
 parsePort = (readMaybe =<<)
-
-parseAllowedOrigins :: Maybe String -> [String]
-parseAllowedOrigins Nothing = []
-parseAllowedOrigins (Just origin) = splitOn "," origin
