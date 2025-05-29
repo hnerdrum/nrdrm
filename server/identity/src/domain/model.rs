@@ -9,6 +9,12 @@ use crate::database::connection::DBClient;
 use super::error::DomainError;
 
 #[derive(Serialize)]
+pub struct HealthCheck {
+    pub boot_time: String,
+    pub api_version: String
+}
+
+#[derive(Serialize)]
 pub struct TokenValidation {
     pub valid: bool,
 }

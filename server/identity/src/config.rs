@@ -1,6 +1,7 @@
 use dotenvy;
 use std::env;
 use std::str::FromStr;
+use chrono::Utc;
 
 #[derive(Debug, Clone)]
 pub enum Environment {
@@ -26,7 +27,9 @@ pub struct Config {
   pub port: String,
   pub database_url: String,
   pub log_level: String,
-  pub auth: AuthConfig
+  pub auth: AuthConfig,
+  pub boot_time: String,
+  pub api_version: String
 }
 
 #[derive(Debug, Clone)]
@@ -41,7 +44,16 @@ pub fn load_config() -> Config {
   let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
   let log_level = env::var("LOG_LEVEL").unwrap_or("tower_http=debug,axum=debug,info".to_string());
   let auth_secret = env::var("AUTH_SECRET").expect("AUTH_SECRET must be set");
-  Config { env: env, port: port, database_url: database_url, log_level, auth: AuthConfig { secret: auth_secret, cookie_name: "nrdrm-login".to_string() } }
+  let build_id = env::var("BUILD_ID").unwrap_or("dev".to_string());
+  Config {
+    env,
+    port,
+    database_url,
+    log_level,
+    auth: AuthConfig { secret: auth_secret, cookie_name: "nrdrm-login".to_string() },
+    boot_time: Utc::now().to_rfc3339(),
+    api_version: build_id.chars().take(7).collect()
+  }
 }
 
 fn load_env() -> Environment {
