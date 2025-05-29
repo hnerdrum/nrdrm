@@ -1,11 +1,10 @@
 name: Deploy Identity backend
 
 on:
-  pull_request:
+  push:
     paths:
       - "server/identity/**"
       - ".github/workflows/deploy-identity.yml"
-  push:
     branches:
       - main
 

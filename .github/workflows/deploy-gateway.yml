@@ -1,11 +1,10 @@
 name: Deploy Gateway
 
 on:
-  pull_request:
+  push:
     paths:
       - "server/gateway/**"
       - ".github/workflows/deploy-gateway.yml"
-  push:
     branches:
       - main
 
