@@ -1,0 +1,22 @@
+{
+  "name": "delete-container-images",
+  "version": "1.0.0",
+  "description": "Cron job for deleting container images",
+  "main": "dist/job.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/job.js",
+    "dev": "ts-node src/job.ts",
+    "clean": "rm -rf dist"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "effect": "^3.17.2"
+  }
+}
