@@ -1,0 +1,54 @@
+name: Deploy Delete images job
+
+on:
+  push:
+    paths:
+      - "cron/delete-container-images/**"
+      - ".github/workflows/deploy-delete-images-job.yml"
+    branches:
+      - main
+      # TODO: remove this branch after testing
+      - delete-container-images-job
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cron/delete-container-images
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to Scaleway Container Registry
+        uses: docker/login-action@v3
+        with:
+          username: nologin
+          password: ${{ secrets.SCALEWAY_API_KEY }}
+          registry: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+      - name: Build the Docker image
+        env:
+          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+          GIT_SHA: ${{ github.sha }}
+        run: docker build -t $CONTAINER_REGISTRY/nrdrm-delete-images-job:$GIT_SHA .
+      - name: Push the Docker Image
+        env:
+          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+          GIT_SHA: ${{ github.sha }}
+        run: docker push $CONTAINER_REGISTRY/nrdrm-delete-images-job:$GIT_SHA
+      - name: Update Scaleway container
+        env:
+          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+          GIT_SHA: ${{ github.sha }}
+        run: >
+          curl \
+            --request PATCH \
+            --header "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
+            --data "{
+              \"redeploy\": true,
+              \"registry_image\": \"$CONTAINER_REGISTRY/nrdrm-delete-images-job:$GIT_SHA\",
+              \"environment_variables\": {
+                \"BUILD_ID\": \"$GIT_SHA\",
+                \"ENV\": \"${{ vars.PROD_ENV }}\"
+              }
+            }" \
+            https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/$CONTAINER_ID
