@@ -49,6 +49,10 @@ jobs:
               \"environment_variables\": {
                 \"SCALEWAY_API_KEY\": \"${{ secrets.SCALEWAY_API_KEY }}\",
                 \"SCALEWAY_CONTAINER_REGISTRY_BASE_URL\": \"${{ vars.SCALEWAY_CONTAINER_REGISTRY_BASE_URL }}\"
+              },
+              \"cron_schedule\": {
+                \"schedule\": \"0 2 * * 1\",
+                \"timezone\": \"Europe/Oslo\"
               }
             }" \
             https://api.scaleway.com/serverless-jobs/v1alpha1/regions/fr-par/job-definitions/$JOB_ID
