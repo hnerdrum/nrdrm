@@ -91,7 +91,10 @@ const filterTagsForDeletion = (data: {
             } old tags, deleting ${tagsToDelete.length} old tags`;
       return Effect.log(message);
     }),
-    Effect.map(({ tagsToDelete }) => tagsToDelete)
+    Effect.map(({ tagsToDelete }) => ({
+      image: data.image,
+      tagsToDelete,
+    }))
   );
 
 const partitionTags = (data: {
@@ -124,10 +127,45 @@ const partitionTags = (data: {
   return { tagsToDelete, readyTags, recentTags, oldTags };
 };
 
+const deleteImageTag = ({
+  image,
+  tag,
+}: {
+  image: ScalewayImage;
+  tag: ScalewayImageTag;
+}) =>
+  Effect.log(`${image.name}: Deleting tag ${tag.name}`).pipe(
+    Effect.flatMap(() =>
+      Effect.tryPromise(() =>
+        fetch(`${config.scaleway.containerRegistry.baseUrl}/tags/${tag.id}`, {
+          method: "DELETE",
+          headers: {
+            "X-Auth-Token": config.scaleway.apiKey,
+          },
+        })
+      )
+    ),
+    Effect.flatMap((response) => {
+      if (!response.ok) {
+        return Effect.fail(
+          new Error(`Failed to delete tag ${tag.name}: ${response.status}`)
+        );
+      }
+      return Effect.sync(() => response);
+    })
+  );
+
 const program = getImages().pipe(
   Effect.flatMap(filterImages),
   Effect.flatMap((images) => Effect.forEach(images, getImageTags)),
   Effect.flatMap((data) => Effect.forEach(data, filterTagsForDeletion)),
+  Effect.flatMap((data) =>
+    Effect.forEach(data, (data) =>
+      Effect.forEach(data.tagsToDelete, (tag) =>
+        deleteImageTag({ image: data.image, tag })
+      )
+    )
+  ),
   Effect.catchAllCause((cause) => {
     if (Cause.isFailType(cause)) {
       return Console.error("Job failed with error:", cause);
