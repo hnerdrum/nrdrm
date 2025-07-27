@@ -15,7 +15,6 @@
     "noUnusedParameters": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -29,6 +28,6 @@
     "importHelpers": true,
     "downlevelIteration": true
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/config.ts"],
   "exclude": ["node_modules", "dist"]
 }
