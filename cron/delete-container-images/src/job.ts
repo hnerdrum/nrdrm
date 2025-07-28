@@ -1,168 +1,24 @@
-import { Effect, Console, Schema, Cause } from "effect";
-import { config } from "./config";
+import { Effect, Console, Cause } from "effect";
+import { getImages, getImageTags } from "./api/scaleway";
 import {
-  ScalewayImage,
-  ScalewayImagesResponseSchema,
-  ScalewayImageTagsResponseSchema,
-  ScalewayImageTag,
-} from "./schema";
-
-const getImages = () =>
-  Effect.tryPromise(() =>
-    fetch(`${config.scaleway.containerRegistry.baseUrl}/images`, {
-      headers: {
-        "X-Auth-Token": config.scaleway.apiKey,
-      },
-    })
-  ).pipe(
-    Effect.flatMap((response) => {
-      if (!response.ok) {
-        return Effect.fail(
-          new Error(`HTTP request failed with status: ${response.status}`)
-        );
-      }
-      return Effect.tryPromise(() => response.json());
-    }),
-    Effect.flatMap((data) =>
-      Schema.decodeUnknown(ScalewayImagesResponseSchema)(data)
-    ),
-    Effect.map((data) => data.images)
-  );
-
-const filterImages = (images: readonly ScalewayImage[]) =>
-  Effect.sync(() => {
-    const isValidImage = (image: ScalewayImage) => image.status === "ready";
-
-    const validImages = images.filter(isValidImage);
-    const invalidImages = images.filter((image) => !isValidImage(image));
-
-    return { validImages, invalidImages };
-  }).pipe(
-    Effect.flatMap(({ validImages, invalidImages }) =>
-      Effect.forEach(invalidImages, (image) =>
-        Effect.log(`${image.name} is in invalid state: ${image.status}`)
-      ).pipe(Effect.map(() => validImages))
-    )
-  );
-
-const getImageTags = (image: ScalewayImage) =>
-  Effect.tryPromise(() =>
-    fetch(
-      `${config.scaleway.containerRegistry.baseUrl}/images/${image.id}/tags`,
-      {
-        headers: {
-          "X-Auth-Token": config.scaleway.apiKey,
-        },
-      }
-    )
-  ).pipe(
-    Effect.flatMap((response) => {
-      if (!response.ok) {
-        return Effect.fail(
-          new Error(`HTTP request failed with status: ${response.status}`)
-        );
-      }
-      return Effect.tryPromise(() => response.json());
-    }),
-    Effect.flatMap((data) =>
-      Schema.decodeUnknown(ScalewayImageTagsResponseSchema)(data)
-    ),
-    Effect.map((tags) => ({ image, tags: tags.tags }))
-  );
-
-const filterTagsForDeletion = (data: {
-  image: ScalewayImage;
-  tags: readonly ScalewayImageTag[];
-}) =>
-  Effect.sync(() => partitionTags(data)).pipe(
-    Effect.tap(({ readyTags, recentTags, oldTags }) =>
-      Effect.log(
-        `${data.image.name}: Found ${readyTags.length} ready tags, ${recentTags.length} recent (last 24h), ${oldTags.length} old`
-      )
-    ),
-    Effect.tap(({ tagsToDelete, recentTags, oldTags }) => {
-      const message =
-        recentTags.length >= config.scaleway.containerRegistry.tagsToKeep
-          ? `${data.image.name}: More than ${config.scaleway.containerRegistry.tagsToKeep} recent tags (${recentTags.length}), deleting all ${oldTags.length} old tags`
-          : `${data.image.name}: Less than ${
-              config.scaleway.containerRegistry.tagsToKeep
-            } recent tags (${recentTags.length}), keeping ${
-              oldTags.length - tagsToDelete.length
-            } old tags, deleting ${tagsToDelete.length} old tags`;
-      return Effect.log(message);
-    }),
-    Effect.map(({ tagsToDelete }) => ({
-      image: data.image,
-      tagsToDelete,
-    }))
-  );
-
-const partitionTags = (data: {
-  image: ScalewayImage;
-  tags: readonly ScalewayImageTag[];
-}) => {
-  const now = new Date();
-  const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-  const readyTags = data.tags.filter((tag) => tag.status === "ready");
-  const recentTags = readyTags.filter(
-    (tag) => tag.created_at > twentyFourHoursAgo
-  );
-  const oldTags = readyTags.filter(
-    (tag) => tag.created_at <= twentyFourHoursAgo
-  );
-
-  const maxOldTagsToKeep = Math.max(
-    0,
-    config.scaleway.containerRegistry.tagsToKeep - recentTags.length
-  );
-
-  const tagsToDelete = oldTags
-    .sort(
-      (a: ScalewayImageTag, b: ScalewayImageTag) =>
-        b.created_at.getTime() - a.created_at.getTime()
-    )
-    .slice(maxOldTagsToKeep);
-
-  return { tagsToDelete, readyTags, recentTags, oldTags };
-};
-
-const deleteImageTag = ({
-  image,
-  tag,
-}: {
-  image: ScalewayImage;
-  tag: ScalewayImageTag;
-}) =>
-  Effect.log(`${image.name}: Deleting tag ${tag.name}`).pipe(
-    Effect.flatMap(() =>
-      Effect.tryPromise(() =>
-        fetch(`${config.scaleway.containerRegistry.baseUrl}/tags/${tag.id}`, {
-          method: "DELETE",
-          headers: {
-            "X-Auth-Token": config.scaleway.apiKey,
-          },
-        })
-      )
-    ),
-    Effect.flatMap((response) => {
-      if (!response.ok) {
-        return Effect.fail(
-          new Error(`Failed to delete tag ${tag.name}: ${response.status}`)
-        );
-      }
-      return Effect.sync(() => response);
-    })
-  );
+  filterValidImages,
+  filterTagsForDeletion,
+  deleteImageTagWithLogging,
+} from "./utils";
+import { ScalewayImage } from "./schema";
 
 const program = getImages().pipe(
-  Effect.flatMap(filterImages),
-  Effect.flatMap((images) => Effect.forEach(images, getImageTags)),
+  Effect.flatMap(filterValidImages),
+  Effect.flatMap((images: readonly ScalewayImage[]) =>
+    Effect.forEach(images, (image) =>
+      getImageTags(image.id).pipe(Effect.map((tags) => ({ image, tags })))
+    )
+  ),
   Effect.flatMap((data) => Effect.forEach(data, filterTagsForDeletion)),
   Effect.flatMap((data) =>
     Effect.forEach(data, (data) =>
       Effect.forEach(data.tagsToDelete, (tag) =>
-        deleteImageTag({ image: data.image, tag })
+        deleteImageTagWithLogging({ image: data.image, tag })
       )
     )
   ),
