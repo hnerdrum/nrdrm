@@ -1,7 +1,6 @@
 module Database.Ingredient
   ( Unit (..),
     unitToString,
-    DbIngredient (..),
     CreateIngredientInput (..),
     UpdateIngredientInput (..),
   )
@@ -11,29 +10,15 @@ import Data.Aeson
 import Data.Aeson.TH (deriveJSON)
 import Data.Maybe (isNothing)
 import Data.Text (Text)
-import Data.Time (UTCTime)
-import Data.UUID (UUID)
 import Database.PostgreSQL.Simple.FromField
   ( FromField (..),
     ResultError (ConversionFailed, UnexpectedNull),
     returnError,
   )
-import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 
 data Unit = G | Ml | Tsp | Tbsp | Qty deriving (Show)
 
 $(deriveJSON defaultOptions ''Unit)
-
-data DbIngredient = DbIngredient
-  { id :: UUID,
-    createdAt :: UTCTime,
-    updatedAt :: UTCTime,
-    name :: Text
-  }
-  deriving (Show)
-
-instance FromRow DbIngredient where
-  fromRow = DbIngredient <$> field <*> field <*> field <*> field
 
 newtype CreateIngredientInput = CreateIngredientInput
   { name :: Text
