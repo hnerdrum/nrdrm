@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeApplications #-}
@@ -16,19 +17,20 @@ where
 
 import Data.Aeson
 import Data.Aeson.TH (deriveJSON)
+import Data.Bifunctor (bimap)
 import Data.Either.Combinators (mapLeft)
 import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import Data.Time (getCurrentTime)
 import Data.UUID (UUID)
-import qualified Data.UUID.V4 as V4
 import Database.Ingredient (CreateIngredientInput (..), Unit (..), UpdateIngredientInput (..))
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.Recipe (DbRecipeIngredient (..))
 import Domain.Errors (AppError (..), DomainError (..))
+import ORM (ToInsert (..))
 import qualified ORM
-import ORM.Schema.Ingredient (IngredientRow (..), IngredientTable)
+import ORM.Schema.Ingredient (IngredientRow (..), IngredientTable, ingredientName)
 
 data RecipeIngredient = RecipeIngredient
   { id :: UUID,
@@ -48,6 +50,10 @@ data Ingredient = Ingredient
 
 $(deriveJSON defaultOptions ''Ingredient)
 
+instance ToInsert CreateIngredientInput IngredientTable where
+  toInsertBuilder input =
+    ORM.setValue ingredientName input.name
+
 getAllIngredients :: Pool PGSimple.Connection -> IO [Ingredient]
 getAllIngredients pool = do
   ingredientRows <- ORM.findAll @IngredientTable pool
@@ -55,23 +61,13 @@ getAllIngredients pool = do
 
 getIngredient :: Pool PGSimple.Connection -> UUID -> IO (Either AppError Ingredient)
 getIngredient pool ingredientId =
-  fmap fromIngredientRow . mapLeft fromIngredientError
+  bimap fromIngredientError fromIngredientRow
     <$> ORM.findUniqueOrError @IngredientTable pool ingredientId
 
 createIngredient :: Pool PGSimple.Connection -> CreateIngredientInput -> IO (Either AppError Ingredient)
-createIngredient pool ingredient = do
-  ingredientId <- V4.nextRandom
-  _ <- withResource pool $ \conn ->
-    PGSimple.execute
-      conn
-      [sql|INSERT INTO ingredient (id, name) VALUES (?, ?)|]
-      (ingredientId, ingredient.name)
-  return $
-    Right $
-      Ingredient
-        { id = ingredientId,
-          name = ingredient.name
-        }
+createIngredient pool input =
+  bimap fromIngredientError fromIngredientRow
+    <$> ORM.createWith @CreateIngredientInput @IngredientTable @IngredientRow pool input
 
 updateIngredient :: Pool PGSimple.Connection -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
 updateIngredient pool ingredientId ingredient = do
