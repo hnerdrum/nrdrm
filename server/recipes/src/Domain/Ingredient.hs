@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Domain.Ingredient
   ( Ingredient (..),
@@ -21,11 +22,13 @@ import Data.Text (Text)
 import Data.Time (getCurrentTime)
 import Data.UUID (UUID)
 import qualified Data.UUID.V4 as V4
-import Database.Ingredient (CreateIngredientInput (..), DbIngredient (..), Unit (..), UpdateIngredientInput (..))
+import Database.Ingredient (CreateIngredientInput (..), Unit (..), UpdateIngredientInput (..))
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
 import Database.Recipe (DbRecipeIngredient (..))
-import Domain.Errors (AppError (..), DomainError (..), addErrorContext)
+import Domain.Errors (AppError (..), DomainError (..))
+import qualified ORM
+import ORM.Schema.Ingredient (IngredientRow (..), IngredientTable)
 
 data RecipeIngredient = RecipeIngredient
   { id :: UUID,
@@ -46,44 +49,50 @@ data Ingredient = Ingredient
 $(deriveJSON defaultOptions ''Ingredient)
 
 getAllIngredients :: Pool PGSimple.Connection -> IO [Ingredient]
-getAllIngredients pool =
-  withResource pool $ \conn -> do
-    dbIngredients <- PGSimple.query_ conn "SELECT * from ingredient"
-    return $ map fromDbIngredient dbIngredients
+getAllIngredients pool = do
+  ingredientRows <- ORM.findAll @IngredientTable pool
+  return $ map fromIngredientRow ingredientRows
 
 getIngredient :: Pool PGSimple.Connection -> UUID -> IO (Either AppError Ingredient)
 getIngredient pool ingredientId =
-  withResource pool $ \conn -> getIngredientById conn ingredientId
+  fmap fromIngredientRow . mapLeft fromIngredientError
+    <$> ORM.findUniqueOrError @IngredientTable pool ingredientId
 
 createIngredient :: Pool PGSimple.Connection -> CreateIngredientInput -> IO (Either AppError Ingredient)
-createIngredient pool ingredient =
-  withResource pool $ \conn ->
-    PGSimple.withTransaction conn $ do
-      ingredientId <- V4.nextRandom
-      _ <-
-        PGSimple.execute
-          conn
-          [sql|
-          INSERT INTO ingredient (id, name)
-          VALUES (?, ?)
-        |]
-          (ingredientId, ingredient.name)
-      getIngredientById conn ingredientId
+createIngredient pool ingredient = do
+  ingredientId <- V4.nextRandom
+  _ <- withResource pool $ \conn ->
+    PGSimple.execute
+      conn
+      [sql|INSERT INTO ingredient (id, name) VALUES (?, ?)|]
+      (ingredientId, ingredient.name)
+  return $
+    Right $
+      Ingredient
+        { id = ingredientId,
+          name = ingredient.name
+        }
 
 updateIngredient :: Pool PGSimple.Connection -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
-updateIngredient pool ingredientId ingredient =
-  withResource pool $ \conn ->
-    PGSimple.withTransaction conn $ do
-      now <- getCurrentTime
-      _ <-
-        PGSimple.execute
-          conn
-          [sql|
-          UPDATE ingredient SET updated_at = ?, name = ?
-          WHERE id = ?
-        |]
-          (now, ingredient.name, ingredientId)
-      getIngredientById conn ingredientId
+updateIngredient pool ingredientId ingredient = do
+  now <- getCurrentTime
+  rowsAffected <- withResource pool $ \conn ->
+    PGSimple.execute
+      conn
+      [sql|
+        UPDATE ingredient SET updated_at = ?, name = ?
+        WHERE id = ?
+      |]
+      (now, ingredient.name, ingredientId)
+  if rowsAffected == 0
+    then return $ Left $ AppError NotFoundError "Ingredient could not be found" (object ["ingredientId" .= ingredientId])
+    else
+      return $
+        Right $
+          Ingredient
+            { id = ingredientId,
+              name = ingredient.name
+            }
 
 deleteIngredient :: Pool PGSimple.Connection -> UUID -> IO ()
 deleteIngredient pool ingredientId =
@@ -98,31 +107,18 @@ deleteIngredient pool ingredientId =
         $ PGSimple.Only ingredientId
     return ()
 
-getIngredientById :: PGSimple.Connection -> UUID -> IO (Either AppError Ingredient)
-getIngredientById conn ingredientId = do
-  dbIngredients <-
-    PGSimple.query
-      conn
-      [sql|
-    SELECT id, created_at, updated_at, name
-    FROM ingredient
-    WHERE id = ?
-  |]
-      $ PGSimple.Only ingredientId
-  return $ mapLeft (addErrorContext (object ["ingredientId" .= ingredientId])) (reduceDbIngredients dbIngredients)
-
-reduceDbIngredients :: [DbIngredient] -> Either AppError Ingredient
-reduceDbIngredients dbIngredients
-  | null dbIngredients = Left (AppError {error = NotFoundError, message = "Ingredient could not be found", context = object []})
-  | length dbIngredients == 1 = Right $ fromDbIngredient (head dbIngredients)
-  | otherwise = Left (AppError {error = MultipleEntitiesError, message = "Found multiple ingredients with matching ID", context = object []})
-
-fromDbIngredient :: DbIngredient -> Ingredient
-fromDbIngredient dbIngredient =
+fromIngredientRow :: IngredientRow -> Ingredient
+fromIngredientRow row =
   Ingredient
-    { id = dbIngredient.id,
-      name = dbIngredient.name
+    { id = row.id,
+      name = row.name
     }
+
+fromIngredientError :: ORM.ORMError -> AppError
+fromIngredientError err =
+  case err of
+    ORM.RecordNotFound ingredientId -> AppError NotFoundError "Ingredient could not be found" (object ["ingredientId" .= ingredientId])
+    ORM.MultipleRecordsFound ingredientId -> AppError MultipleEntitiesError "Found multiple ingredients with matching ID" (object ["ingredientId" .= ingredientId])
 
 fromDbRecipeIngredient :: DbRecipeIngredient -> Maybe RecipeIngredient
 fromDbRecipeIngredient dbRI = do
