@@ -11,23 +11,22 @@ module ORM.Operations
     findFirst,
     findFirstOrError,
     count,
+    create,
     ORMError (..),
   )
 where
 
 import Data.Pool (Pool)
-import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.UUID (UUID)
+import qualified Data.UUID.V4 as V4
 import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.FromRow (FromRow)
 import Database.PostgreSQL.Simple.ToField (ToField)
 import ORM.Core (Entity (..), PrimaryKeyType)
+import ORM.Errors (ORMError (..))
+import qualified ORM.Insert as Insert
 import ORM.Query (QueryBuilder, runQuery, runQueryOne, selectAll, whereEq)
-
-data ORMError
-  = RecordNotFound Text
-  | MultipleRecordsFound Text
-  deriving (Show, Eq)
 
 findAll ::
   forall table result.
@@ -98,3 +97,13 @@ count ::
 count pool modifier = do
   results :: [result] <- runQuery pool (modifier (selectAll @table))
   return $ length results
+
+create ::
+  forall table result.
+  (Entity table, FromRow result, PrimaryKeyType table ~ UUID, Show (PrimaryKeyType table)) =>
+  Pool Connection ->
+  Insert.InsertBuilder table ->
+  IO (Either ORMError result)
+create pool builder = do
+  pkValue <- V4.nextRandom
+  Insert.insert pool pkValue builder
