@@ -2,6 +2,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TypeApplications #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Domain.Ingredient
   ( Ingredient (..),
@@ -18,14 +19,11 @@ where
 import Data.Aeson
 import Data.Aeson.TH (deriveJSON)
 import Data.Bifunctor (bimap)
-import Data.Either.Combinators (mapLeft)
-import Data.Pool (Pool, withResource)
+import Data.Pool (Pool)
 import Data.Text (Text)
-import Data.Time (getCurrentTime)
 import Data.UUID (UUID)
 import Database.Ingredient (CreateIngredientInput (..), Unit (..), UpdateIngredientInput (..))
-import qualified Database.PostgreSQL.Simple as PGSimple
-import Database.PostgreSQL.Simple.SqlQQ (sql)
+import Database.PostgreSQL.Simple (Connection)
 import Database.Recipe (DbRecipeIngredient (..))
 import Domain.Errors (AppError (..), DomainError (..))
 import ORM (ToInsert (..), ToUpdate (..))
@@ -58,27 +56,27 @@ instance ToUpdate UpdateIngredientInput IngredientTable where
   toUpdateBuilder input =
     ORM.setField ingredientName input.name (ORM.emptyUpdate @IngredientTable)
 
-getAllIngredients :: Pool PGSimple.Connection -> IO [Ingredient]
+getAllIngredients :: Pool Connection -> IO [Ingredient]
 getAllIngredients pool = do
   ingredientRows <- ORM.findAll @IngredientTable pool
   return $ map fromIngredientRow ingredientRows
 
-getIngredient :: Pool PGSimple.Connection -> UUID -> IO (Either AppError Ingredient)
+getIngredient :: Pool Connection -> UUID -> IO (Either AppError Ingredient)
 getIngredient pool ingredientId =
   bimap fromIngredientError fromIngredientRow
     <$> ORM.findUniqueOrError @IngredientTable pool ingredientId
 
-createIngredient :: Pool PGSimple.Connection -> CreateIngredientInput -> IO (Either AppError Ingredient)
+createIngredient :: Pool Connection -> CreateIngredientInput -> IO (Either AppError Ingredient)
 createIngredient pool input =
   bimap fromIngredientError fromIngredientRow
     <$> ORM.createWith @CreateIngredientInput @IngredientTable @IngredientRow pool input
 
-updateIngredient :: Pool PGSimple.Connection -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
+updateIngredient :: Pool Connection -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
 updateIngredient pool ingredientId input =
   bimap fromIngredientError fromIngredientRow
     <$> ORM.updateWith @UpdateIngredientInput @IngredientTable @IngredientRow pool ingredientId input
 
-deleteIngredient :: Pool PGSimple.Connection -> UUID -> IO ()
+deleteIngredient :: Pool Connection -> UUID -> IO ()
 deleteIngredient pool ingredientId = do
   _ <- ORM.deleteByPk @IngredientTable pool ingredientId
   return ()
@@ -100,13 +98,13 @@ fromDbRecipeIngredient :: DbRecipeIngredient -> Maybe RecipeIngredient
 fromDbRecipeIngredient dbRI = do
   ingredientId <- dbIngredientId dbRI
   ingredientAmount <- dbIngredientAmount dbRI
-  ingredientName <- dbIngredientName dbRI
+  ingName <- dbIngredientName dbRI
   ingredientUnit <- dbIngredientUnit dbRI
 
   return
     RecipeIngredient
       { id = ingredientId,
-        name = ingredientName,
+        name = ingName,
         amount = ingredientAmount,
         unit = ingredientUnit
       }
