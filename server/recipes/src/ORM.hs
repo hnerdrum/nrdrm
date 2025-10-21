@@ -8,6 +8,9 @@ module ORM
     count,
     create,
     createWith,
+    updateByPk,
+    updateWith,
+    deleteByPk,
     ORMError (..),
     selectAll,
     select,
@@ -24,7 +27,19 @@ module ORM
     set,
     setValue,
     InsertBuilder,
+    update,
+    updateReturning,
+    setField,
+    whereUpdate,
+    UpdateBuilder,
+    emptyUpdate,
+    delete,
+    deleteReturning,
+    whereDelete,
+    DeleteBuilder,
+    emptyDelete,
     ToInsert (..),
+    ToUpdate (..),
     Entity (..),
     Field (..),
     Column (..),
@@ -36,8 +51,11 @@ where
 import Database.PostgreSQL.Simple.ToField (toField)
 import ORM.Column
 import ORM.Core
+import ORM.Delete
 import ORM.Errors
 import ORM.Insert
 import ORM.Operations
 import ORM.Query
 import ORM.ToInsert
+import ORM.ToUpdate
+import ORM.Update
