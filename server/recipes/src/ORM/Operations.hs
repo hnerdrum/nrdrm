@@ -12,6 +12,8 @@ module ORM.Operations
     findFirstOrError,
     count,
     create,
+    updateByPk,
+    deleteByPk,
     ORMError (..),
   )
 where
@@ -22,11 +24,13 @@ import Data.UUID (UUID)
 import qualified Data.UUID.V4 as V4
 import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.FromRow (FromRow)
-import Database.PostgreSQL.Simple.ToField (ToField)
-import ORM.Core (Entity (..), PrimaryKeyType)
+import Database.PostgreSQL.Simple.ToField (ToField, toField)
+import ORM.Core (Entity (..), Field (..), PrimaryKeyType)
+import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError (..))
 import qualified ORM.Insert as Insert
 import ORM.Query (QueryBuilder, runQuery, runQueryOne, selectAll, whereEq)
+import qualified ORM.Update as Update
 
 findAll ::
   forall table result.
@@ -107,3 +111,26 @@ create ::
 create pool builder = do
   pkValue <- V4.nextRandom
   Insert.insert pool pkValue builder
+
+updateByPk ::
+  forall table result.
+  (Entity table, FromRow result, ToField (PrimaryKeyType table)) =>
+  Pool Connection ->
+  PrimaryKeyType table ->
+  Update.UpdateBuilder table ->
+  IO (Either ORMError result)
+updateByPk pool pkValue builder = do
+  let pkField = primaryKey @table
+      builderWithWhere = Update.whereUpdate (fieldColumn pkField <> " = ?") [toField pkValue] builder
+  Update.update pool builderWithWhere
+
+deleteByPk ::
+  forall table.
+  (Entity table, ToField (PrimaryKeyType table)) =>
+  Pool Connection ->
+  PrimaryKeyType table ->
+  IO Int
+deleteByPk pool pkValue =
+  let pkField = primaryKey @table
+      builder = Delete.whereDelete (fieldColumn pkField <> " = ?") [toField pkValue] (Delete.emptyDelete @table)
+   in Delete.delete pool builder
