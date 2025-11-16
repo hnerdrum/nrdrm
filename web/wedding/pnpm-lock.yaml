@@ -8,6 +8,9 @@ dependencies:
   '@astrojs/vercel':
     specifier: ^9.0.0
     version: 9.0.0(astro@5.15.6)
+  '@fontsource-variable/lora':
+    specifier: ^5.2.8
+    version: 5.2.8
   astro:
     specifier: ^5.15.6
     version: 5.15.6(typescript@5.9.3)
@@ -380,6 +383,10 @@ packages:
     requiresBuild: true
     dev: false
     optional: true
+
+  /@fontsource-variable/lora@5.2.8:
+    resolution: {integrity: sha512-cxjTJ9BbOWIzusewR4UMBLVePvTSWV6dtNaNsCkF/oKoyA68fJGWfaYCILOOP1BObE4dmjfZ3xo6m9hdHhtYhg==}
+    dev: false
 
   /@img/colour@1.0.0:
     resolution: {integrity: sha512-A5P/LfWGFSl6nsckYtjw9da+19jB8hkJ6ACTGcDfEJ0aE+l2n2El7dsVM7UVHZQ9s2lmYMWlrS21YLy2IR1LUw==}
