@@ -1,0 +1,167 @@
+---
+import { Icon } from 'astro-icon/components';
+---
+
+<section id="schedule">
+	<h2>Program</h2>
+
+	<div class="timeline-card">
+		<ul class="timeline">
+			<li>
+				<div class="time">13:00</div>
+				<div class="dot">
+					<Icon name="lucide:heart" />
+				</div>
+				<div class="content">
+					<h3>Vielse i bakgården</h3>
+					<p>Ankomst via Dælenenggata 21-23.</p>
+				</div>
+			</li>
+			<li>
+				<div class="time">15:00</div>
+				<div class="dot">
+					<Icon name="lucide:wine" />
+				</div>
+				<div class="content">
+					<h3>Mottakelse på Nordstrand Vel</h3>
+					<p>Norstrandveien 24.</p>
+				</div>
+			</li>
+			<li>
+				<div class="time">15:30</div>
+				<div class="dot">
+					<Icon name="lucide:users" />
+				</div>
+				<div class="content">
+					<h3>Brudeparet ankommer</h3>
+				</div>
+			</li>
+			<li>
+				<div class="time">16:30</div>
+				<div class="dot">
+					<Icon name="lucide:utensils-crossed" />
+				</div>
+				<div class="content">
+					<h3>Middag</h3>
+				</div>
+			</li>
+			<li>
+				<div class="time">22:00</div>
+				<div class="dot">
+					<Icon name="lucide:music" />
+				</div>
+				<div class="content">
+					<h3>Fest</h3>
+				</div>
+			</li>
+		</ul>
+	</div>
+</section>
+
+<style>
+	#schedule {
+		min-height: 100vh;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 4rem 1.5rem;
+		box-sizing: border-box;
+	}
+
+	h2 {
+		font-family: 'Brittany', cursive;
+		font-size: clamp(2.5rem, 5vw, 4rem);
+		margin: 0 0 2rem;
+	}
+
+	.timeline-card {
+		position: relative;
+		width: 100%;
+		max-width: 700px;
+		background-color: #fdfbf0;
+		border-radius: 0.5rem;
+		padding: 2.5rem 2rem;
+		box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+		border: 2px solid #d5d0a8;
+		box-sizing: border-box;
+	}
+
+	.timeline {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 2rem;
+	}
+
+	.timeline li {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto minmax(0, 2fr);
+		align-items: center;
+		column-gap: 1.5rem;
+		position: relative;
+	}
+
+	.time {
+		text-align: right;
+		color: rgba(0, 0, 0, 0.5);
+		font-size: 0.95rem;
+	}
+
+	.dot {
+		width: 46px;
+		height: 46px;
+		border-radius: 999px;
+		background-color: #fcadc1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #fdfbf0;
+		z-index: 1;
+	}
+
+	.dot :global(svg) {
+		width: 24px;
+		height: 24px;
+		stroke: currentColor;
+		fill: none;
+		stroke-width: 2;
+	}
+
+	.content h3 {
+		margin: 0 0 0.25rem;
+		font-size: 1.05rem;
+	}
+
+	.content p {
+		margin: 0;
+		font-size: 0.95rem;
+		line-height: 1.5;
+		color: rgba(0, 0, 0, 0.75);
+	}
+
+	@media (max-width: 640px) {
+		.timeline-card {
+			padding: 2rem 1.5rem;
+		}
+
+		.timeline li {
+			grid-template-columns: auto minmax(0, 1fr);
+			grid-template-rows: auto auto;
+			column-gap: 1rem;
+			row-gap: 0.25rem;
+		}
+
+		.time {
+			grid-column: 2;
+			text-align: left;
+			font-size: 0.9rem;
+		}
+
+		.dot {
+			grid-row: span 2;
+		}
+	}
+</style>
