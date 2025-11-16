@@ -78,7 +78,7 @@ import { Icon } from 'astro-icon/components';
 	.timeline-card {
 		position: relative;
 		width: 100%;
-		max-width: 700px;
+		max-width: 600px;
 		background-color: #fdfbf0;
 		border-radius: 0.5rem;
 		padding: 2.5rem 2rem;
@@ -98,7 +98,7 @@ import { Icon } from 'astro-icon/components';
 
 	.timeline li {
 		display: grid;
-		grid-template-columns: minmax(0, 1fr) auto minmax(0, 2fr);
+		grid-template-columns: 80px auto 1fr;
 		align-items: center;
 		column-gap: 1.5rem;
 		position: relative;
@@ -156,12 +156,22 @@ import { Icon } from 'astro-icon/components';
 
 		.time {
 			grid-column: 2;
+			grid-row: 1;
 			text-align: left;
 			font-size: 0.9rem;
+			display: flex;
+			align-items: center;
+		}
+
+		.content {
+			grid-column: 2;
+			grid-row: 2;
 		}
 
 		.dot {
-			grid-row: span 2;
+			grid-row: 1 / -1;
+			grid-column: 1;
+			align-self: center;
 		}
 	}
 </style>
