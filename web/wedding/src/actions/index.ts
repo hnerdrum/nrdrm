@@ -2,8 +2,6 @@ import { defineAction, ActionError } from 'astro:actions';
 import { z } from 'astro/zod';
 import { Resend } from 'resend';
 
-const resend = new Resend(import.meta.env.RESEND_API_KEY);
-
 const rsvpSchema = z.object({
 	names: z.string().min(1, 'Navn er påkrevd'),
 	attending: z.enum(['yes', 'no']),
@@ -22,6 +20,7 @@ export const server = {
 				});
 			}
 
+			const resend = new Resend(import.meta.env.RESEND_API_KEY);
 			const attendingText = attending === 'yes' ? 'Kommer' : 'Kommer dessverre ikke';
 
 			try {
