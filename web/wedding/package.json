@@ -13,7 +13,9 @@
 		"@fontsource-variable/lora": "^5.2.8",
 		"@iconify-json/lucide": "latest",
 		"astro": "^5.15.6",
-		"astro-icon": "latest"
+		"astro-icon": "latest",
+		"resend": "latest",
+		"zod": "latest"
 	},
 	"devDependencies": {
 		"prettier": "latest",
