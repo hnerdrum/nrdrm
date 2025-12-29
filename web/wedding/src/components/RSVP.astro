@@ -1,0 +1,201 @@
+---
+import { actions } from 'astro:actions';
+---
+
+<section id="rsvp">
+	<h2>RSVP</h2>
+
+	<div class="rsvp-card">
+		<form id="rsvp-form" action={actions.submitRSVP} method="POST">
+			<div class="form-group">
+				<label for="names">Navn (alle i følget) *</label>
+				<input type="text" id="names" name="names" required />
+			</div>
+
+			<div class="form-group">
+				<label>Kommer dere? *</label>
+				<div class="radio-group">
+					<label class="radio-label">
+						<input type="radio" name="attending" value="yes" required />
+						<span>Kommer</span>
+					</label>
+					<label class="radio-label">
+						<input type="radio" name="attending" value="no" required />
+						<span>Kommer dessverre ikke</span>
+					</label>
+				</div>
+			</div>
+
+			<div class="form-group" id="dietary-group" style="display: none;">
+				<label for="dietaryRestrictions">Har du/dere noen allergier eller spesielle matbehov?</label
+				>
+				<textarea id="dietaryRestrictions" name="dietaryRestrictions" rows="3"></textarea>
+			</div>
+
+			<button type="submit" class="submit-button" id="submit-button">
+				<span class="button-text">Send</span>
+			</button>
+
+			<div id="form-message" class="form-message" style="display: none;"></div>
+		</form>
+	</div>
+</section>
+
+<script>
+	import '../scripts/rsvp';
+</script>
+
+<style>
+	#rsvp {
+		min-height: 100vh;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 4rem 1.5rem;
+		box-sizing: border-box;
+	}
+
+	h2 {
+		font-family: 'Brittany', cursive;
+		font-size: clamp(2.5rem, 5vw, 4rem);
+		margin: 0 0 4rem;
+	}
+
+	.rsvp-card {
+		width: 100%;
+		max-width: 750px;
+		background-color: #fdfbf0;
+		border-radius: 0.5rem;
+		padding: 3rem 2.5rem;
+		box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+		border: 2px solid #d5d0a8;
+		box-sizing: border-box;
+	}
+
+	form {
+		display: flex;
+		flex-direction: column;
+		gap: 2rem;
+	}
+
+	.form-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	label {
+		font-size: 1rem;
+		font-weight: 500;
+		color: rgba(0, 0, 0, 0.8);
+		font-family: 'Lora Variable', serif;
+	}
+
+	input[type='text'],
+	textarea {
+		width: 100%;
+		padding: 0.875rem 1rem;
+		border: 1px solid #d5d0a8;
+		border-radius: 0.5rem;
+		font-size: 1rem;
+		font-family: 'Lora Variable', serif;
+		background-color: #fff;
+		color: rgba(0, 0, 0, 0.8);
+		box-sizing: border-box;
+		transition: border-color 0.2s ease;
+	}
+
+	input[type='text']:focus,
+	textarea:focus {
+		outline: none;
+		border-color: #fcadc1;
+	}
+
+	input[type='text']::placeholder,
+	textarea::placeholder {
+		color: rgba(0, 0, 0, 0.4);
+	}
+
+	.radio-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.radio-label {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		cursor: pointer;
+		padding: 0.75rem;
+		border-radius: 0.5rem;
+		transition: background-color 0.2s ease;
+	}
+
+	.radio-label:hover {
+		background-color: rgba(252, 173, 193, 0.1);
+	}
+
+	.radio-label input[type='radio'] {
+		width: 20px;
+		height: 20px;
+		cursor: pointer;
+		accent-color: #fcadc1;
+	}
+
+	.radio-label span {
+		font-weight: 400;
+		cursor: pointer;
+	}
+
+	.submit-button {
+		background-color: #fcadc1;
+		color: #fff;
+		border: none;
+		border-radius: 0.5rem;
+		padding: 1rem 2rem;
+		font-size: 1.1rem;
+		font-weight: 500;
+		font-family: 'Lora Variable', serif;
+		cursor: pointer;
+		align-self: center;
+		width: 100%;
+	}
+
+	.submit-button:hover:not(:disabled) {
+		background-color: #f99fb8;
+		box-shadow: 0 4px 12px rgba(252, 173, 193, 0.3);
+	}
+
+	.submit-button:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
+
+	.form-message {
+		padding: 1rem;
+		border-radius: 0.5rem;
+		text-align: center;
+		font-size: 1rem;
+		font-family: 'Lora Variable', serif;
+	}
+
+	.form-message.success {
+		background-color: rgba(77, 166, 166, 0.12);
+		color: #2a7a7a;
+		border: 1px solid rgba(77, 166, 166, 0.35);
+	}
+
+	.form-message.error {
+		background-color: rgba(244, 67, 54, 0.1);
+		color: #c62828;
+		border: 1px solid rgba(244, 67, 54, 0.3);
+	}
+
+	@media (max-width: 640px) {
+		.rsvp-card {
+			padding: 2.5rem 1.5rem;
+		}
+	}
+</style>

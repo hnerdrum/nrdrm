@@ -1,0 +1,178 @@
+---
+import { Icon } from 'astro-icon/components';
+---
+
+<section id="gifts">
+	<h2>Gaver</h2>
+
+	<div class="gift-card">
+		<div class="message">
+			<p>
+				Bryllupsreisen vår går til Tanzania og Zanzibar — vår første reise som ektefeller! Vi ønsker
+				oss bidrag som kan gjøre opplevelsen enda finere. Overføring kan gjøres til vår
+				bryllupskonto 6032.57.66762.
+			</p>
+			<p>For de som ønsker å gi en fysisk gave, har vi også opprettet en ønskeliste.</p>
+		</div>
+
+		<a
+			href="https://onsk.no/lister/6ry-2ly"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="registry-link"
+		>
+			<div class="registry-content">
+				<div class="registry-icon">
+					<Icon name="lucide:gift" />
+				</div>
+				<div class="registry-text">
+					<span class="registry-title">Vår ønskeliste</span>
+				</div>
+			</div>
+			<div class="arrow-icon">
+				<Icon name="lucide:chevron-right" />
+			</div>
+		</a>
+	</div>
+</section>
+
+<style>
+	#gifts {
+		min-height: 100vh;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 4rem 1.5rem;
+		box-sizing: border-box;
+	}
+
+	h2 {
+		font-family: 'Brittany', cursive;
+		font-size: clamp(2.5rem, 5vw, 4rem);
+		margin: 0 0 4rem;
+	}
+
+	.gift-card {
+		width: 100%;
+		max-width: 750px;
+		background-color: #fdfbf0;
+		border-radius: 0.5rem;
+		padding: 3rem 2.5rem;
+		box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+		border: 2px solid #d5d0a8;
+		box-sizing: border-box;
+		text-align: center;
+	}
+
+	.message {
+		margin-bottom: 3rem;
+	}
+
+	.message p {
+		font-size: 1.1rem;
+		line-height: 1.6;
+		color: rgba(0, 0, 0, 0.8);
+		margin: 0 0 1.5rem;
+	}
+
+	.message p:last-child {
+		margin-bottom: 0;
+	}
+
+	.registry-link {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		background-color: #fff;
+		border: 1px solid #d5d0a8;
+		border-radius: 0.75rem;
+		padding: 1.25rem 1.5rem;
+		text-decoration: none;
+		color: inherit;
+		transition: all 0.3s ease;
+		max-width: 400px;
+		margin: 0 auto;
+	}
+
+	.registry-link:hover {
+		transform: translateY(-3px);
+		box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+		border-color: #fcadc1;
+	}
+
+	.registry-content {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+		text-align: left;
+	}
+
+	.registry-icon {
+		width: 48px;
+		height: 48px;
+		background-color: #fcadc1;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #fff;
+		flex-shrink: 0;
+	}
+
+	.registry-icon :global(svg) {
+		width: 24px;
+		height: 24px;
+	}
+
+	.registry-text {
+		display: flex;
+		flex-direction: column;
+	}
+
+	.registry-title {
+		font-weight: 600;
+		font-size: 1.1rem;
+		color: #333;
+	}
+
+	.registry-subtitle {
+		font-size: 0.9rem;
+		color: #666;
+	}
+
+	.arrow-icon {
+		color: #d5d0a8;
+		transition: transform 0.3s ease;
+	}
+
+	.registry-link:hover .arrow-icon {
+		transform: translateX(5px);
+		color: #fcadc1;
+	}
+
+	.arrow-icon :global(svg) {
+		width: 20px;
+		height: 20px;
+	}
+
+	@media (max-width: 640px) {
+		.gift-card {
+			padding: 2.5rem 1.5rem;
+		}
+
+		.registry-link {
+			padding: 1rem;
+		}
+
+		.registry-icon {
+			width: 40px;
+			height: 40px;
+		}
+
+		.registry-icon :global(svg) {
+			width: 20px;
+			height: 20px;
+		}
+	}
+</style>
