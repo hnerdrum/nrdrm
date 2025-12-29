@@ -22,10 +22,11 @@ if (form && submitButton && messageDiv && dietaryGroup) {
 	};
 
 	form.addEventListener('change', (e) => {
-		if (!(e.target instanceof HTMLInputElement) || e.target.name !== 'attending') {
+		const target = e.target as HTMLInputElement | null;
+		if (!target || target.name !== 'attending') {
 			return;
 		}
-		dietaryGroup.style.display = e.target.value === 'yes' ? 'flex' : 'none';
+		dietaryGroup.style.display = target.value === 'yes' ? 'flex' : 'none';
 	});
 
 	form.addEventListener('submit', async (e) => {
