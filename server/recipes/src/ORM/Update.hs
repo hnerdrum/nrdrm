@@ -2,11 +2,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 module ORM.Update
   ( UpdateBuilder,
+    Updatable (..),
     update,
+    updateBuilder,
     updateReturning,
     setField,
     whereUpdate,
@@ -23,8 +26,12 @@ import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import ORM.Core (Entity (..), Field (..))
+import ORM.Core (Entity (..), Field (..), PrimaryKeyType)
 import ORM.Errors (ORMError (..))
+
+class (Entity table) => Updatable table where
+  type UpdateInput table
+  toUpdateBuilder :: UpdateInput table -> UpdateBuilder table
 
 data UpdateBuilder table = UpdateBuilder
   { ubTable :: Text,
@@ -57,11 +64,27 @@ whereUpdate condition params builder =
 
 update ::
   forall table result.
+  (Updatable table, FromRow result, ToField (PrimaryKeyType table)) =>
+  Pool Connection ->
+  PrimaryKeyType table ->
+  UpdateInput table ->
+  IO (Either ORMError result)
+update pool pkValue input = do
+  let pkField = primaryKey @table
+      builderWithWhere =
+        whereUpdate
+          (fieldColumn pkField <> " = ?")
+          [toField pkValue]
+          (toUpdateBuilder @table input)
+  updateBuilder pool builderWithWhere
+
+updateBuilder ::
+  forall table result.
   (Entity table, FromRow result) =>
   Pool Connection ->
   UpdateBuilder table ->
   IO (Either ORMError result)
-update pool builder = do
+updateBuilder pool builder = do
   results <- updateReturning pool builder
   case results of
     [] -> return $ Left $ RecordNotFound "No record found to update"

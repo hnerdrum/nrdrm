@@ -1,8 +1,5 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE TypeApplications #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Domain.Ingredient
   ( Ingredient (..),
@@ -26,9 +23,9 @@ import Database.Ingredient (CreateIngredientInput (..), Unit (..), UpdateIngredi
 import Database.PostgreSQL.Simple (Connection)
 import Database.Recipe (DbRecipeIngredient (..))
 import Domain.Errors (AppError (..), DomainError (..))
-import ORM (ToInsert (..), ToUpdate (..))
-import qualified ORM
-import ORM.Schema.Ingredient (IngredientRow (..), IngredientTable, ingredientName)
+import ORM (ORMError (..))
+import qualified ORM.Client.Ingredient as Ingredient
+import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
 
 data RecipeIngredient = RecipeIngredient
   { id :: UUID,
@@ -48,37 +45,29 @@ data Ingredient = Ingredient
 
 $(deriveJSON defaultOptions ''Ingredient)
 
-instance ToInsert CreateIngredientInput IngredientTable where
-  toInsertBuilder input =
-    ORM.setValue ingredientName input.name
-
-instance ToUpdate UpdateIngredientInput IngredientTable where
-  toUpdateBuilder input =
-    ORM.setField ingredientName input.name (ORM.emptyUpdate @IngredientTable)
-
 getAllIngredients :: Pool Connection -> IO [Ingredient]
 getAllIngredients pool = do
-  ingredientRows <- ORM.findAll @IngredientTable pool
+  ingredientRows <- Ingredient.findAll pool
   return $ map fromIngredientRow ingredientRows
 
 getIngredient :: Pool Connection -> UUID -> IO (Either AppError Ingredient)
 getIngredient pool ingredientId =
   bimap fromIngredientError fromIngredientRow
-    <$> ORM.findUniqueOrError @IngredientTable pool ingredientId
+    <$> Ingredient.findUniqueOrError pool ingredientId
 
 createIngredient :: Pool Connection -> CreateIngredientInput -> IO (Either AppError Ingredient)
 createIngredient pool input =
   bimap fromIngredientError fromIngredientRow
-    <$> ORM.createWith @CreateIngredientInput @IngredientTable @IngredientRow pool input
+    <$> Ingredient.create pool (toIngredientCreate input)
 
 updateIngredient :: Pool Connection -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
 updateIngredient pool ingredientId input =
   bimap fromIngredientError fromIngredientRow
-    <$> ORM.updateWith @UpdateIngredientInput @IngredientTable @IngredientRow pool ingredientId input
+    <$> Ingredient.update pool ingredientId (toIngredientUpdate input)
 
 deleteIngredient :: Pool Connection -> UUID -> IO ()
 deleteIngredient pool ingredientId = do
-  _ <- ORM.deleteByPk @IngredientTable pool ingredientId
+  _ <- Ingredient.delete pool ingredientId
   return ()
 
 fromIngredientRow :: IngredientRow -> Ingredient
@@ -88,11 +77,19 @@ fromIngredientRow row =
       name = row.name
     }
 
-fromIngredientError :: ORM.ORMError -> AppError
+toIngredientCreate :: CreateIngredientInput -> IngredientCreate
+toIngredientCreate input =
+  IngredientCreate {name = input.name}
+
+toIngredientUpdate :: UpdateIngredientInput -> IngredientUpdate
+toIngredientUpdate input =
+  IngredientUpdate {name = Just input.name}
+
+fromIngredientError :: ORMError -> AppError
 fromIngredientError err =
   case err of
-    ORM.RecordNotFound ingredientId -> AppError NotFoundError "Ingredient could not be found" (object ["ingredientId" .= ingredientId])
-    ORM.MultipleRecordsFound ingredientId -> AppError MultipleEntitiesError "Found multiple ingredients with matching ID" (object ["ingredientId" .= ingredientId])
+    RecordNotFound ingredientId -> AppError NotFoundError "Ingredient could not be found" (object ["ingredientId" .= ingredientId])
+    MultipleRecordsFound ingredientId -> AppError MultipleEntitiesError "Found multiple ingredients with matching ID" (object ["ingredientId" .= ingredientId])
 
 fromDbRecipeIngredient :: DbRecipeIngredient -> Maybe RecipeIngredient
 fromDbRecipeIngredient dbRI = do
