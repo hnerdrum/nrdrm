@@ -2,10 +2,13 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module ORM.Insert
   ( InsertBuilder,
+    Insertable (..),
     insert,
+    insertBuilder,
     insertReturning,
     set,
     setValue,
@@ -21,8 +24,12 @@ import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import ORM.Core (Entity (..), Field (..), PrimaryKeyType)
+import ORM.Core (Entity (..), Field (..))
 import ORM.Errors (ORMError (..))
+
+class Entity table => Insertable table where
+  type CreateInput table
+  toInsertBuilder :: CreateInput table -> InsertBuilder table
 
 data InsertBuilder table = InsertBuilder
   { ibTable :: Text,
@@ -32,30 +39,40 @@ data InsertBuilder table = InsertBuilder
 
 insert ::
   forall table result.
-  (Entity table, FromRow result, ToField (PrimaryKeyType table), Show (PrimaryKeyType table)) =>
+  (Insertable table, FromRow result) =>
   Pool Connection ->
-  PrimaryKeyType table ->
+  CreateInput table ->
+  IO (Either ORMError result)
+insert pool input =
+  insertBuilder pool (toInsertBuilder @table input)
+
+insertBuilder ::
+  forall table result.
+  (FromRow result) =>
+  Pool Connection ->
   InsertBuilder table ->
   IO (Either ORMError result)
-insert pool pkValue builder = do
-  result <- insertReturning pool pkValue builder
+insertBuilder pool builder = do
+  result <- insertReturning pool builder
   case result of
-    [] -> return $ Left $ RecordNotFound $ "Insert failed for primary key: " <> (Text.pack . show) pkValue
+    [] ->
+      return $
+        Left $
+          RecordNotFound $
+            "INSERT into " <> ibTable builder <> " returned no rows"
     [row] -> return $ Right row
     _ -> return $ Left $ MultipleRecordsFound "Insert returned multiple rows"
 
 insertReturning ::
   forall table result.
-  (Entity table, FromRow result, ToField (PrimaryKeyType table)) =>
+  (FromRow result) =>
   Pool Connection ->
-  PrimaryKeyType table ->
   InsertBuilder table ->
   IO [result]
-insertReturning pool pkValue builder =
+insertReturning pool builder =
   withResource pool $ \conn -> do
-    let pkField = primaryKey @table
-        allColumns = fieldColumn pkField : ibColumns builder
-        allValues = toField pkValue : ibValues builder
+    let allColumns = ibColumns builder
+        allValues = ibValues builder
         placeholders = Text.intercalate ", " $ replicate (length allValues) "?"
         columnsText = Text.intercalate ", " allColumns
         queryText =

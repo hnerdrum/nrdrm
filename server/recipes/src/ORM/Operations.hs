@@ -11,26 +11,20 @@ module ORM.Operations
     findFirst,
     findFirstOrError,
     count,
-    create,
-    updateByPk,
-    deleteByPk,
+    delete,
     ORMError (..),
   )
 where
 
 import Data.Pool (Pool)
 import qualified Data.Text as Text
-import Data.UUID (UUID)
-import qualified Data.UUID.V4 as V4
 import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.FromRow (FromRow)
 import Database.PostgreSQL.Simple.ToField (ToField, toField)
 import ORM.Core (Entity (..), Field (..), PrimaryKeyType)
 import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError (..))
-import qualified ORM.Insert as Insert
 import ORM.Query (QueryBuilder, runQuery, runQueryOne, selectAll, whereEq)
-import qualified ORM.Update as Update
 
 findAll ::
   forall table result.
@@ -102,35 +96,13 @@ count pool modifier = do
   results :: [result] <- runQuery pool (modifier (selectAll @table))
   return $ length results
 
-create ::
-  forall table result.
-  (Entity table, FromRow result, PrimaryKeyType table ~ UUID, Show (PrimaryKeyType table)) =>
-  Pool Connection ->
-  Insert.InsertBuilder table ->
-  IO (Either ORMError result)
-create pool builder = do
-  pkValue <- V4.nextRandom
-  Insert.insert pool pkValue builder
-
-updateByPk ::
-  forall table result.
-  (Entity table, FromRow result, ToField (PrimaryKeyType table)) =>
-  Pool Connection ->
-  PrimaryKeyType table ->
-  Update.UpdateBuilder table ->
-  IO (Either ORMError result)
-updateByPk pool pkValue builder = do
-  let pkField = primaryKey @table
-      builderWithWhere = Update.whereUpdate (fieldColumn pkField <> " = ?") [toField pkValue] builder
-  Update.update pool builderWithWhere
-
-deleteByPk ::
+delete ::
   forall table.
   (Entity table, ToField (PrimaryKeyType table)) =>
   Pool Connection ->
   PrimaryKeyType table ->
   IO Int
-deleteByPk pool pkValue =
+delete pool pkValue =
   let pkField = primaryKey @table
       builder = Delete.whereDelete (fieldColumn pkField <> " = ?") [toField pkValue] (Delete.emptyDelete @table)
    in Delete.delete pool builder
