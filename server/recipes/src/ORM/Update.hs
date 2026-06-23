@@ -76,19 +76,22 @@ updateReturning ::
   IO [result]
 updateReturning pool builder =
   withResource pool $ \conn -> do
-    let setClause = Text.intercalate ", " $ map (\(col, _) -> col <> " = ?") (ubSets builder)
+    let setClause = buildSetClause (ubSets builder)
         setParams = map snd (ubSets builder)
-        whereClause =
-          if null (ubWhere builder)
-            then ""
-            else " WHERE " <> Text.intercalate " AND " (ubWhere builder)
+        whereClause = buildWhereClause (ubWhere builder)
         allParams = setParams ++ ubWhereParams builder
         queryText =
           "UPDATE "
             <> ubTable builder
-            <> " SET "
             <> setClause
             <> whereClause
             <> " RETURNING *"
         query = Query (TE.encodeUtf8 queryText)
     PGSimple.queryWith fromRow conn query allParams
+
+buildSetClause :: [(Text, Action)] -> Text
+buildSetClause sets = " SET " <> Text.intercalate ", " (map (\(col, _) -> col <> " = ?") sets)
+
+buildWhereClause :: [Text] -> Text
+buildWhereClause [] = ""
+buildWhereClause conditions = " WHERE " <> Text.intercalate " AND " conditions
