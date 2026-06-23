@@ -76,20 +76,26 @@ buildQuery :: QueryBuilder table -> (Query, [Action])
 buildQuery qb =
   let baseQuery = "SELECT * FROM " <> qbTable qb
       whereClause =
-        if null (qbWhere qb)
-          then ""
-          else " WHERE " <> T.intercalate " AND " (qbWhere qb)
-      orderClause = case qbOrderBy qb of
-        Nothing -> ""
-        Just (col, dir) ->
-          " ORDER BY " <> col <> case dir of
-            Asc -> " ASC"
-            Desc -> " DESC"
-      limitClause = case qbLimit qb of
-        Nothing -> ""
-        Just n -> " LIMIT " <> T.pack (show n)
+        buildWhereClause (qbWhere qb)
+      orderClause = buildOrderClause (qbOrderBy qb)
+      limitClause = buildLimitClause (qbLimit qb)
       finalQuery = baseQuery <> whereClause <> orderClause <> limitClause
    in (Query (TE.encodeUtf8 finalQuery), qbParams qb)
+
+buildWhereClause :: [Text] -> Text
+buildWhereClause [] = ""
+buildWhereClause conditions = " WHERE " <> T.intercalate " AND " conditions
+
+buildOrderClause :: Maybe (Text, OrderDirection) -> Text
+buildOrderClause Nothing = ""
+buildOrderClause (Just (col, dir)) =
+  " ORDER BY " <> col <> case dir of
+    Asc -> " ASC"
+    Desc -> " DESC"
+
+buildLimitClause :: Maybe Int -> Text
+buildLimitClause Nothing = ""
+buildLimitClause (Just n) = " LIMIT " <> T.pack (show n)
 
 runQuery :: (FromRow result) => Pool Connection -> QueryBuilder table -> IO [result]
 runQuery pool qb =
