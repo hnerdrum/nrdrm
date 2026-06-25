@@ -5,6 +5,7 @@ module ORM.Core
     Column (..),
     SqlType (..),
     Field (..),
+    NullableValue (..),
     PrimaryKeyType,
   )
 where
@@ -29,3 +30,11 @@ class Entity table where
   primaryKey :: Field table (PrimaryKeyType table)
 
 type family PrimaryKeyType table
+
+-- | Three-way column input for nullable fields on create and update.
+-- 'Omit' leaves the column out; 'Value' sets it; 'Null' sets SQL NULL.
+data NullableValue a
+  = Omit
+  | Value a
+  | Null
+  deriving (Show, Eq)

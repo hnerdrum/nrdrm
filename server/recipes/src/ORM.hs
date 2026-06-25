@@ -23,6 +23,9 @@ module ORM
     insertReturning,
     Insertable (..),
     set,
+    setNull,
+    setMaybe,
+    setNullable,
     setValue,
     InsertBuilder,
     update,
@@ -30,6 +33,9 @@ module ORM
     updateReturning,
     Updatable (..),
     setField,
+    setFieldNull,
+    setFieldMaybe,
+    setFieldNullable,
     whereUpdate,
     UpdateBuilder,
     emptyUpdate,
@@ -41,6 +47,7 @@ module ORM
     Field (..),
     Column (..),
     PrimaryKeyType,
+    NullableValue (..),
     toField,
   )
 where
