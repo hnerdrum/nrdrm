@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -19,8 +20,8 @@ import Data.Time (UTCTime)
 import Data.UUID (UUID)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
-import ORM.Insert (Insertable (..), setValue)
-import ORM.Update (Updatable (..), emptyUpdate, setField)
+import ORM.Insert (Insertable (..), setMaybe, setValue)
+import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 
 data IngredientTable = IngredientTable
 
@@ -33,14 +34,18 @@ instance Entity IngredientTable where
 instance Insertable IngredientTable where
   type CreateInput IngredientTable = IngredientCreate
   toInsertBuilder input =
-    setValue ingredientName input.name
+    setMaybe ingredientUpdatedAt input.updatedAt $
+      setMaybe ingredientCreatedAt input.createdAt $
+        setMaybe ingredientId input.id $
+          setValue ingredientName input.name
 
 instance Updatable IngredientTable where
   type UpdateInput IngredientTable = IngredientUpdate
+  updatedAtField = Just ingredientUpdatedAt
   toUpdateBuilder input =
-    case input.name of
-      Nothing -> emptyUpdate @IngredientTable
-      Just n -> setField ingredientName n (emptyUpdate @IngredientTable)
+    setFieldMaybe ingredientUpdatedAt input.updatedAt $
+      setFieldMaybe ingredientCreatedAt input.createdAt $
+        setFieldMaybe ingredientName input.name (emptyUpdate @IngredientTable)
 
 data IngredientRow = IngredientRow
   { id :: UUID,
@@ -50,13 +55,18 @@ data IngredientRow = IngredientRow
   }
   deriving (Show)
 
-newtype IngredientCreate = IngredientCreate
-  { name :: Text
+data IngredientCreate = IngredientCreate
+  { id :: Maybe UUID,
+    createdAt :: Maybe UTCTime,
+    updatedAt :: Maybe UTCTime,
+    name :: Text
   }
   deriving (Show, Eq)
 
-newtype IngredientUpdate = IngredientUpdate
-  { name :: Maybe Text
+data IngredientUpdate = IngredientUpdate
+  { name :: Maybe Text,
+    createdAt :: Maybe UTCTime,
+    updatedAt :: Maybe UTCTime
   }
   deriving (Show, Eq)
 

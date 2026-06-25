@@ -14,7 +14,7 @@ data RecipeIngredientJoinRow = RecipeIngredientJoinRow
     recipeCreatedAt :: UTCTime,
     recipeUpdatedAt :: UTCTime,
     recipeName :: Text,
-    recipeDescription :: Text,
+    recipeDescription :: Maybe Text,
     ingredientId :: Maybe UUID,
     ingredientCreatedAt :: Maybe UTCTime,
     ingredientUpdatedAt :: Maybe UTCTime,

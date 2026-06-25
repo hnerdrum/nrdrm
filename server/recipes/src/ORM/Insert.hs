@@ -11,6 +11,9 @@ module ORM.Insert
     insertBuilder,
     insertReturning,
     set,
+    setNull,
+    setMaybe,
+    setNullable,
     setValue,
   )
 where
@@ -24,7 +27,7 @@ import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import ORM.Core (Entity (..), Field (..))
+import ORM.Core (Entity (..), Field (..), NullableValue (..))
 import ORM.Errors (ORMError (..))
 
 class Entity table => Insertable table where
@@ -103,3 +106,36 @@ set field value builder =
 
 setValue :: forall table a. (Entity table, ToField a) => Field table a -> a -> InsertBuilder table
 setValue field value = set field value (emptyInsert @table)
+
+setNull ::
+  forall table a.
+  (ToField (Maybe a)) =>
+  Field table a ->
+  InsertBuilder table ->
+  InsertBuilder table
+setNull field builder =
+  builder
+    { ibColumns = ibColumns builder ++ [fieldColumn field],
+      ibValues = ibValues builder ++ [toField (Nothing :: Maybe a)]
+    }
+
+setMaybe ::
+  forall table a.
+  (ToField a) =>
+  Field table a ->
+  Maybe a ->
+  InsertBuilder table ->
+  InsertBuilder table
+setMaybe _ Nothing builder = builder
+setMaybe field (Just value) builder = set field value builder
+
+setNullable ::
+  forall table a.
+  (ToField a, ToField (Maybe a)) =>
+  Field table a ->
+  NullableValue a ->
+  InsertBuilder table ->
+  InsertBuilder table
+setNullable _ Omit builder = builder
+setNullable field (Value value) builder = set field value builder
+setNullable field Null builder = setNull field builder

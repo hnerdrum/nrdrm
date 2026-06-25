@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
@@ -12,6 +13,9 @@ module ORM.Update
     updateBuilder,
     updateReturning,
     setField,
+    setFieldNull,
+    setFieldMaybe,
+    setFieldNullable,
     whereUpdate,
     emptyUpdate,
   )
@@ -21,17 +25,22 @@ import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
+import Data.Time (UTCTime, getCurrentTime)
 import Database.PostgreSQL.Simple (Connection)
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import ORM.Core (Entity (..), Field (..), PrimaryKeyType)
+import ORM.Core (Entity (..), Field (..), NullableValue (..), PrimaryKeyType)
 import ORM.Errors (ORMError (..))
+import qualified ORM.Operations as Ops
 
-class (Entity table) => Updatable table where
+class Entity table => Updatable table where
   type UpdateInput table
   toUpdateBuilder :: UpdateInput table -> UpdateBuilder table
+  updatedAtField :: Maybe (Field table UTCTime)
+  default updatedAtField :: Maybe (Field table UTCTime)
+  updatedAtField = Nothing
 
 data UpdateBuilder table = UpdateBuilder
   { ubTable :: Text,
@@ -55,6 +64,38 @@ setField field value builder =
     { ubSets = ubSets builder ++ [(fieldColumn field, toField value)]
     }
 
+setFieldNull ::
+  forall table a.
+  (ToField (Maybe a)) =>
+  Field table a ->
+  UpdateBuilder table ->
+  UpdateBuilder table
+setFieldNull field builder =
+  builder
+    { ubSets = ubSets builder ++ [(fieldColumn field, toField (Nothing :: Maybe a))]
+    }
+
+setFieldMaybe ::
+  forall table a.
+  (ToField a) =>
+  Field table a ->
+  Maybe a ->
+  UpdateBuilder table ->
+  UpdateBuilder table
+setFieldMaybe _ Nothing builder = builder
+setFieldMaybe field (Just value) builder = setField field value builder
+
+setFieldNullable ::
+  forall table a.
+  (ToField a, ToField (Maybe a)) =>
+  Field table a ->
+  NullableValue a ->
+  UpdateBuilder table ->
+  UpdateBuilder table
+setFieldNullable _ Omit builder = builder
+setFieldNullable field (Value value) builder = setField field value builder
+setFieldNullable field Null builder = setFieldNull field builder
+
 whereUpdate :: Text -> [Action] -> UpdateBuilder table -> UpdateBuilder table
 whereUpdate condition params builder =
   builder
@@ -64,19 +105,25 @@ whereUpdate condition params builder =
 
 update ::
   forall table result.
-  (Updatable table, FromRow result, ToField (PrimaryKeyType table)) =>
+  (Updatable table, FromRow result, ToField (PrimaryKeyType table), Show (PrimaryKeyType table)) =>
   Pool Connection ->
   PrimaryKeyType table ->
   UpdateInput table ->
   IO (Either ORMError result)
 update pool pkValue input = do
-  let pkField = primaryKey @table
-      builderWithWhere =
-        whereUpdate
-          (fieldColumn pkField <> " = ?")
-          [toField pkValue]
-          (toUpdateBuilder @table input)
-  updateBuilder pool builderWithWhere
+  let builder = toUpdateBuilder @table input
+  if null (ubSets builder)
+    then Ops.findUniqueOrError @table @result pool pkValue
+    else do
+      now <- getCurrentTime
+      let pkField = primaryKey @table
+          builderWithTouch = touchUpdatedAt @table now builder
+          builderWithWhere =
+            whereUpdate
+              (fieldColumn pkField <> " = ?")
+              [toField pkValue]
+              builderWithTouch
+      updateBuilder pool builderWithWhere
 
 updateBuilder ::
   forall table result.
@@ -118,3 +165,17 @@ buildSetClause sets = " SET " <> Text.intercalate ", " (map (\(col, _) -> col <>
 buildWhereClause :: [Text] -> Text
 buildWhereClause [] = ""
 buildWhereClause conditions = " WHERE " <> Text.intercalate " AND " conditions
+
+touchUpdatedAt ::
+  forall table.
+  (Updatable table) =>
+  UTCTime ->
+  UpdateBuilder table ->
+  UpdateBuilder table
+touchUpdatedAt now builder =
+  case updatedAtField @table of
+    Nothing -> builder
+    Just field ->
+      if fieldColumn field `elem` map fst (ubSets builder)
+        then builder
+        else setField field now builder

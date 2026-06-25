@@ -79,11 +79,20 @@ fromIngredientRow row =
 
 toIngredientCreate :: CreateIngredientInput -> IngredientCreate
 toIngredientCreate input =
-  IngredientCreate {name = input.name}
+  IngredientCreate
+    { id = Nothing,
+      createdAt = Nothing,
+      updatedAt = Nothing,
+      name = input.name
+    }
 
 toIngredientUpdate :: UpdateIngredientInput -> IngredientUpdate
 toIngredientUpdate input =
-  IngredientUpdate {name = Just input.name}
+  IngredientUpdate
+    { name = Just input.name,
+      createdAt = Nothing,
+      updatedAt = Nothing
+    }
 
 fromIngredientError :: ORMError -> AppError
 fromIngredientError err =
