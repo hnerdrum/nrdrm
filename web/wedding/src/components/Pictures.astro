@@ -1,0 +1,218 @@
+---
+import { Icon } from 'astro-icon/components';
+---
+
+<section id="bilder">
+	<h2>Bilder</h2>
+
+	<div class="pictures-card">
+		<div class="message">
+			<p>
+				Bryllupsbildene fra fotografen vår er klare! Vi har også satt opp en enkel måte for dere å
+				dele bilder dere tok under feiringen.
+			</p>
+		</div>
+
+		<div class="picture-links">
+			<a
+				href="https://momentstudio.pic-time.com/OCsT4se5Tj4Ms"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="picture-link"
+			>
+				<div class="picture-link-content">
+					<div class="picture-link-icon photographer">
+						<Icon name="lucide:camera" />
+					</div>
+					<div class="picture-link-text">
+						<span class="picture-link-title">Bilder fra fotografen</span>
+						<span class="picture-link-subtitle">Se alle bildene fra bryllupsdagen</span>
+					</div>
+				</div>
+				<div class="arrow-icon">
+					<Icon name="lucide:chevron-right" />
+				</div>
+			</a>
+
+			<a
+				href="https://photos.app.goo.gl/n7PbVR1pbbLGduQT9"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="picture-link"
+			>
+				<div class="picture-link-content">
+					<div class="picture-link-icon upload">
+						<Icon name="lucide:image-plus" />
+					</div>
+					<div class="picture-link-text">
+						<span class="picture-link-title">Last opp bilder</span>
+						<span class="picture-link-subtitle">Del bildene du tok med oss</span>
+					</div>
+				</div>
+				<div class="arrow-icon">
+					<Icon name="lucide:chevron-right" />
+				</div>
+			</a>
+		</div>
+	</div>
+</section>
+
+<style>
+	#bilder {
+		min-height: 100vh;
+		width: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		padding: 4rem 1.5rem;
+		box-sizing: border-box;
+	}
+
+	h2 {
+		font-family: 'Brittany', cursive;
+		font-size: clamp(2.5rem, 5vw, 4rem);
+		margin: 0 0 4rem;
+	}
+
+	.pictures-card {
+		width: 100%;
+		max-width: 750px;
+		background-color: #fdfbf0;
+		border-radius: 0.5rem;
+		padding: 3rem 2.5rem;
+		box-shadow: 0 18px 40px rgba(0, 0, 0, 0.08);
+		border: 2px solid #d5d0a8;
+		box-sizing: border-box;
+		text-align: center;
+	}
+
+	.message {
+		margin-bottom: 3rem;
+	}
+
+	.message p {
+		font-size: 1.1rem;
+		line-height: 1.6;
+		color: rgba(0, 0, 0, 0.8);
+		margin: 0;
+	}
+
+	.picture-links {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+		max-width: 480px;
+		margin: 0 auto;
+	}
+
+	.picture-link {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		background-color: #fff;
+		border: 1px solid #d5d0a8;
+		border-radius: 0.75rem;
+		padding: 1.25rem 1.5rem;
+		text-decoration: none;
+		color: inherit;
+		transition: all 0.3s ease;
+	}
+
+	.picture-link:hover {
+		transform: translateY(-3px);
+		box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+		border-color: #fcadc1;
+	}
+
+	.picture-link-content {
+		display: flex;
+		align-items: center;
+		gap: 1.25rem;
+		text-align: left;
+	}
+
+	.picture-link-icon {
+		width: 48px;
+		height: 48px;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: #fff;
+		flex-shrink: 0;
+	}
+
+	.picture-link-icon.photographer {
+		background-color: #fcadc1;
+	}
+
+	.picture-link-icon.upload {
+		background-color: #4da6a6;
+	}
+
+	.picture-link-icon :global(svg) {
+		width: 24px;
+		height: 24px;
+	}
+
+	.picture-link-text {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.picture-link-title {
+		font-weight: 600;
+		font-size: 1.1rem;
+		color: #333;
+	}
+
+	.picture-link-subtitle {
+		font-size: 0.9rem;
+		color: #666;
+	}
+
+	.arrow-icon {
+		color: #d5d0a8;
+		transition: transform 0.3s ease;
+		flex-shrink: 0;
+	}
+
+	.picture-link:hover .arrow-icon {
+		transform: translateX(5px);
+		color: #fcadc1;
+	}
+
+	.picture-link:last-child:hover .arrow-icon {
+		color: #4da6a6;
+	}
+
+	.arrow-icon :global(svg) {
+		width: 20px;
+		height: 20px;
+	}
+
+	@media (max-width: 640px) {
+		.pictures-card {
+			padding: 2.5rem 1.5rem;
+		}
+
+		.picture-link {
+			padding: 1rem;
+		}
+
+		.picture-link-icon {
+			width: 40px;
+			height: 40px;
+		}
+
+		.picture-link-icon :global(svg) {
+			width: 20px;
+			height: 20px;
+		}
+
+		.picture-link-subtitle {
+			font-size: 0.85rem;
+		}
+	}
+</style>
