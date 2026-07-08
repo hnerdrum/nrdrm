@@ -68,3 +68,14 @@ operationsSpec =
     it "findFirst returns Nothing when no row matches" $ \TestEnv {envPool = pool} -> do
       result <- Ops.findFirst @WidgetTable @WidgetRow pool $ whereEq widgetName "nonexistent"
       result `shouldBe` Nothing
+
+    it "count returns the number of rows matching a filter" $ \TestEnv {envPool = pool} -> do
+      _ <- WidgetFixtures.insertWidget pool "alpha"
+      _ <- WidgetFixtures.insertWidget pool "alpha"
+      _ <- WidgetFixtures.insertWidget pool "beta"
+      n <- Ops.count @WidgetTable pool $ whereEq widgetName "alpha"
+      n `shouldBe` 2
+
+    it "count returns 0 when no rows match" $ \TestEnv {envPool = pool} -> do
+      n <- Ops.count @WidgetTable pool $ whereEq widgetName "nonexistent"
+      n `shouldBe` 0

@@ -24,7 +24,7 @@ import Database.PostgreSQL.Simple.ToField (ToField, toField)
 import ORM.Core (Entity (..), Field (..), PrimaryKeyType)
 import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError (..))
-import ORM.Query (QueryBuilder, runQuery, runQueryOne, selectAll, whereEq)
+import ORM.Query (QueryBuilder, runCountQuery, runQuery, runQueryOne, selectAll, whereEq)
 
 findAll ::
   forall table result.
@@ -87,14 +87,13 @@ findFirstOrError pool modifier = do
     Just record -> return $ Right record
 
 count ::
-  forall table result.
-  (Entity table, FromRow result) =>
+  forall table.
+  Entity table =>
   Pool Connection ->
   (QueryBuilder table -> QueryBuilder table) ->
   IO Int
-count pool modifier = do
-  results :: [result] <- runQuery pool (modifier (selectAll @table))
-  return $ length results
+count pool modifier =
+  runCountQuery pool (modifier (selectAll @table))
 
 delete ::
   forall table.

@@ -15,14 +15,16 @@ module ORM.Query
     OrderDirection (..),
     runQuery,
     runQueryOne,
+    runCountQuery,
   )
 where
 
+import Data.Int (Int64)
 import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import Database.PostgreSQL.Simple (Connection)
+import Database.PostgreSQL.Simple (Connection, Only (..))
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
@@ -75,11 +77,15 @@ limit n qb = qb {qbLimit = Just n}
 buildQuery :: QueryBuilder table -> (Query, [Action])
 buildQuery qb =
   let baseQuery = "SELECT * FROM " <> qbTable qb
-      whereClause =
-        buildWhereClause (qbWhere qb)
+      whereClause = buildWhereClause (qbWhere qb)
       orderClause = buildOrderClause (qbOrderBy qb)
       limitClause = buildLimitClause (qbLimit qb)
       finalQuery = baseQuery <> whereClause <> orderClause <> limitClause
+   in (Query (TE.encodeUtf8 finalQuery), qbParams qb)
+
+buildCountQuery :: QueryBuilder table -> (Query, [Action])
+buildCountQuery qb =
+  let finalQuery = "SELECT COUNT(*) FROM " <> qbTable qb <> buildWhereClause (qbWhere qb)
    in (Query (TE.encodeUtf8 finalQuery), qbParams qb)
 
 buildWhereClause :: [Text] -> Text
@@ -109,3 +115,10 @@ runQueryOne pool qb = do
   return $ case results of
     [] -> Nothing
     (x : _) -> Just x
+
+runCountQuery :: Pool Connection -> QueryBuilder table -> IO Int
+runCountQuery pool qb =
+  withResource pool $ \conn -> do
+    let (query, params) = buildCountQuery qb
+    [Only count] <- PGSimple.query conn query params
+    return (fromIntegral (count :: Int64))
