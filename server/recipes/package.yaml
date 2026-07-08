@@ -91,6 +91,7 @@ tests:
       - Support.TestDb
       - Support.TestMigrations
       - ORM.OperationsSpec
+      - ORM.WidgetFixtures
     ghc-options:
       - -threaded
       - -rtsopts
