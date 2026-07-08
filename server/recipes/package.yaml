@@ -79,12 +79,25 @@ tests:
   recipes-test:
     main: Spec.hs
     source-dirs: test
+    default-extensions:
+      - DuplicateRecordFields
+      - NamedFieldPuns
+      - OverloadedRecordDot
+      - OverloadedStrings
+      - TypeApplications
+      - TypeFamilies
+    other-modules:
+      - Schema.Widget
+      - Support.TestDb
+      - Support.TestMigrations
+      - ORM.OperationsSpec
     ghc-options:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
       - base
+      - directory
       - recipes
       - hspec
       - hspec-wai

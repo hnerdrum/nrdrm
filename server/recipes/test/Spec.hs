@@ -1,12 +1,8 @@
 module Main (main) where
 
+import ORM.OperationsSpec (operationsSpec)
+import Support.TestDb (withTestDb)
 import Test.Hspec
 
 main :: IO ()
-main = hspec spec
-
-spec :: Spec
-spec = do
-    describe "Test" $ do
-      it "Should test something" $ do
-        (2 :: Integer) `shouldBe` (2 :: Integer)
+main = hspec $ withTestDb operationsSpec

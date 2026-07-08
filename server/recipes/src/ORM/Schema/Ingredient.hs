@@ -53,7 +53,7 @@ data IngredientRow = IngredientRow
     updatedAt :: UTCTime,
     name :: Text
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
 data IngredientCreate = IngredientCreate
   { id :: Maybe UUID,

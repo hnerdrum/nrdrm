@@ -1,0 +1,14 @@
+services:
+  recipes-test-db:
+    image: postgres:alpine
+    environment:
+      POSTGRES_DB: recipes_test
+      POSTGRES_USER: nrdrm
+      POSTGRES_PASSWORD: nrdrm
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nrdrm -d recipes_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
