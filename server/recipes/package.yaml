@@ -88,11 +88,15 @@ tests:
       - TypeFamilies
     other-modules:
       - Schema.Widget
+      - Schema.Shelf
+      - Schema.ShelfBookRow
       - Support.Assert
       - Support.TestDb
       - Support.TestMigrations
       - ORM.OperationsSpec
+      - ORM.JoinSpec
       - ORM.WidgetFixtures
+      - ORM.ShelfFixtures
     ghc-options:
       - -threaded
       - -rtsopts

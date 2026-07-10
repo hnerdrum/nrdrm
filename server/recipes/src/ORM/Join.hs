@@ -30,8 +30,8 @@ import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..))
-
-data JoinType = LeftJoin | InnerJoin | RightJoin
+import ORM.JoinChain (aliasedField, col)
+import ORM.Relation (JoinType (..))
 
 data JoinBuilder leftTable rightTable = JoinBuilder
   { jbLeftTable :: Text,
@@ -102,15 +102,6 @@ whereJoin condition params builder =
       jbParams = jbParams builder ++ params
     }
 
-aliasedField :: Maybe Text -> Field table a -> Text
-aliasedField maybeAlias field =
-  case maybeAlias of
-    Nothing -> fieldColumn field
-    Just alias -> alias <> "." <> fieldColumn field
-
-col :: Text -> Field table a -> Text
-col alias field = alias <> "." <> fieldColumn field
-
 selectFields ::
   JoinBuilder leftTable rightTable ->
   [(Maybe Text, [Field table a])] ->
@@ -130,6 +121,11 @@ on leftField rightField builder =
         jbOnConditions builder
           ++ [(fieldColumn leftField, fieldColumn rightField)]
     }
+
+joinTypeText :: JoinType -> Text
+joinTypeText LeftJoin = "LEFT JOIN"
+joinTypeText InnerJoin = "INNER JOIN"
+joinTypeText RightJoin = "RIGHT JOIN"
 
 buildJoinQuery :: JoinBuilder leftTable rightTable -> (Query, [Action])
 buildJoinQuery jb =
@@ -153,11 +149,6 @@ buildJoinQuery jb =
         Nothing -> "*"
         Just cols -> Text.intercalate ", " cols
 
-      joinTypeText = case jbJoinType jb of
-        LeftJoin -> "LEFT JOIN"
-        InnerJoin -> "INNER JOIN"
-        RightJoin -> "RIGHT JOIN"
-
       onClause =
         if null (jbOnConditions jb)
           then ""
@@ -178,7 +169,7 @@ buildJoinQuery jb =
           <> " FROM "
           <> leftTableRef
           <> " "
-          <> joinTypeText
+          <> joinTypeText (jbJoinType jb)
           <> " "
           <> rightTableRef
           <> onClause
