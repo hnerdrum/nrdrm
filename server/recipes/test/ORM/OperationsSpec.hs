@@ -14,8 +14,9 @@ import ORM.Query (whereEq)
 import qualified ORM.Update as Update
 import qualified ORM.WidgetFixtures as WidgetFixtures
 import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable (..), WidgetUpdate (..), widgetName)
+import Support.Assert (assertJust, assertRight)
 import Support.TestDb (TestEnv (..))
-import Test.Hspec (SpecWith, describe, expectationFailure, it, shouldBe, shouldSatisfy)
+import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
 
 operationsSpec :: SpecWith TestEnv
 operationsSpec =
@@ -61,11 +62,9 @@ operationsSpec =
       alpha2 <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "beta"
       result <- Ops.findFirst @WidgetTable @WidgetRow pool $ whereEq widgetName "alpha"
-      case result of
-        Just row -> do
-          row.name `shouldBe` "alpha"
-          row.id `shouldSatisfy` (`elem` [alpha1.id, alpha2.id])
-        Nothing -> expectationFailure "expected Just"
+      row <- assertJust result
+      row.name `shouldBe` "alpha"
+      row.id `shouldSatisfy` (`elem` [alpha1.id, alpha2.id])
 
     it "findFirst returns Nothing when no row matches" $ \TestEnv {envPool = pool} -> do
       result <- Ops.findFirst @WidgetTable @WidgetRow pool $ whereEq widgetName "nonexistent"
@@ -84,24 +83,22 @@ operationsSpec =
 
     it "update changes a widget name by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "before"
-      result <-
-        Update.update @WidgetTable @WidgetRow pool widget.id $
+      updated <-
+        Update.update @WidgetTable @WidgetRow pool widget.id
           WidgetUpdate
             { name = Just "after",
               createdAt = Nothing,
               updatedAt = Nothing,
               description = Omit
             }
-      case result of
-        Left err -> expectationFailure $ show err
-        Right updated -> do
-          updated.name `shouldBe` "after"
-          found <- Ops.findUnique @WidgetTable @WidgetRow pool widget.id
-          found `shouldBe` Just updated
+          >>= assertRight
+      updated.name `shouldBe` "after"
+      found <- Ops.findUnique @WidgetTable @WidgetRow pool widget.id
+      found `shouldBe` Just updated
 
     it "update with Omit leaves description unchanged" $ \TestEnv {envPool = pool} -> do
-      inserted <-
-        Insert.insert @WidgetTable @WidgetRow pool $
+      widget <-
+        Insert.insert @WidgetTable @WidgetRow pool
           WidgetCreate
             { id = Nothing,
               createdAt = Nothing,
@@ -109,19 +106,15 @@ operationsSpec =
               name = "widget",
               description = Value "keep me"
             }
-      case inserted of
-        Left err -> expectationFailure $ show err
-        Right widget -> do
-          result <-
-            Update.update @WidgetTable @WidgetRow pool widget.id $
-              WidgetUpdate
-                { name = Just "renamed",
-                  createdAt = Nothing,
-                  updatedAt = Nothing,
-                  description = Omit
-                }
-          case result of
-            Left err -> expectationFailure $ show err
-            Right updated -> do
-              updated.name `shouldBe` "renamed"
-              updated.description `shouldBe` Just "keep me"
+          >>= assertRight
+      updated <-
+        Update.update @WidgetTable @WidgetRow pool widget.id
+          WidgetUpdate
+            { name = Just "renamed",
+              createdAt = Nothing,
+              updatedAt = Nothing,
+              description = Omit
+            }
+          >>= assertRight
+      updated.name `shouldBe` "renamed"
+      updated.description `shouldBe` Just "keep me"

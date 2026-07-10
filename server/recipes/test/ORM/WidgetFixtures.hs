@@ -9,19 +9,17 @@ import Database.PostgreSQL.Simple
 import ORM (NullableValue (Omit))
 import qualified ORM.Insert as Insert
 import Schema.Widget
+import Support.Assert (assertRight)
 
 insertWidget :: Pool Connection -> Text -> IO WidgetRow
-insertWidget pool name = do
-  result <-
-    Insert.insert @WidgetTable
-      pool
-      WidgetCreate
-        { id = Nothing,
-          createdAt = Nothing,
-          updatedAt = Nothing,
-          name,
-          description = Omit
-        }
-  case result of
-    Left err -> fail $ "Failed to insert widget: " ++ show err
-    Right widget -> return widget
+insertWidget pool name =
+  Insert.insert @WidgetTable @WidgetRow
+    pool
+    WidgetCreate
+      { id = Nothing,
+        createdAt = Nothing,
+        updatedAt = Nothing,
+        name,
+        description = Omit
+      }
+    >>= assertRight

@@ -88,6 +88,7 @@ tests:
       - TypeFamilies
     other-modules:
       - Schema.Widget
+      - Support.Assert
       - Support.TestDb
       - Support.TestMigrations
       - ORM.OperationsSpec
