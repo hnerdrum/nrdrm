@@ -84,7 +84,9 @@ operationsSpec =
     it "update changes a widget name by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "before"
       updated <-
-        Update.update @WidgetTable @WidgetRow pool widget.id
+        Update.update @WidgetTable @WidgetRow
+          pool
+          widget.id
           WidgetUpdate
             { name = Just "after",
               createdAt = Nothing,
@@ -98,7 +100,8 @@ operationsSpec =
 
     it "update with Omit leaves description unchanged" $ \TestEnv {envPool = pool} -> do
       widget <-
-        Insert.insert @WidgetTable @WidgetRow pool
+        Insert.insert @WidgetTable @WidgetRow
+          pool
           WidgetCreate
             { id = Nothing,
               createdAt = Nothing,
@@ -108,7 +111,9 @@ operationsSpec =
             }
           >>= assertRight
       updated <-
-        Update.update @WidgetTable @WidgetRow pool widget.id
+        Update.update @WidgetTable @WidgetRow
+          pool
+          widget.id
           WidgetUpdate
             { name = Just "renamed",
               createdAt = Nothing,
@@ -118,3 +123,14 @@ operationsSpec =
           >>= assertRight
       updated.name `shouldBe` "renamed"
       updated.description `shouldBe` Just "keep me"
+
+    it "delete removes a widget by id" $ \TestEnv {envPool = pool} -> do
+      widget <- WidgetFixtures.insertWidget pool "doomed"
+      deleted <- Ops.delete @WidgetTable pool widget.id
+      deleted `shouldBe` 1
+      found <- Ops.findUnique @WidgetTable @WidgetRow pool widget.id
+      found `shouldBe` Nothing
+
+    it "delete returns 0 when no row matches" $ \TestEnv {envPool = pool} -> do
+      deleted <- Ops.delete @WidgetTable pool (nil :: UUID)
+      deleted `shouldBe` 0
