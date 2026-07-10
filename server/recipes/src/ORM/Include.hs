@@ -1,15 +1,18 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module ORM.Include
   ( IncludesJoin (..),
     BuildJoinChain (..),
     NestInclude (..),
+    ExecuteInclude (..),
     findManyWith,
+    applyRootFilter,
   )
 where
 
@@ -27,35 +30,42 @@ import ORM.Query (QueryBuilder, queryWhereConditions, queryWhereParams, selectAl
 class IncludesJoin include where
   includesJoin :: include -> Bool
 
-class (IncludesJoin include) => BuildJoinChain root include | include -> root where
+class IncludesJoin include => BuildJoinChain root include | include -> root where
   type JoinFlatRow include :: Type
   buildJoinChain :: include -> JoinChain root
 
-class (IncludesJoin include) => NestInclude include result | include -> result where
+class IncludesJoin include => NestInclude include result | include -> result where
   type RootRow include :: Type
   nestRows :: include -> [JoinFlatRow include] -> [result]
   wrapRoot :: include -> RootRow include -> result
 
-findManyWith ::
-  forall root include result.
+class ExecuteInclude root include result | include -> result where
+  executeInclude ::
+    Pool Connection ->
+    include ->
+    (QueryBuilder root -> QueryBuilder root) ->
+    IO [result]
+
+instance
   ( Entity root,
     BuildJoinChain root include,
     NestInclude include result,
     FromRow (JoinFlatRow include),
     FromRow (RootRow include)
   ) =>
-  Pool Connection ->
-  include ->
-  (QueryBuilder root -> QueryBuilder root) ->
-  IO [result]
-findManyWith pool include modifier
-  | includesJoin include = do
-      let chain = applyRootFilter (buildJoinChain include) modifier
-      flatRows <- JoinChain.runJoinChain @(JoinFlatRow include) pool chain
-      pure $ nestRows include flatRows
-  | otherwise = do
-      roots <- findMany @root @(RootRow include) pool modifier
-      pure $ map (wrapRoot include) roots
+  ExecuteInclude root include result
+  where
+  executeInclude pool include modifier
+    | includesJoin include = do
+        let chain = applyRootFilter (buildJoinChain include) modifier
+        flatRows <- JoinChain.runJoinChain @(JoinFlatRow include) pool chain
+        pure $ nestRows include flatRows
+    | otherwise = do
+        roots <- findMany @root @(RootRow include) pool modifier
+        pure $ map (wrapRoot include) roots
+
+findManyWith :: ExecuteInclude root include result => Pool Connection -> include -> (QueryBuilder root -> QueryBuilder root) -> IO [result]
+findManyWith = executeInclude
 
 applyRootFilter ::
   forall root.

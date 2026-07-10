@@ -1,6 +1,7 @@
 module ORM.ShelfFixtures
   ( insertShelf,
     insertBook,
+    insertChapter,
   )
 where
 
@@ -24,4 +25,11 @@ insertBook pool shelfRef title =
   Insert.insert @BookTable @BookRow
     pool
     BookCreate {id = Nothing, shelfRef, title}
+    >>= assertRight
+
+insertChapter :: Pool Connection -> UUID -> Text -> IO ChapterRow
+insertChapter pool bookRef heading =
+  Insert.insert @ChapterTable @ChapterRow
+    pool
+    ChapterCreate {id = Nothing, bookRef, heading}
     >>= assertRight

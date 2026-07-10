@@ -4,16 +4,23 @@
 module Schema.Shelf
   ( ShelfTable (..),
     BookTable (..),
+    ChapterTable (..),
     ShelfRow (..),
     BookRow (..),
+    ChapterRow (..),
     ShelfCreate (..),
     BookCreate (..),
+    ChapterCreate (..),
     shelfId,
     shelfName,
     bookId,
     bookShelfId,
     bookTitle,
+    chapterId,
+    chapterBookId,
+    chapterHeading,
     shelfBooks,
+    bookChapters,
   )
 where
 
@@ -53,6 +60,21 @@ instance Insertable BookTable where
       set bookShelfId input.shelfRef $
         setValue bookTitle input.title
 
+data ChapterTable = ChapterTable
+
+type instance PrimaryKeyType ChapterTable = UUID
+
+instance Entity ChapterTable where
+  tableName = "test_chapter"
+  primaryKey = chapterId
+
+instance Insertable ChapterTable where
+  type CreateInput ChapterTable = ChapterCreate
+  toInsertBuilder input =
+    setMaybe chapterId input.id $
+      set chapterBookId input.bookRef $
+        setValue chapterHeading input.heading
+
 data ShelfRow = ShelfRow
   { id :: UUID,
     name :: Text
@@ -63,6 +85,13 @@ data BookRow = BookRow
   { id :: UUID,
     shelfRef :: UUID,
     title :: Text
+  }
+  deriving (Show, Eq)
+
+data ChapterRow = ChapterRow
+  { id :: UUID,
+    bookRef :: UUID,
+    heading :: Text
   }
   deriving (Show, Eq)
 
@@ -79,11 +108,21 @@ data BookCreate = BookCreate
   }
   deriving (Show, Eq)
 
+data ChapterCreate = ChapterCreate
+  { id :: Maybe UUID,
+    bookRef :: UUID,
+    heading :: Text
+  }
+  deriving (Show, Eq)
+
 instance FromRow ShelfRow where
   fromRow = ShelfRow <$> field <*> field
 
 instance FromRow BookRow where
   fromRow = BookRow <$> field <*> field <*> field
+
+instance FromRow ChapterRow where
+  fromRow = ChapterRow <$> field <*> field <*> field
 
 shelfId :: Field ShelfTable UUID
 shelfId = Field "id" "id"
@@ -100,10 +139,27 @@ bookShelfId = Field "shelfId" "shelf_id"
 bookTitle :: Field BookTable Text
 bookTitle = Field "title" "title"
 
+chapterId :: Field ChapterTable UUID
+chapterId = Field "id" "id"
+
+chapterBookId :: Field ChapterTable UUID
+chapterBookId = Field "chapterBookId" "book_id"
+
+chapterHeading :: Field ChapterTable Text
+chapterHeading = Field "heading" "heading"
+
 shelfBooks :: HasMany ShelfTable BookTable UUID
 shelfBooks =
   HasMany
     { localKey = shelfId,
       foreignKey = bookShelfId,
+      joinType = LeftJoin
+    }
+
+bookChapters :: HasMany BookTable ChapterTable UUID
+bookChapters =
+  HasMany
+    { localKey = bookId,
+      foreignKey = chapterBookId,
       joinType = LeftJoin
     }
