@@ -7,11 +7,13 @@ where
 
 import Data.List (sort)
 import Data.UUID (UUID, nil)
-import ORM (ORMError (..))
+import ORM (NullableValue (..), ORMError (..))
+import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
 import ORM.Query (whereEq)
+import qualified ORM.Update as Update
 import qualified ORM.WidgetFixtures as WidgetFixtures
-import Schema.Widget (WidgetRow (..), WidgetTable (..), widgetName)
+import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable (..), WidgetUpdate (..), widgetName)
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, expectationFailure, it, shouldBe, shouldSatisfy)
 
@@ -79,3 +81,47 @@ operationsSpec =
     it "count returns 0 when no rows match" $ \TestEnv {envPool = pool} -> do
       n <- Ops.count @WidgetTable pool $ whereEq widgetName "nonexistent"
       n `shouldBe` 0
+
+    it "update changes a widget name by id" $ \TestEnv {envPool = pool} -> do
+      widget <- WidgetFixtures.insertWidget pool "before"
+      result <-
+        Update.update @WidgetTable @WidgetRow pool widget.id $
+          WidgetUpdate
+            { name = Just "after",
+              createdAt = Nothing,
+              updatedAt = Nothing,
+              description = Omit
+            }
+      case result of
+        Left err -> expectationFailure $ show err
+        Right updated -> do
+          updated.name `shouldBe` "after"
+          found <- Ops.findUnique @WidgetTable @WidgetRow pool widget.id
+          found `shouldBe` Just updated
+
+    it "update with Omit leaves description unchanged" $ \TestEnv {envPool = pool} -> do
+      inserted <-
+        Insert.insert @WidgetTable @WidgetRow pool $
+          WidgetCreate
+            { id = Nothing,
+              createdAt = Nothing,
+              updatedAt = Nothing,
+              name = "widget",
+              description = Value "keep me"
+            }
+      case inserted of
+        Left err -> expectationFailure $ show err
+        Right widget -> do
+          result <-
+            Update.update @WidgetTable @WidgetRow pool widget.id $
+              WidgetUpdate
+                { name = Just "renamed",
+                  createdAt = Nothing,
+                  updatedAt = Nothing,
+                  description = Omit
+                }
+          case result of
+            Left err -> expectationFailure $ show err
+            Right updated -> do
+              updated.name `shouldBe` "renamed"
+              updated.description `shouldBe` Just "keep me"
