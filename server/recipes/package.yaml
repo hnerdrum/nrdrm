@@ -95,8 +95,10 @@ tests:
       - Support.TestMigrations
       - ORM.OperationsSpec
       - ORM.JoinSpec
+      - ORM.IncludeSpec
       - ORM.WidgetFixtures
       - ORM.ShelfFixtures
+      - Schema.ShelfInclude
     ghc-options:
       - -threaded
       - -rtsopts
