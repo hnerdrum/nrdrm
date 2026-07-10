@@ -15,6 +15,7 @@ module ORM.JoinChain
     aliasedField,
     buildJoinQuery,
     runJoinChain,
+    rootAlias,
   )
 where
 
@@ -162,3 +163,6 @@ runJoinChain pool chain =
   withResource pool $ \conn -> do
     let (query, params) = buildJoinQuery chain
     PGSimple.queryWith fromRow conn query params
+
+rootAlias :: JoinChain root -> Text
+rootAlias = jcRootAlias

@@ -6,6 +6,8 @@
 module ORM.Query
   ( Query,
     QueryBuilder,
+    queryWhereConditions,
+    queryWhereParams,
     select,
     selectAll,
     where_,
@@ -73,6 +75,12 @@ orderBy field dir qb =
 
 limit :: Int -> QueryBuilder table -> QueryBuilder table
 limit n qb = qb {qbLimit = Just n}
+
+queryWhereConditions :: QueryBuilder table -> [Text]
+queryWhereConditions = qbWhere
+
+queryWhereParams :: QueryBuilder table -> [Action]
+queryWhereParams = qbParams
 
 buildQuery :: QueryBuilder table -> (Query, [Action])
 buildQuery qb =
