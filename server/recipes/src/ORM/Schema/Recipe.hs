@@ -13,6 +13,7 @@ module ORM.Schema.Recipe
     recipeUpdatedAt,
     recipeName,
     recipeDescription,
+    recipeIngredients,
   )
 where
 
@@ -22,6 +23,8 @@ import Data.UUID (UUID)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
 import ORM.Insert (Insertable (..), setMaybe, setNullable, setValue)
+import ORM.Relation (HasMany (..), JoinType (..))
+import ORM.Schema.RecipeIngredient (RecipeIngredientTable, riRecipeId)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe, setFieldNullable)
 
 data RecipeTable = RecipeTable
@@ -93,3 +96,11 @@ recipeName = Field "name" "name"
 
 recipeDescription :: Field RecipeTable Text
 recipeDescription = Field "description" "description"
+
+recipeIngredients :: HasMany RecipeTable RecipeIngredientTable UUID
+recipeIngredients =
+  HasMany
+    { localKey = recipeId,
+      foreignKey = riRecipeId,
+      joinType = LeftJoin
+    }
