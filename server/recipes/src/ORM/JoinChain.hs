@@ -9,6 +9,7 @@ module ORM.JoinChain
     startJoinChain,
     buildJoinChainFromHasMany,
     addHasManyJoin,
+    addBelongsToJoin,
     selectColumns,
     selectFields,
     whereJoin,
@@ -30,7 +31,7 @@ import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..))
-import ORM.Relation (HasMany (..), JoinType (..))
+import ORM.Relation (BelongsTo (..), HasMany (..), JoinType (..))
 
 data JoinedTable = JoinedTable
   { jtTable :: Text,
@@ -84,16 +85,38 @@ addHasManyJoin ::
   Text ->
   JoinChain root ->
   JoinChain root
-addHasManyJoin rel leftAlias childAlias chain =
+addHasManyJoin HasMany {joinType, localKey, foreignKey} leftAlias childAlias chain =
   chain
     { jcJoins =
         jcJoins chain
           ++ [ JoinedTable
                 { jtTable = tableName @child,
                   jtAlias = childAlias,
-                  jtJoinType = joinType rel,
-                  jtOnLeft = leftAlias <> "." <> fieldColumn (localKey rel),
-                  jtOnRight = childAlias <> "." <> fieldColumn (foreignKey rel)
+                  jtJoinType = joinType,
+                  jtOnLeft = leftAlias <> "." <> fieldColumn localKey,
+                  jtOnRight = childAlias <> "." <> fieldColumn foreignKey
+                }
+             ]
+    }
+
+addBelongsToJoin ::
+  forall root child parent key.
+  (Entity parent) =>
+  BelongsTo child parent key ->
+  Text ->
+  Text ->
+  JoinChain root ->
+  JoinChain root
+addBelongsToJoin BelongsTo {joinType, foreignKey, references} childAlias parentAlias chain =
+  chain
+    { jcJoins =
+        jcJoins chain
+          ++ [ JoinedTable
+                { jtTable = tableName @parent,
+                  jtAlias = parentAlias,
+                  jtJoinType = joinType,
+                  jtOnLeft = childAlias <> "." <> fieldColumn foreignKey,
+                  jtOnRight = parentAlias <> "." <> fieldColumn references
                 }
              ]
     }

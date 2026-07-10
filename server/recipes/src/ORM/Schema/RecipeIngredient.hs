@@ -5,6 +5,7 @@ module ORM.Schema.RecipeIngredient
     riIngredientId,
     riAmount,
     riUnit,
+    riIngredient,
   )
 where
 
@@ -13,6 +14,9 @@ import Data.UUID (UUID)
 import Database.Ingredient (Unit)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
+import ORM.Relation (BelongsTo (..), JoinType (..))
+import ORM.Schema.Ingredient (IngredientTable)
+import qualified ORM.Schema.Ingredient as Ingredient
 
 data RecipeIngredientTable = RecipeIngredientTable
 
@@ -45,3 +49,10 @@ riAmount = Field "amount" "amount"
 riUnit :: Field RecipeIngredientTable Text
 riUnit = Field "unit" "unit"
 
+riIngredient :: BelongsTo RecipeIngredientTable IngredientTable UUID
+riIngredient =
+  BelongsTo
+    { foreignKey = riIngredientId,
+      references = Ingredient.ingredientId,
+      joinType = LeftJoin
+    }
