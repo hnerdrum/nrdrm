@@ -124,6 +124,45 @@ operationsSpec =
       updated.name `shouldBe` "renamed"
       updated.description `shouldBe` Just "keep me"
 
+    it "insert with Null sets description to NULL" $ \TestEnv {envPool = pool} -> do
+      widget <-
+        Insert.insert @WidgetTable @WidgetRow
+          pool
+          WidgetCreate
+            { id = Nothing,
+              createdAt = Nothing,
+              updatedAt = Nothing,
+              name = "widget",
+              description = Null
+            }
+          >>= assertRight
+      widget.description `shouldBe` Nothing
+
+    it "update with Null clears description" $ \TestEnv {envPool = pool} -> do
+      widget <-
+        Insert.insert @WidgetTable @WidgetRow
+          pool
+          WidgetCreate
+            { id = Nothing,
+              createdAt = Nothing,
+              updatedAt = Nothing,
+              name = "widget",
+              description = Value "keep me"
+            }
+          >>= assertRight
+      updated <-
+        Update.update @WidgetTable @WidgetRow
+          pool
+          widget.id
+          WidgetUpdate
+            { name = Nothing,
+              createdAt = Nothing,
+              updatedAt = Nothing,
+              description = Null
+            }
+          >>= assertRight
+      updated.description `shouldBe` Nothing
+
     it "delete removes a widget by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "doomed"
       deleted <- Ops.delete @WidgetTable pool widget.id
