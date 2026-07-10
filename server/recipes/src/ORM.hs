@@ -49,6 +49,42 @@ module ORM
     PrimaryKeyType,
     NullableValue (..),
     toField,
+    -- Relations
+    JoinType (..),
+    HasMany (..),
+    BelongsTo (..),
+    -- Join chain (N-table)
+    JoinChain,
+    JoinedTable (..),
+    startJoinChain,
+    buildJoinChainFromHasMany,
+    addHasManyJoin,
+    addBelongsToJoin,
+    selectColumns,
+    selectFields,
+    whereJoin,
+    col,
+    aliasedField,
+    buildJoinQuery,
+    runJoinChain,
+    rootAlias,
+    -- Include (Prisma-like reads)
+    IncludesJoin (..),
+    BuildJoinChain (..),
+    NestInclude (..),
+    ExecuteInclude (..),
+    findManyWith,
+    applyRootFilter,
+    -- Grouping
+    groupByKey,
+    -- Legacy 2-table join builder
+    JoinBuilder,
+    leftJoin,
+    innerJoin,
+    on,
+    selectFrom,
+    runJoin,
+    as,
   )
 where
 
@@ -57,7 +93,12 @@ import ORM.Column
 import ORM.Core
 import ORM.Delete hiding (delete)
 import ORM.Errors
+import ORM.Group
+import ORM.Include
 import ORM.Insert
+import ORM.Join hiding (JoinType, aliasedField, col, selectColumns, selectFields, whereJoin)
+import ORM.JoinChain
 import ORM.Operations
 import ORM.Query
+import ORM.Relation
 import ORM.Update
