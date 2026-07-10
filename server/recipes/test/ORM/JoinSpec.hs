@@ -13,6 +13,7 @@ import qualified ORM.JoinChain as JoinChain
 import ORM.Relation (HasMany (..), JoinType (..))
 import qualified ORM.ShelfFixtures as ShelfFixtures
 import qualified Schema.Shelf as Shelf
+import Schema.ShelfBookChapterRow (ShelfBookChapterJoinRow (..))
 import Schema.ShelfBookRow (ShelfBookJoinRow (..))
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
@@ -71,7 +72,7 @@ joinSpec =
         JoinChain.runJoinChain @ShelfBookJoinRow pool $
           JoinChain.whereJoin "s.name = ?" [toField ("fiction" :: Text)] shelfBookJoin
       length rows `shouldBe` 1
-      shelfName (head rows) `shouldBe` "fiction"
+      (head rows).shelfName `shouldBe` "fiction"
 
     it "whereJoin filters by right alias" $ \TestEnv {envPool = pool} -> do
       shelf <- ShelfFixtures.insertShelf pool "fiction"
@@ -81,7 +82,7 @@ joinSpec =
         JoinChain.runJoinChain @ShelfBookJoinRow pool $
           JoinChain.whereJoin "b.title = ?" [toField ("Dune" :: Text)] shelfBookJoin
       length rows `shouldBe` 1
-      bookTitle (head rows) `shouldBe` Just "Dune"
+      (head rows).bookTitle `shouldBe` Just "Dune"
 
     it "whereJoin can return zero rows" $ \TestEnv {envPool = pool} -> do
       _ <- ShelfFixtures.insertShelf pool "fiction"
@@ -89,3 +90,22 @@ joinSpec =
         JoinChain.runJoinChain @ShelfBookJoinRow pool $
           JoinChain.whereJoin "s.name = ?" [toField ("nonexistent" :: Text)] shelfBookJoin
       rows `shouldBe` []
+
+    it "chained leftJoin returns one row per chapter" $ \TestEnv {envPool = pool} -> do
+      shelf <- ShelfFixtures.insertShelf pool "fiction"
+      book <- ShelfFixtures.insertBook pool shelf.id "Dune"
+      _ <- ShelfFixtures.insertChapter pool book.id "Arrakis"
+      _ <- ShelfFixtures.insertChapter pool book.id "Caladan"
+      let shelfBookChapterJoin =
+            JoinChain.selectColumns
+              [ JoinChain.col "s" Shelf.shelfId,
+                JoinChain.col "s" Shelf.shelfName,
+                JoinChain.col "b" Shelf.bookId,
+                JoinChain.col "b" Shelf.bookTitle,
+                JoinChain.col "c" Shelf.chapterId,
+                JoinChain.col "c" Shelf.chapterHeading
+              ]
+              (JoinChain.addHasManyJoin Shelf.bookChapters "b" "c" shelfBookJoin)
+      rows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow pool shelfBookChapterJoin
+      length rows `shouldBe` 2
+      sort (map (.chapterHeading) rows) `shouldBe` sort [Just "Arrakis", Just "Caladan"]

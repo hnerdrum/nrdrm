@@ -8,6 +8,7 @@ module ORM.JoinChain
     JoinedTable (..),
     startJoinChain,
     buildJoinChainFromHasMany,
+    addHasManyJoin,
     selectColumns,
     selectFields,
     whereJoin,
@@ -73,16 +74,28 @@ buildJoinChainFromHasMany ::
   Text ->
   JoinChain parent
 buildJoinChainFromHasMany rel parentAlias childAlias =
-  (startJoinChain @parent parentAlias)
+  addHasManyJoin rel parentAlias childAlias (startJoinChain @parent parentAlias)
+
+addHasManyJoin ::
+  forall root parent child key.
+  (Entity child) =>
+  HasMany parent child key ->
+  Text ->
+  Text ->
+  JoinChain root ->
+  JoinChain root
+addHasManyJoin rel leftAlias childAlias chain =
+  chain
     { jcJoins =
-        [ JoinedTable
-            { jtTable = tableName @child,
-              jtAlias = childAlias,
-              jtJoinType = joinType rel,
-              jtOnLeft = parentAlias <> "." <> fieldColumn (localKey rel),
-              jtOnRight = childAlias <> "." <> fieldColumn (foreignKey rel)
-            }
-        ]
+        jcJoins chain
+          ++ [ JoinedTable
+                { jtTable = tableName @child,
+                  jtAlias = childAlias,
+                  jtJoinType = joinType rel,
+                  jtOnLeft = leftAlias <> "." <> fieldColumn (localKey rel),
+                  jtOnRight = childAlias <> "." <> fieldColumn (foreignKey rel)
+                }
+             ]
     }
 
 selectColumns ::

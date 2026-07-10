@@ -22,7 +22,7 @@ import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import qualified Database.PostgreSQL.Simple as PG
 import ORM.Core (Entity (..))
-import Schema.Shelf (BookTable, ShelfTable)
+import Schema.Shelf (BookTable, ChapterTable, ShelfTable)
 import Schema.Widget (WidgetTable)
 import Support.TestMigrations (runTestMigrations)
 import System.Directory (doesFileExist)
@@ -86,6 +86,7 @@ destroyTestEnv TestEnv {envPool = pool} =
 resetTestData :: TestEnv -> IO ()
 resetTestData env = do
   truncateTable @WidgetTable env
+  truncateTable @ChapterTable env
   truncateTable @BookTable env
   truncateTable @ShelfTable env
 

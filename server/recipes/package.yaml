@@ -90,6 +90,7 @@ tests:
       - Schema.Widget
       - Schema.Shelf
       - Schema.ShelfBookRow
+      - Schema.ShelfBookChapterRow
       - Support.Assert
       - Support.TestDb
       - Support.TestMigrations
