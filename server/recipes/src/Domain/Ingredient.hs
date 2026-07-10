@@ -5,7 +5,6 @@ module Domain.Ingredient
   ( Ingredient (..),
     RecipeIngredient (..),
     getAllIngredients,
-    fromDbRecipeIngredient,
     getIngredient,
     createIngredient,
     updateIngredient,
@@ -21,7 +20,6 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import Database.Ingredient (CreateIngredientInput (..), Unit (..), UpdateIngredientInput (..))
 import Database.PostgreSQL.Simple (Connection)
-import Database.Recipe (DbRecipeIngredient (..))
 import Domain.Errors (AppError (..), DomainError (..))
 import ORM (ORMError (..))
 import qualified ORM.Client.Ingredient as Ingredient
@@ -99,18 +97,3 @@ fromIngredientError err =
   case err of
     RecordNotFound ingredientId -> AppError NotFoundError "Ingredient could not be found" (object ["ingredientId" .= ingredientId])
     MultipleRecordsFound ingredientId -> AppError MultipleEntitiesError "Found multiple ingredients with matching ID" (object ["ingredientId" .= ingredientId])
-
-fromDbRecipeIngredient :: DbRecipeIngredient -> Maybe RecipeIngredient
-fromDbRecipeIngredient dbRI = do
-  ingredientId <- dbIngredientId dbRI
-  ingredientAmount <- dbIngredientAmount dbRI
-  ingName <- dbIngredientName dbRI
-  ingredientUnit <- dbIngredientUnit dbRI
-
-  return
-    RecipeIngredient
-      { id = ingredientId,
-        name = ingName,
-        amount = ingredientAmount,
-        unit = ingredientUnit
-      }
