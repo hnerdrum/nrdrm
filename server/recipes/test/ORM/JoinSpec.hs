@@ -1,0 +1,91 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+
+module ORM.JoinSpec
+  ( joinSpec,
+  )
+where
+
+import Data.List (sort)
+import Data.Text (Text)
+import Database.PostgreSQL.Simple.ToField (toField)
+import qualified ORM.JoinChain as JoinChain
+import ORM.Relation (HasMany (..), JoinType (..))
+import qualified ORM.ShelfFixtures as ShelfFixtures
+import qualified Schema.Shelf as Shelf
+import Schema.ShelfBookRow (ShelfBookJoinRow (..))
+import Support.TestDb (TestEnv (..))
+import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
+
+selectShelfBookColumns :: JoinChain.JoinChain Shelf.ShelfTable -> JoinChain.JoinChain Shelf.ShelfTable
+selectShelfBookColumns =
+  JoinChain.selectColumns
+    [ JoinChain.col "s" Shelf.shelfId,
+      JoinChain.col "s" Shelf.shelfName,
+      JoinChain.col "b" Shelf.bookId,
+      JoinChain.col "b" Shelf.bookTitle
+    ]
+
+shelfBookJoin :: JoinChain.JoinChain Shelf.ShelfTable
+shelfBookJoin =
+  selectShelfBookColumns $
+    JoinChain.buildJoinChainFromHasMany Shelf.shelfBooks "s" "b"
+
+joinSpec :: SpecWith TestEnv
+joinSpec =
+  describe "ORM.JoinChain" $ do
+    it "leftJoin via HasMany returns one row per book on a shelf" $ \TestEnv {envPool = pool} -> do
+      shelf <- ShelfFixtures.insertShelf pool "fiction"
+      _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
+      _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
+      rows <- JoinChain.runJoinChain @ShelfBookJoinRow pool shelfBookJoin
+      length rows `shouldBe` 2
+      sort (map (.bookTitle) rows) `shouldBe` sort [Just "Dune", Just "Neuromancer"]
+      map (.shelfId) rows `shouldBe` [shelf.id, shelf.id]
+
+    it "leftJoin returns a shelf with no books as one row with null book fields" $ \TestEnv {envPool = pool} -> do
+      shelf <- ShelfFixtures.insertShelf pool "empty"
+      (row :: ShelfBookJoinRow) : _ <- JoinChain.runJoinChain @ShelfBookJoinRow pool shelfBookJoin
+      row.shelfId `shouldBe` shelf.id
+      row.shelfName `shouldBe` "empty"
+      row.bookId `shouldBe` Nothing
+      row.bookTitle `shouldBe` Nothing
+
+    it "innerJoin excludes shelves without books" $ \TestEnv {envPool = pool} -> do
+      emptyShelf <- ShelfFixtures.insertShelf pool "empty"
+      stockedShelf <- ShelfFixtures.insertShelf pool "stocked"
+      _ <- ShelfFixtures.insertBook pool stockedShelf.id "Book"
+      let innerRelation = Shelf.shelfBooks {joinType = InnerJoin}
+          innerJoin =
+            selectShelfBookColumns $
+              JoinChain.buildJoinChainFromHasMany innerRelation "s" "b"
+      rows <- JoinChain.runJoinChain @ShelfBookJoinRow pool innerJoin
+      map (.shelfId) rows `shouldBe` [stockedShelf.id]
+      map (.shelfId) rows `shouldSatisfy` (notElem emptyShelf.id)
+
+    it "whereJoin filters by left alias" $ \TestEnv {envPool = pool} -> do
+      fiction <- ShelfFixtures.insertShelf pool "fiction"
+      _ <- ShelfFixtures.insertShelf pool "nonfiction"
+      _ <- ShelfFixtures.insertBook pool fiction.id "Dune"
+      rows <-
+        JoinChain.runJoinChain @ShelfBookJoinRow pool $
+          JoinChain.whereJoin "s.name = ?" [toField ("fiction" :: Text)] shelfBookJoin
+      length rows `shouldBe` 1
+      shelfName (head rows) `shouldBe` "fiction"
+
+    it "whereJoin filters by right alias" $ \TestEnv {envPool = pool} -> do
+      shelf <- ShelfFixtures.insertShelf pool "fiction"
+      _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
+      _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
+      rows <-
+        JoinChain.runJoinChain @ShelfBookJoinRow pool $
+          JoinChain.whereJoin "b.title = ?" [toField ("Dune" :: Text)] shelfBookJoin
+      length rows `shouldBe` 1
+      bookTitle (head rows) `shouldBe` Just "Dune"
+
+    it "whereJoin can return zero rows" $ \TestEnv {envPool = pool} -> do
+      _ <- ShelfFixtures.insertShelf pool "fiction"
+      rows <-
+        JoinChain.runJoinChain @ShelfBookJoinRow pool $
+          JoinChain.whereJoin "s.name = ?" [toField ("nonexistent" :: Text)] shelfBookJoin
+      rows `shouldBe` []
