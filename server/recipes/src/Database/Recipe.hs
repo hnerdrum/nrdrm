@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Database.Recipe
-  ( DbRecipeIngredient (..),
-    CreateRecipeInput (..),
+  ( CreateRecipeInput (..),
     CreateRecipeIngredientInput (..),
     getCreateRecipeInput,
     getCreateRecipeIngredientInput,
@@ -14,28 +13,8 @@ where
 
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.:?))
 import Data.Text (Text)
-import Data.Time (UTCTime)
 import Data.UUID (UUID)
 import Database.Ingredient (Unit (..), unitToString)
-import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
-
-data DbRecipeIngredient = DbRecipeIngredient
-  { dbRecipeId :: UUID,
-    dbRecipeCreatedAt :: UTCTime,
-    dbRecipeUpdatedAt :: UTCTime,
-    dbRecipeName :: Text,
-    dbRecipeDescription :: Text,
-    dbIngredientId :: Maybe UUID,
-    dbIngredientCreatedAt :: Maybe UTCTime,
-    dbIngredientUpdatedAt :: Maybe UTCTime,
-    dbIngredientName :: Maybe Text,
-    dbIngredientAmount :: Maybe Int,
-    dbIngredientUnit :: Maybe Unit
-  }
-  deriving (Show)
-
-instance FromRow DbRecipeIngredient where
-  fromRow = DbRecipeIngredient <$> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field
 
 data CreateRecipeInput = CreateRecipeInput
   { name :: Text,

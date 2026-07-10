@@ -11,23 +11,34 @@ module Domain.Recipe
   )
 where
 
-import Control.Monad
+import Control.Monad (forM_)
 import Data.Aeson (object, (.=))
 import Data.Aeson.TH (defaultOptions, deriveJSON)
-import Data.Either.Combinators
-import qualified Data.List.NonEmpty as NE
-import qualified Data.Map as Map
-import Data.Maybe (catMaybes)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import Data.Time (getCurrentTime)
-import Data.UUID hiding (null)
+import Data.UUID (UUID)
 import qualified Data.UUID.V4 as V4
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.SqlQQ (sql)
-import Database.Recipe (CreateRecipeInput (..), DbRecipeIngredient (..), UpdateRecipeInput (..), getCreateRecipeIngredientInput, getCreateRecipeInput, getUpdateRecipeIngredientInput)
+import Database.Recipe
+  ( CreateRecipeInput (..),
+    UpdateRecipeInput (..),
+    getCreateRecipeIngredientInput,
+    getCreateRecipeInput,
+    getUpdateRecipeIngredientInput,
+  )
 import Domain.Errors (AppError (..), DomainError (..), addErrorContext)
-import Domain.Ingredient (RecipeIngredient (..), fromDbRecipeIngredient)
+import Domain.Ingredient (RecipeIngredient (..))
+import qualified ORM.Client.Recipe as Recipe
+import ORM.Schema.Ingredient (IngredientRow (..))
+import ORM.Schema.Recipe (RecipeRow (..))
+import ORM.Schema.RecipeInclude
+  ( RecipeIngredientWithIngredient (..),
+    RecipeWithIngredients (..),
+  )
+import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..))
 
 data Recipe = Recipe
   { id :: UUID,
@@ -40,49 +51,49 @@ data Recipe = Recipe
 $(deriveJSON defaultOptions ''Recipe)
 
 getAllRecipes :: Pool PGSimple.Connection -> IO [Recipe]
-getAllRecipes pool =
-  withResource pool $ \conn -> do
-    dbRecipeIngredients <-
-      PGSimple.query_
-        conn
-        [sql|
-        SELECT r.id, r.created_at, r.updated_at, r.name, r.description,
-               i.id, i.created_at, i.updated_at, i.name, ri.amount, ri.unit
-        FROM recipe r
-        LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id
-        LEFT JOIN ingredient i ON i.id = ri.ingredient_id
-      |]
-    return $ mapDbRecipeIngredients dbRecipeIngredients
+getAllRecipes pool = do
+  recipes <- Recipe.findAllWithIngredients pool
+  pure $ map fromRecipeWithIngredients recipes
 
 getRecipe :: Pool PGSimple.Connection -> UUID -> IO (Either AppError Recipe)
-getRecipe pool recipeId =
-  withResource pool $ \conn -> getRecipeById conn recipeId
+getRecipe pool recipeId = do
+  mRecipe <- Recipe.findUniqueWithIngredients pool recipeId
+  pure $
+    case mRecipe of
+      Nothing ->
+        Left $
+          addErrorContext (object ["recipeId" .= recipeId]) $
+            AppError NotFoundError "Recipe could not be found" (object [])
+      Just recipeWithIngredients ->
+        Right (fromRecipeWithIngredients recipeWithIngredients)
 
 createRecipe :: Pool PGSimple.Connection -> CreateRecipeInput -> IO (Either AppError Recipe)
-createRecipe pool recipe =
-  withResource pool $ \conn ->
-    PGSimple.withTransaction conn $ do
-      recipeId <- V4.nextRandom
-      _ <-
-        PGSimple.execute
-          conn
-          [sql|
-          INSERT INTO recipe (id, name, description)
-          VALUES (?, ?, ?)
-        |]
-          $ getCreateRecipeInput recipeId recipe
-      _ <-
-        PGSimple.executeMany
-          conn
-          [sql|
-          INSERT INTO recipe_ingredient (recipe_id, ingredient_id, amount, unit)
-          VALUES (?, ?, ?, ?)
-        |]
-          $ getCreateRecipeIngredientInput recipeId recipe
-      getRecipeById conn recipeId
+createRecipe pool recipe = do
+  recipeId <-
+    withResource pool $ \conn ->
+      PGSimple.withTransaction conn $ do
+        newRecipeId <- V4.nextRandom
+        _ <-
+          PGSimple.execute
+            conn
+            [sql|
+            INSERT INTO recipe (id, name, description)
+            VALUES (?, ?, ?)
+          |]
+            $ getCreateRecipeInput newRecipeId recipe
+        _ <-
+          PGSimple.executeMany
+            conn
+            [sql|
+            INSERT INTO recipe_ingredient (recipe_id, ingredient_id, amount, unit)
+            VALUES (?, ?, ?, ?)
+          |]
+            $ getCreateRecipeIngredientInput newRecipeId recipe
+        pure newRecipeId
+  getRecipe pool recipeId
 
 updateRecipe :: Pool PGSimple.Connection -> UUID -> UpdateRecipeInput -> IO (Either AppError Recipe)
-updateRecipe pool recipeId updateRecipeInput =
+updateRecipe pool recipeId updateRecipeInput = do
   withResource pool $ \conn ->
     PGSimple.withTransaction conn $ do
       now <- getCurrentTime
@@ -112,7 +123,7 @@ updateRecipe pool recipeId updateRecipeInput =
             DO UPDATE SET amount = EXCLUDED.amount, unit = EXCLUDED.unit
          |]
           params
-      getRecipeById conn recipeId
+  getRecipe pool recipeId
 
 deleteRecipe :: Pool PGSimple.Connection -> UUID -> IO ()
 deleteRecipe pool recipeId =
@@ -136,46 +147,26 @@ deleteRecipe pool recipeId =
           $ PGSimple.Only recipeId
       return ()
 
-getRecipeById :: PGSimple.Connection -> UUID -> IO (Either AppError Recipe)
-getRecipeById conn recipeId = do
-  dbRecipeIngredients <-
-    PGSimple.query
-      conn
-      [sql|
-      SELECT r.id, r.created_at, r.updated_at, r.name, r.description,
-      i.id, i.created_at , i.updated_at, i.name, ri.amount, ri.unit
-      FROM recipe r
-      LEFT JOIN recipe_ingredient ri ON r.id = ri.recipe_id
-      LEFT JOIN ingredient i ON i.id = ri.ingredient_id
-      WHERE r.id = ?
-    |]
-      $ PGSimple.Only recipeId
-  return $ mapLeft (addErrorContext (object ["recipeId" .= recipeId])) (reduceDbRecipeIngredients dbRecipeIngredients)
-
-mapDbRecipeIngredients :: [DbRecipeIngredient] -> [Recipe]
-mapDbRecipeIngredients dbRecipeIngredients =
-  map toRecipe $ groupById dbRecipeIngredients
-
-reduceDbRecipeIngredients :: [DbRecipeIngredient] -> Either AppError Recipe
-reduceDbRecipeIngredients dbRecipeIngredients
-  | null recipeGroups = Left (AppError {error = NotFoundError, message = "Recipe could not be found", context = object []})
-  | length recipeGroups == 1 = Right $ toRecipe $ head recipeGroups
-  | otherwise = Left (AppError {error = MultipleEntitiesError, message = "Found multiple recipes with matching ID", context = object []})
-  where
-    recipeGroups = groupById dbRecipeIngredients
-
-toRecipe :: NE.NonEmpty DbRecipeIngredient -> Recipe
-toRecipe dbRIs =
+fromRecipeWithIngredients :: RecipeWithIngredients -> Recipe
+fromRecipeWithIngredients (RecipeWithIngredients (RecipeRow rid _ _ rname rdesc) ingredients) =
   Recipe
-    { id = dbRecipeId dbRecipeIngredient,
-      name = dbRecipeName dbRecipeIngredient,
-      description = dbRecipeDescription dbRecipeIngredient,
-      ingredients = catMaybes $ NE.toList $ NE.map fromDbRecipeIngredient dbRIs
+    { id = rid,
+      name = rname,
+      description = fromMaybe "" rdesc,
+      ingredients = mapMaybe fromRecipeIngredientWithIngredient ingredients
     }
-  where
-    dbRecipeIngredient = NE.head dbRIs
 
-groupById :: [DbRecipeIngredient] -> [NE.NonEmpty DbRecipeIngredient]
-groupById dbRI = map NE.fromList $ filter (not . null) $ Map.elems groups
-  where
-    groups = Map.fromListWith (++) [(dbRecipeId ri, [ri]) | ri <- dbRI]
+fromRecipeIngredientWithIngredient :: RecipeIngredientWithIngredient -> Maybe RecipeIngredient
+fromRecipeIngredientWithIngredient
+  ( RecipeIngredientWithIngredient
+      (RecipeIngredientRow _ _ amount unit)
+      (Just (IngredientRow iid _ _ iname))
+    ) =
+    Just
+      RecipeIngredient
+        { id = iid,
+          name = iname,
+          amount,
+          unit
+        }
+fromRecipeIngredientWithIngredient _ = Nothing
