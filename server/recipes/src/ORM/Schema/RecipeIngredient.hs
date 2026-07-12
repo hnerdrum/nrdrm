@@ -1,6 +1,9 @@
+{-# LANGUAGE TypeApplications #-}
+
 module ORM.Schema.RecipeIngredient
   ( RecipeIngredientTable (..),
     RecipeIngredientRow (..),
+    RecipeIngredientCreate (..),
     riRecipeId,
     riIngredientId,
     riAmount,
@@ -11,9 +14,10 @@ where
 
 import Data.Text (Text)
 import Data.UUID (UUID)
-import Database.Ingredient (Unit)
+import Database.Ingredient (Unit, unitToString)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
+import ORM.Insert (Insertable (..), emptyInsert, set)
 import ORM.Relation (BelongsTo (..), JoinType (..))
 import ORM.Schema.Ingredient (IngredientTable)
 import qualified ORM.Schema.Ingredient as Ingredient
@@ -33,6 +37,22 @@ data RecipeIngredientRow = RecipeIngredientRow
     unit :: Unit
   }
   deriving (Show)
+
+data RecipeIngredientCreate = RecipeIngredientCreate
+  { recipeId :: UUID,
+    ingredientId :: UUID,
+    amount :: Int,
+    unit :: Unit
+  }
+  deriving (Show)
+
+instance Insertable RecipeIngredientTable where
+  type CreateInput RecipeIngredientTable = RecipeIngredientCreate
+  toInsertBuilder input =
+    set riUnit (unitToString input.unit) $
+      set riAmount input.amount $
+        set riIngredientId input.ingredientId $
+          set riRecipeId input.recipeId (emptyInsert @RecipeIngredientTable)
 
 instance FromRow RecipeIngredientRow where
   fromRow = RecipeIngredientRow <$> field <*> field <*> field <*> field

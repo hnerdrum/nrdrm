@@ -1,20 +1,15 @@
-{-# LANGUAGE OverloadedRecordDot #-}
-
 module Database.Recipe
   ( CreateRecipeInput (..),
     CreateRecipeIngredientInput (..),
-    getCreateRecipeInput,
-    getCreateRecipeIngredientInput,
     UpdateRecipeInput (..),
     UpdateRecipeIngredientInput (..),
-    getUpdateRecipeIngredientInput,
   )
 where
 
 import Data.Aeson (FromJSON (parseJSON), withObject, (.:), (.:?))
 import Data.Text (Text)
 import Data.UUID (UUID)
-import Database.Ingredient (Unit (..), unitToString)
+import Database.Ingredient (Unit (..))
 
 data CreateRecipeInput = CreateRecipeInput
   { name :: Text,
@@ -54,13 +49,6 @@ instance FromJSON UpdateRecipeInput where
           ingredients = ingredientsValue
         }
 
-getCreateRecipeInput :: UUID -> CreateRecipeInput -> (UUID, Text, Text)
-getCreateRecipeInput recipeId input = (recipeId, input.name, input.description)
-
-getCreateRecipeIngredientInput :: UUID -> CreateRecipeInput -> [(UUID, UUID, Int, Text)]
-getCreateRecipeIngredientInput recipeId input =
-  map (\ingredient -> (recipeId, ingredient.id, ingredient.amount, unitToString ingredient.unit)) input.ingredients
-
 data CreateRecipeIngredientInput = CreateRecipeIngredientInput
   { id :: UUID,
     amount :: Int,
@@ -98,13 +86,3 @@ instance FromJSON UpdateRecipeIngredientInput where
           amount = amountValue,
           unit = unitValue
         }
-
-getUpdateRecipeIngredientInput :: UUID -> UpdateRecipeInput -> [(UUID, UUID, Maybe Int, Maybe Text)]
-getUpdateRecipeIngredientInput recipeId input = case input.ingredients of
-  Nothing -> []
-  Just ings ->
-    map
-      ( \ingredient ->
-          (recipeId, ingredient.id, ingredient.amount, fmap unitToString ingredient.unit)
-      )
-      ings
