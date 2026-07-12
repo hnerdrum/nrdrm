@@ -10,6 +10,8 @@ module ORM.Insert
     insert,
     insertBuilder,
     insertReturning,
+    executeInsert,
+    emptyInsert,
     set,
     setNull,
     setMaybe,
@@ -88,6 +90,28 @@ insertReturning pool builder =
             <> ") RETURNING *"
         query = Query (TE.encodeUtf8 queryText)
     PGSimple.queryWith fromRow conn query allValues
+
+executeInsert ::
+  Pool Connection ->
+  InsertBuilder table ->
+  IO ()
+executeInsert pool builder =
+  withResource pool $ \conn -> do
+    let allColumns = ibColumns builder
+        allValues = ibValues builder
+        placeholders = Text.intercalate ", " $ replicate (length allValues) "?"
+        columnsText = Text.intercalate ", " allColumns
+        queryText =
+          "INSERT INTO "
+            <> ibTable builder
+            <> " ("
+            <> columnsText
+            <> ") VALUES ("
+            <> placeholders
+            <> ")"
+        query = Query (TE.encodeUtf8 queryText)
+    _ <- PGSimple.execute conn query allValues
+    pure ()
 
 emptyInsert :: forall table. (Entity table) => InsertBuilder table
 emptyInsert =
