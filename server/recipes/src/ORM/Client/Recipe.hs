@@ -51,7 +51,7 @@ import qualified ORM.Update as Update
 
 findAllWithIngredients :: Pool Connection -> IO [RecipeWithIngredients]
 findAllWithIngredients pool =
-  findManyWith @RecipeTable pool recipeIngredientsInclude (\query -> query)
+  findManyWith @RecipeTable pool recipeIngredientsInclude Prelude.id
 
 findUniqueWithIngredients :: Pool Connection -> UUID -> IO (Maybe RecipeWithIngredients)
 findUniqueWithIngredients pool pk = do
