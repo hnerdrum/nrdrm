@@ -77,14 +77,6 @@ module ORM
     applyRootFilter,
     -- Grouping
     groupByKey,
-    -- Legacy 2-table join builder
-    JoinBuilder,
-    leftJoin,
-    innerJoin,
-    on,
-    selectFrom,
-    runJoin,
-    as,
   )
 where
 
@@ -96,7 +88,6 @@ import ORM.Errors
 import ORM.Group
 import ORM.Include
 import ORM.Insert
-import ORM.Join hiding (JoinType, aliasedField, col, selectColumns, selectFields, whereJoin)
 import ORM.JoinChain
 import ORM.Operations
 import ORM.Query
