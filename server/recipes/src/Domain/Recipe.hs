@@ -14,7 +14,7 @@ where
 import Data.Aeson (object)
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Data.Bifunctor (bimap)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (mapMaybe)
 import Data.Pool (Pool)
 import Data.Text (Text)
 import Data.UUID (UUID)
@@ -35,7 +35,7 @@ import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..))
 data Recipe = Recipe
   { id :: UUID,
     name :: Text,
-    description :: Text,
+    description :: Maybe Text,
     ingredients :: [RecipeIngredient]
   }
   deriving (Show)
@@ -76,7 +76,7 @@ fromRecipeWithIngredients (RecipeWithIngredients (RecipeRow rid _ _ rname rdesc)
   Recipe
     { id = rid,
       name = rname,
-      description = fromMaybe "" rdesc,
+      description = rdesc,
       ingredients = mapMaybe fromRecipeIngredientItem ingredients
     }
 

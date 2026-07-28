@@ -1,7 +1,7 @@
 export type Recipe = {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
   ingredients: RecipeIngredient[];
 };
 
