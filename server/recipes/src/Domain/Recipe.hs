@@ -27,7 +27,7 @@ import qualified ORM.Client.Recipe as Recipe
 import ORM.Schema.Ingredient (IngredientRow (..))
 import ORM.Schema.Recipe (RecipeRow (..))
 import ORM.Schema.RecipeInclude
-  ( RecipeIngredientWithIngredient (..),
+  ( RecipeIngredientItem (..),
     RecipeWithIngredients (..),
   )
 import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..))
@@ -44,20 +44,23 @@ $(deriveJSON defaultOptions ''Recipe)
 
 getAllRecipes :: Pool Connection -> IO [Recipe]
 getAllRecipes pool = do
-  recipes <- Recipe.findAllWithIngredients pool
+  recipes <- Recipe.findAll pool Recipe.withIngredients
   pure $ map fromRecipeWithIngredients recipes
 
 getRecipe :: Pool Connection -> UUID -> IO (Either AppError Recipe)
 getRecipe pool recipeId =
-  bimap fromRecipeError fromRecipeWithIngredients <$> Recipe.findUniqueOrError pool recipeId
+  bimap fromRecipeError fromRecipeWithIngredients
+    <$> Recipe.findUniqueOrError pool Recipe.withIngredients recipeId
 
 createRecipe :: Pool Connection -> CreateRecipeInput -> IO (Either AppError Recipe)
 createRecipe pool input =
-  bimap fromRecipeError fromRecipeWithIngredients <$> Recipe.create pool input
+  bimap fromRecipeError fromRecipeWithIngredients
+    <$> Recipe.create pool Recipe.withIngredients input
 
 updateRecipe :: Pool Connection -> UUID -> UpdateRecipeInput -> IO (Either AppError Recipe)
 updateRecipe pool recipeId input =
-  bimap fromRecipeError fromRecipeWithIngredients <$> Recipe.update pool recipeId input
+  bimap fromRecipeError fromRecipeWithIngredients
+    <$> Recipe.update pool Recipe.withIngredients recipeId input
 
 deleteRecipe :: Pool Connection -> UUID -> IO ()
 deleteRecipe = Recipe.delete
@@ -74,12 +77,12 @@ fromRecipeWithIngredients (RecipeWithIngredients (RecipeRow rid _ _ rname rdesc)
     { id = rid,
       name = rname,
       description = fromMaybe "" rdesc,
-      ingredients = mapMaybe fromRecipeIngredientWithIngredient ingredients
+      ingredients = mapMaybe fromRecipeIngredientItem ingredients
     }
 
-fromRecipeIngredientWithIngredient :: RecipeIngredientWithIngredient -> Maybe RecipeIngredient
-fromRecipeIngredientWithIngredient
-  ( RecipeIngredientWithIngredient
+fromRecipeIngredientItem :: RecipeIngredientItem -> Maybe RecipeIngredient
+fromRecipeIngredientItem
+  ( RecipeIngredientItem
       (RecipeIngredientRow _ _ amount unit)
       (Just (IngredientRow iid _ _ iname))
     ) =
@@ -90,4 +93,4 @@ fromRecipeIngredientWithIngredient
           amount,
           unit
         }
-fromRecipeIngredientWithIngredient _ = Nothing
+fromRecipeIngredientItem _ = Nothing

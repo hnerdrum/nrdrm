@@ -68,12 +68,10 @@ module ORM
     buildJoinQuery,
     runJoinChain,
     rootAlias,
-    -- Include (Prisma-like reads)
     IncludesJoin (..),
     BuildJoinChain (..),
     NestInclude (..),
     ExecuteInclude (..),
-    findManyWith,
     applyRootFilter,
     -- Grouping
     groupByKey,
@@ -86,7 +84,7 @@ import ORM.Core
 import ORM.Delete hiding (delete)
 import ORM.Errors
 import ORM.Group
-import ORM.Include
+import ORM.Include hiding (findAll, findMany, findUnique, findUniqueOrError)
 import ORM.Insert
 import ORM.JoinChain
 import ORM.Operations
