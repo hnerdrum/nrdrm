@@ -16,8 +16,11 @@ module ORM.Query
     limit,
     OrderDirection (..),
     runQuery,
+    runQueryConn,
     runQueryOne,
+    runQueryOneConn,
     runCountQuery,
+    runCountQueryConn,
   )
 where
 
@@ -111,22 +114,32 @@ buildLimitClause :: Maybe Int -> Text
 buildLimitClause Nothing = ""
 buildLimitClause (Just n) = " LIMIT " <> T.pack (show n)
 
+runQueryConn :: (FromRow result) => Connection -> QueryBuilder table -> IO [result]
+runQueryConn conn qb = do
+  let (query, params) = buildQuery qb
+  PGSimple.queryWith fromRow conn query params
+
 runQuery :: (FromRow result) => Pool Connection -> QueryBuilder table -> IO [result]
 runQuery pool qb =
-  withResource pool $ \conn -> do
-    let (query, params) = buildQuery qb
-    PGSimple.queryWith fromRow conn query params
+  withResource pool $ \conn -> runQueryConn conn qb
 
-runQueryOne :: (FromRow result) => Pool Connection -> QueryBuilder table -> IO (Maybe result)
-runQueryOne pool qb = do
-  results <- runQuery pool (limit 1 qb)
-  return $ case results of
+runQueryOneConn :: (FromRow result) => Connection -> QueryBuilder table -> IO (Maybe result)
+runQueryOneConn conn qb = do
+  results <- runQueryConn conn (limit 1 qb)
+  pure $ case results of
     [] -> Nothing
     (x : _) -> Just x
 
+runQueryOne :: (FromRow result) => Pool Connection -> QueryBuilder table -> IO (Maybe result)
+runQueryOne pool qb =
+  withResource pool $ \conn -> runQueryOneConn conn qb
+
+runCountQueryConn :: Connection -> QueryBuilder table -> IO Int
+runCountQueryConn conn qb = do
+  let (query, params) = buildCountQuery qb
+  [Only count] <- PGSimple.query conn query params
+  pure (fromIntegral (count :: Int64))
+
 runCountQuery :: Pool Connection -> QueryBuilder table -> IO Int
 runCountQuery pool qb =
-  withResource pool $ \conn -> do
-    let (query, params) = buildCountQuery qb
-    [Only count] <- PGSimple.query conn query params
-    return (fromIntegral (count :: Int64))
+  withResource pool $ \conn -> runCountQueryConn conn qb

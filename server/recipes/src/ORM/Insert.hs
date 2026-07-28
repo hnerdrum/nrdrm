@@ -8,9 +8,13 @@ module ORM.Insert
   ( InsertBuilder,
     Insertable (..),
     insert,
+    insertConn,
     insertBuilder,
+    insertBuilderConn,
     insertReturning,
+    insertReturningConn,
     executeInsert,
+    executeInsertConn,
     emptyInsert,
     set,
     setNull,
@@ -32,7 +36,7 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..), NullableValue (..))
 import ORM.Errors (ORMError (..))
 
-class Entity table => Insertable table where
+class (Entity table) => Insertable table where
   type CreateInput table
   toInsertBuilder :: CreateInput table -> InsertBuilder table
 
@@ -49,7 +53,16 @@ insert ::
   CreateInput table ->
   IO (Either ORMError result)
 insert pool input =
-  insertBuilder pool (toInsertBuilder @table input)
+  withResource pool $ \conn -> insertConn @table @result conn input
+
+insertConn ::
+  forall table result.
+  (Insertable table, FromRow result) =>
+  Connection ->
+  CreateInput table ->
+  IO (Either ORMError result)
+insertConn conn input =
+  insertBuilderConn conn (toInsertBuilder @table input)
 
 insertBuilder ::
   forall table result.
@@ -57,16 +70,25 @@ insertBuilder ::
   Pool Connection ->
   InsertBuilder table ->
   IO (Either ORMError result)
-insertBuilder pool builder = do
-  result <- insertReturning pool builder
+insertBuilder pool builder =
+  withResource pool $ \conn -> insertBuilderConn conn builder
+
+insertBuilderConn ::
+  forall table result.
+  (FromRow result) =>
+  Connection ->
+  InsertBuilder table ->
+  IO (Either ORMError result)
+insertBuilderConn conn builder = do
+  result <- insertReturningConn conn builder
   case result of
     [] ->
-      return $
+      pure $
         Left $
           RecordNotFound $
             "INSERT into " <> ibTable builder <> " returned no rows"
-    [row] -> return $ Right row
-    _ -> return $ Left $ MultipleRecordsFound "Insert returned multiple rows"
+    [row] -> pure $ Right row
+    _ -> pure $ Left $ MultipleRecordsFound "Insert returned multiple rows"
 
 insertReturning ::
   forall table result.
@@ -75,43 +97,57 @@ insertReturning ::
   InsertBuilder table ->
   IO [result]
 insertReturning pool builder =
-  withResource pool $ \conn -> do
-    let allColumns = ibColumns builder
-        allValues = ibValues builder
-        placeholders = Text.intercalate ", " $ replicate (length allValues) "?"
-        columnsText = Text.intercalate ", " allColumns
-        queryText =
-          "INSERT INTO "
-            <> ibTable builder
-            <> " ("
-            <> columnsText
-            <> ") VALUES ("
-            <> placeholders
-            <> ") RETURNING *"
-        query = Query (TE.encodeUtf8 queryText)
-    PGSimple.queryWith fromRow conn query allValues
+  withResource pool $ \conn -> insertReturningConn conn builder
+
+insertReturningConn ::
+  forall table result.
+  (FromRow result) =>
+  Connection ->
+  InsertBuilder table ->
+  IO [result]
+insertReturningConn conn builder = do
+  let allColumns = ibColumns builder
+      allValues = ibValues builder
+      placeholders = Text.intercalate ", " $ replicate (length allValues) "?"
+      columnsText = Text.intercalate ", " allColumns
+      queryText =
+        "INSERT INTO "
+          <> ibTable builder
+          <> " ("
+          <> columnsText
+          <> ") VALUES ("
+          <> placeholders
+          <> ") RETURNING *"
+      query = Query (TE.encodeUtf8 queryText)
+  PGSimple.queryWith fromRow conn query allValues
 
 executeInsert ::
   Pool Connection ->
   InsertBuilder table ->
   IO ()
 executeInsert pool builder =
-  withResource pool $ \conn -> do
-    let allColumns = ibColumns builder
-        allValues = ibValues builder
-        placeholders = Text.intercalate ", " $ replicate (length allValues) "?"
-        columnsText = Text.intercalate ", " allColumns
-        queryText =
-          "INSERT INTO "
-            <> ibTable builder
-            <> " ("
-            <> columnsText
-            <> ") VALUES ("
-            <> placeholders
-            <> ")"
-        query = Query (TE.encodeUtf8 queryText)
-    _ <- PGSimple.execute conn query allValues
-    pure ()
+  withResource pool $ \conn -> executeInsertConn conn builder
+
+executeInsertConn ::
+  Connection ->
+  InsertBuilder table ->
+  IO ()
+executeInsertConn conn builder = do
+  let allColumns = ibColumns builder
+      allValues = ibValues builder
+      placeholders = Text.intercalate ", " $ replicate (length allValues) "?"
+      columnsText = Text.intercalate ", " allColumns
+      queryText =
+        "INSERT INTO "
+          <> ibTable builder
+          <> " ("
+          <> columnsText
+          <> ") VALUES ("
+          <> placeholders
+          <> ")"
+      query = Query (TE.encodeUtf8 queryText)
+  _ <- PGSimple.execute conn query allValues
+  pure ()
 
 emptyInsert :: forall table. (Entity table) => InsertBuilder table
 emptyInsert =

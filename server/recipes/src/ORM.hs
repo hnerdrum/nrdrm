@@ -73,7 +73,7 @@ module ORM
     NestInclude (..),
     ExecuteInclude (..),
     applyRootFilter,
-    -- Grouping
+    transaction,
     groupByKey,
   )
 where
@@ -90,4 +90,5 @@ import ORM.JoinChain
 import ORM.Operations
 import ORM.Query
 import ORM.Relation
+import ORM.Transaction
 import ORM.Update

@@ -7,7 +7,9 @@
 module ORM.Delete
   ( DeleteBuilder,
     delete,
+    deleteConn,
     deleteReturning,
+    deleteReturningConn,
     whereDelete,
     emptyDelete,
   )
@@ -52,17 +54,25 @@ delete ::
   DeleteBuilder table ->
   IO Int
 delete pool builder =
-  withResource pool $ \conn -> do
-    let whereClause =
-          if null (dbWhere builder)
-            then ""
-            else " WHERE " <> Text.intercalate " AND " (dbWhere builder)
-        queryText =
-          "DELETE FROM "
-            <> dbTable builder
-            <> whereClause
-        query = Query (TE.encodeUtf8 queryText)
-    fromIntegral <$> PGSimple.execute conn query (dbWhereParams builder)
+  withResource pool $ \conn -> deleteConn conn builder
+
+deleteConn ::
+  forall table.
+  (Entity table) =>
+  Connection ->
+  DeleteBuilder table ->
+  IO Int
+deleteConn conn builder = do
+  let whereClause =
+        if null (dbWhere builder)
+          then ""
+          else " WHERE " <> Text.intercalate " AND " (dbWhere builder)
+      queryText =
+        "DELETE FROM "
+          <> dbTable builder
+          <> whereClause
+      query = Query (TE.encodeUtf8 queryText)
+  fromIntegral <$> PGSimple.execute conn query (dbWhereParams builder)
 
 deleteReturning ::
   forall table result.
@@ -71,15 +81,23 @@ deleteReturning ::
   DeleteBuilder table ->
   IO [result]
 deleteReturning pool builder =
-  withResource pool $ \conn -> do
-    let whereClause =
-          if null (dbWhere builder)
-            then ""
-            else " WHERE " <> Text.intercalate " AND " (dbWhere builder)
-        queryText =
-          "DELETE FROM "
-            <> dbTable builder
-            <> whereClause
-            <> " RETURNING *"
-        query = Query (TE.encodeUtf8 queryText)
-    PGSimple.queryWith fromRow conn query (dbWhereParams builder)
+  withResource pool $ \conn -> deleteReturningConn conn builder
+
+deleteReturningConn ::
+  forall table result.
+  (Entity table, FromRow result) =>
+  Connection ->
+  DeleteBuilder table ->
+  IO [result]
+deleteReturningConn conn builder = do
+  let whereClause =
+        if null (dbWhere builder)
+          then ""
+          else " WHERE " <> Text.intercalate " AND " (dbWhere builder)
+      queryText =
+        "DELETE FROM "
+          <> dbTable builder
+          <> whereClause
+          <> " RETURNING *"
+      query = Query (TE.encodeUtf8 queryText)
+  PGSimple.queryWith fromRow conn query (dbWhereParams builder)

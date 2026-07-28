@@ -50,6 +50,7 @@ import ORM.Schema.RecipeIngredient
     RecipeIngredientTable,
     riRecipeId,
   )
+import ORM.Transaction (transaction)
 import qualified ORM.Update as Update
 
 withIngredients :: RecipeInclude
@@ -82,15 +83,16 @@ create ::
   IO (Either ORMError RecipeWithIngredients)
 create pool include input = do
   recipeId <- V4.nextRandom
-  recipeResult <-
-    Insert.insert @RecipeTable @RecipeRow pool (toRecipeCreate recipeId input)
-  case recipeResult of
-    Left err -> pure (Left err)
-    Right _ -> do
-      forM_ input.ingredients $ \ingredient ->
-        Insert.executeInsert pool $
-          Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate recipeId ingredient)
-      findUniqueOrError pool include recipeId
+  transaction pool $ \conn -> do
+    recipeResult <-
+      Insert.insertConn @RecipeTable @RecipeRow conn (toRecipeCreate recipeId input)
+    case recipeResult of
+      Left err -> pure (Left err)
+      Right _ -> do
+        forM_ input.ingredients $ \ingredient ->
+          Insert.executeInsertConn conn $
+            Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate recipeId ingredient)
+        Include.findUniqueOrErrorConn @RecipeTable conn include recipeId
 
 update ::
   Pool Connection ->
@@ -100,21 +102,22 @@ update ::
   IO (Either ORMError RecipeWithIngredients)
 update pool include recipeId input = do
   now <- getCurrentTime
-  updateResult <-
-    Update.update @RecipeTable @RecipeRow pool recipeId (toRecipeUpdate now input)
-  case updateResult of
-    Left err -> pure (Left err)
-    Right _ -> do
-      case input.ingredients of
-        Nothing -> pure ()
-        Just ingredients -> do
-          _ <-
-            Delete.delete pool $
-              Delete.whereDelete (fieldColumn riRecipeId <> " = ?") [toField recipeId] (Delete.emptyDelete @RecipeIngredientTable)
-          forM_ (mapMaybe (toRecipeIngredientUpdate recipeId) ingredients) $ \ri ->
-            Insert.executeInsert pool $
-              Insert.toInsertBuilder @RecipeIngredientTable ri
-      findUniqueOrError pool include recipeId
+  transaction pool $ \conn -> do
+    updateResult <-
+      Update.updateConn @RecipeTable @RecipeRow conn recipeId (toRecipeUpdate now input)
+    case updateResult of
+      Left err -> pure (Left err)
+      Right _ -> do
+        case input.ingredients of
+          Nothing -> pure ()
+          Just ingredients -> do
+            _ <-
+              Delete.deleteConn conn $
+                Delete.whereDelete (fieldColumn riRecipeId <> " = ?") [toField recipeId] (Delete.emptyDelete @RecipeIngredientTable)
+            forM_ (mapMaybe (toRecipeIngredientUpdate recipeId) ingredients) $ \ri ->
+              Insert.executeInsertConn conn $
+                Insert.toInsertBuilder @RecipeIngredientTable ri
+        Include.findUniqueOrErrorConn @RecipeTable conn include recipeId
 
 delete :: Pool Connection -> UUID -> IO ()
 delete pool recipeId = do
