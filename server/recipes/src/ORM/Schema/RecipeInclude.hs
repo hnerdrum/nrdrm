@@ -201,16 +201,16 @@ toIngredientRow row
   | otherwise = Nothing
 
 instance {-# OVERLAPPING #-} ExecuteInclude RecipeTable RecipeInclude RecipeWithIngredients where
-  executeInclude pool include modifier =
+  executeInclude conn include modifier =
     case include.ingredients of
       Nothing -> do
-        recipes <- Ops.findMany @RecipeTable @RecipeRow pool modifier
+        recipes <- Ops.findManyConn @RecipeTable @RecipeRow conn modifier
         pure $ map (wrapRoot include) recipes
       Just RecipeIngredientInclude {ingredient = False} -> do
         let chain = applyRootFilter buildRecipeRiJoin modifier
-        flatRows <- JoinChain.runJoinChain @RecipeRiJoinRow pool chain
+        flatRows <- JoinChain.runJoinChainConn @RecipeRiJoinRow conn chain
         pure $ nestRecipeRiRows flatRows
       Just RecipeIngredientInclude {ingredient = True} -> do
         let chain = applyRootFilter buildRecipeFullJoin modifier
-        flatRows <- JoinChain.runJoinChain @RecipeIngredientJoinRow pool chain
+        flatRows <- JoinChain.runJoinChainConn @RecipeIngredientJoinRow conn chain
         pure $ nestRecipeFullRows flatRows

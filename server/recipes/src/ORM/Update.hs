@@ -10,8 +10,11 @@ module ORM.Update
   ( UpdateBuilder,
     Updatable (..),
     update,
+    updateConn,
     updateBuilder,
+    updateBuilderConn,
     updateReturning,
+    updateReturningConn,
     setField,
     setFieldNull,
     setFieldMaybe,
@@ -35,7 +38,7 @@ import ORM.Core (Entity (..), Field (..), NullableValue (..), PrimaryKeyType)
 import ORM.Errors (ORMError (..))
 import qualified ORM.Operations as Ops
 
-class Entity table => Updatable table where
+class (Entity table) => Updatable table where
   type UpdateInput table
   toUpdateBuilder :: UpdateInput table -> UpdateBuilder table
   updatedAtField :: Maybe (Field table UTCTime)
@@ -110,10 +113,20 @@ update ::
   PrimaryKeyType table ->
   UpdateInput table ->
   IO (Either ORMError result)
-update pool pkValue input = do
+update pool pkValue input =
+  withResource pool $ \conn -> updateConn @table @result conn pkValue input
+
+updateConn ::
+  forall table result.
+  (Updatable table, FromRow result, ToField (PrimaryKeyType table), Show (PrimaryKeyType table)) =>
+  Connection ->
+  PrimaryKeyType table ->
+  UpdateInput table ->
+  IO (Either ORMError result)
+updateConn conn pkValue input = do
   let builder = toUpdateBuilder @table input
   if null (ubSets builder)
-    then Ops.findUniqueOrError @table @result pool pkValue
+    then Ops.findUniqueOrErrorConn @table @result conn pkValue
     else do
       now <- getCurrentTime
       let pkField = primaryKey @table
@@ -123,7 +136,7 @@ update pool pkValue input = do
               (fieldColumn pkField <> " = ?")
               [toField pkValue]
               builderWithTouch
-      updateBuilder pool builderWithWhere
+      updateBuilderConn conn builderWithWhere
 
 updateBuilder ::
   forall table result.
@@ -131,12 +144,21 @@ updateBuilder ::
   Pool Connection ->
   UpdateBuilder table ->
   IO (Either ORMError result)
-updateBuilder pool builder = do
-  results <- updateReturning pool builder
+updateBuilder pool builder =
+  withResource pool $ \conn -> updateBuilderConn conn builder
+
+updateBuilderConn ::
+  forall table result.
+  (Entity table, FromRow result) =>
+  Connection ->
+  UpdateBuilder table ->
+  IO (Either ORMError result)
+updateBuilderConn conn builder = do
+  results <- updateReturningConn conn builder
   case results of
-    [] -> return $ Left $ RecordNotFound "No record found to update"
-    [row] -> return $ Right row
-    _ -> return $ Left $ MultipleRecordsFound "Update affected multiple rows"
+    [] -> pure $ Left $ RecordNotFound "No record found to update"
+    [row] -> pure $ Right row
+    _ -> pure $ Left $ MultipleRecordsFound "Update affected multiple rows"
 
 updateReturning ::
   forall table result.
@@ -145,19 +167,27 @@ updateReturning ::
   UpdateBuilder table ->
   IO [result]
 updateReturning pool builder =
-  withResource pool $ \conn -> do
-    let setClause = buildSetClause (ubSets builder)
-        setParams = map snd (ubSets builder)
-        whereClause = buildWhereClause (ubWhere builder)
-        allParams = setParams ++ ubWhereParams builder
-        queryText =
-          "UPDATE "
-            <> ubTable builder
-            <> setClause
-            <> whereClause
-            <> " RETURNING *"
-        query = Query (TE.encodeUtf8 queryText)
-    PGSimple.queryWith fromRow conn query allParams
+  withResource pool $ \conn -> updateReturningConn conn builder
+
+updateReturningConn ::
+  forall table result.
+  (Entity table, FromRow result) =>
+  Connection ->
+  UpdateBuilder table ->
+  IO [result]
+updateReturningConn conn builder = do
+  let setClause = buildSetClause (ubSets builder)
+      setParams = map snd (ubSets builder)
+      whereClause = buildWhereClause (ubWhere builder)
+      allParams = setParams ++ ubWhereParams builder
+      queryText =
+        "UPDATE "
+          <> ubTable builder
+          <> setClause
+          <> whereClause
+          <> " RETURNING *"
+      query = Query (TE.encodeUtf8 queryText)
+  PGSimple.queryWith fromRow conn query allParams
 
 buildSetClause :: [(Text, Action)] -> Text
 buildSetClause sets = " SET " <> Text.intercalate ", " (map (\(col, _) -> col <> " = ?") sets)

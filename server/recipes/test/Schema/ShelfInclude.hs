@@ -24,7 +24,7 @@ import ORM.Include
     applyRootFilter,
   )
 import qualified ORM.JoinChain as JoinChain
-import ORM.Operations (findMany)
+import ORM.Operations (findManyConn)
 import Schema.Shelf
   ( BookRow (..),
     ChapterRow (..),
@@ -171,16 +171,16 @@ toChapterRow row
   | otherwise = Nothing
 
 instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfInclude ShelfWithBooks where
-  executeInclude pool include modifier =
+  executeInclude conn include modifier =
     case include.books of
       Nothing -> do
-        shelves <- findMany @ShelfTable @ShelfRow pool modifier
+        shelves <- findManyConn @ShelfTable @ShelfRow conn modifier
         pure $ map (wrapRoot include) shelves
       Just BookInclude {chapters = False} -> do
         let chain = applyRootFilter buildShelfBookJoin modifier
-        flatRows <- JoinChain.runJoinChain @ShelfBookJoinRow pool chain
+        flatRows <- JoinChain.runJoinChainConn @ShelfBookJoinRow conn chain
         pure $ nestShelfRows flatRows
       Just BookInclude {chapters = True} -> do
         let chain = applyRootFilter buildShelfBookChapterJoin modifier
-        flatRows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow pool chain
+        flatRows <- JoinChain.runJoinChainConn @ShelfBookChapterJoinRow conn chain
         pure $ nestShelfBookChapterRows flatRows

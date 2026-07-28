@@ -17,6 +17,7 @@ module ORM.JoinChain
     aliasedField,
     buildJoinQuery,
     runJoinChain,
+    runJoinChainConn,
     rootAlias,
   )
 where
@@ -90,12 +91,12 @@ addHasManyJoin HasMany {joinType, localKey, foreignKey} leftAlias childAlias cha
     { jcJoins =
         jcJoins chain
           ++ [ JoinedTable
-                { jtTable = tableName @child,
-                  jtAlias = childAlias,
-                  jtJoinType = joinType,
-                  jtOnLeft = leftAlias <> "." <> fieldColumn localKey,
-                  jtOnRight = childAlias <> "." <> fieldColumn foreignKey
-                }
+                 { jtTable = tableName @child,
+                   jtAlias = childAlias,
+                   jtJoinType = joinType,
+                   jtOnLeft = leftAlias <> "." <> fieldColumn localKey,
+                   jtOnRight = childAlias <> "." <> fieldColumn foreignKey
+                 }
              ]
     }
 
@@ -112,12 +113,12 @@ addBelongsToJoin BelongsTo {joinType, foreignKey, references} childAlias parentA
     { jcJoins =
         jcJoins chain
           ++ [ JoinedTable
-                { jtTable = tableName @parent,
-                  jtAlias = parentAlias,
-                  jtJoinType = joinType,
-                  jtOnLeft = childAlias <> "." <> fieldColumn foreignKey,
-                  jtOnRight = parentAlias <> "." <> fieldColumn references
-                }
+                 { jtTable = tableName @parent,
+                   jtAlias = parentAlias,
+                   jtJoinType = joinType,
+                   jtOnLeft = childAlias <> "." <> fieldColumn foreignKey,
+                   jtOnRight = parentAlias <> "." <> fieldColumn references
+                 }
              ]
     }
 
@@ -189,6 +190,16 @@ buildJoinQuery jc =
       queryText = "SELECT " <> selectClause <> fromClause <> whereClause
    in (Query (TE.encodeUtf8 queryText), jcParams jc)
 
+runJoinChainConn ::
+  forall result root.
+  (FromRow result) =>
+  Connection ->
+  JoinChain root ->
+  IO [result]
+runJoinChainConn conn chain = do
+  let (query, params) = buildJoinQuery chain
+  PGSimple.queryWith fromRow conn query params
+
 runJoinChain ::
   forall result root.
   (FromRow result) =>
@@ -196,9 +207,7 @@ runJoinChain ::
   JoinChain root ->
   IO [result]
 runJoinChain pool chain =
-  withResource pool $ \conn -> do
-    let (query, params) = buildJoinQuery chain
-    PGSimple.queryWith fromRow conn query params
+  withResource pool $ \conn -> runJoinChainConn @result conn chain
 
 rootAlias :: JoinChain root -> Text
 rootAlias = jcRootAlias
