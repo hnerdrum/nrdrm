@@ -1,12 +1,15 @@
 {-# LANGUAGE TypeApplications #-}
 
 module ORM.Client.Recipe
-  ( findAllWithIngredients,
-    findUniqueWithIngredients,
+  ( findAll,
+    findMany,
+    findUnique,
     findUniqueOrError,
     create,
     update,
     delete,
+    withIngredients,
+    noInclude,
   )
 where
 
@@ -26,21 +29,21 @@ import Database.Recipe
   )
 import ORM.Core (NullableValue (..), fieldColumn)
 import qualified ORM.Delete as Delete
-import ORM.Errors (ORMError (..))
-import ORM.Include (findManyWith)
+import ORM.Errors (ORMError)
+import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
-import ORM.Query (whereEq)
+import ORM.Query (QueryBuilder)
 import ORM.Schema.Recipe
   ( RecipeCreate (..),
     RecipeRow,
     RecipeTable,
     RecipeUpdate (..),
   )
-import qualified ORM.Schema.Recipe as Recipe
 import ORM.Schema.RecipeInclude
-  ( RecipeWithIngredients (..),
-    recipeIngredientsInclude,
+  ( RecipeInclude (..),
+    RecipeIngredientInclude (..),
+    RecipeWithIngredients (..),
   )
 import ORM.Schema.RecipeIngredient
   ( RecipeIngredientCreate (..),
@@ -49,24 +52,35 @@ import ORM.Schema.RecipeIngredient
   )
 import qualified ORM.Update as Update
 
-findAllWithIngredients :: Pool Connection -> IO [RecipeWithIngredients]
-findAllWithIngredients pool =
-  findManyWith @RecipeTable pool recipeIngredientsInclude Prelude.id
+withIngredients :: RecipeInclude
+withIngredients =
+  RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = True})}
 
-findUniqueWithIngredients :: Pool Connection -> UUID -> IO (Maybe RecipeWithIngredients)
-findUniqueWithIngredients pool pk = do
-  results <-
-    findManyWith @RecipeTable pool recipeIngredientsInclude (whereEq Recipe.recipeId pk)
-  case results of
-    [recipe] -> pure (Just recipe)
-    [] -> pure Nothing
-    _ -> error "findUniqueWithIngredients: multiple recipes matched primary key"
+noInclude :: RecipeInclude
+noInclude = RecipeInclude {ingredients = Nothing}
+
+findAll :: Pool Connection -> RecipeInclude -> IO [RecipeWithIngredients]
+findAll = Include.findAll @RecipeTable
+
+findMany ::
+  Pool Connection ->
+  RecipeInclude ->
+  (QueryBuilder RecipeTable -> QueryBuilder RecipeTable) ->
+  IO [RecipeWithIngredients]
+findMany = Include.findMany @RecipeTable
+
+findUnique :: Pool Connection -> RecipeInclude -> UUID -> IO (Maybe RecipeWithIngredients)
+findUnique = Include.findUnique @RecipeTable
+
+findUniqueOrError :: Pool Connection -> RecipeInclude -> UUID -> IO (Either ORMError RecipeWithIngredients)
+findUniqueOrError = Include.findUniqueOrError @RecipeTable
 
 create ::
   Pool Connection ->
+  RecipeInclude ->
   CreateRecipeInput ->
   IO (Either ORMError RecipeWithIngredients)
-create pool input = do
+create pool include input = do
   recipeId <- V4.nextRandom
   recipeResult <-
     Insert.insert @RecipeTable @RecipeRow pool (toRecipeCreate recipeId input)
@@ -76,14 +90,15 @@ create pool input = do
       forM_ input.ingredients $ \ingredient ->
         Insert.executeInsert pool $
           Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate recipeId ingredient)
-      findUniqueOrError pool recipeId
+      findUniqueOrError pool include recipeId
 
 update ::
   Pool Connection ->
+  RecipeInclude ->
   UUID ->
   UpdateRecipeInput ->
   IO (Either ORMError RecipeWithIngredients)
-update pool recipeId input = do
+update pool include recipeId input = do
   now <- getCurrentTime
   updateResult <-
     Update.update @RecipeTable @RecipeRow pool recipeId (toRecipeUpdate now input)
@@ -99,22 +114,12 @@ update pool recipeId input = do
           forM_ (mapMaybe (toRecipeIngredientUpdate recipeId) ingredients) $ \ri ->
             Insert.executeInsert pool $
               Insert.toInsertBuilder @RecipeIngredientTable ri
-      findUniqueOrError pool recipeId
+      findUniqueOrError pool include recipeId
 
 delete :: Pool Connection -> UUID -> IO ()
 delete pool recipeId = do
   _ <- Ops.delete @RecipeTable pool recipeId
   pure ()
-
-findUniqueOrError ::
-  Pool Connection ->
-  UUID ->
-  IO (Either ORMError RecipeWithIngredients)
-findUniqueOrError pool pk = do
-  mRecipe <- findUniqueWithIngredients pool pk
-  case mRecipe of
-    Nothing -> pure $ Left $ RecordNotFound "Recipe could not be found"
-    Just recipe -> pure $ Right recipe
 
 toRecipeCreate :: UUID -> CreateRecipeInput -> RecipeCreate
 toRecipeCreate recipeId input =

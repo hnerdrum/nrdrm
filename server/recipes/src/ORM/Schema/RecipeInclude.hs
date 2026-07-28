@@ -9,8 +9,7 @@ module ORM.Schema.RecipeInclude
   ( RecipeInclude (..),
     RecipeIngredientInclude (..),
     RecipeWithIngredients (..),
-    RecipeIngredientWithIngredient (..),
-    recipeIngredientsInclude,
+    RecipeIngredientItem (..),
   )
 where
 
@@ -26,7 +25,7 @@ import ORM.Include
     applyRootFilter,
   )
 import qualified ORM.JoinChain as JoinChain
-import ORM.Operations (findMany)
+import qualified ORM.Operations as Ops
 import ORM.Schema.Ingredient (IngredientRow (..))
 import qualified ORM.Schema.Ingredient as Ingredient
 import ORM.Schema.Recipe (RecipeRow (..), RecipeTable, recipeIngredients)
@@ -45,21 +44,17 @@ newtype RecipeInclude = RecipeInclude
   }
   deriving (Show, Eq)
 
-data RecipeIngredientWithIngredient = RecipeIngredientWithIngredient
-  { junction :: RecipeIngredientRow,
+data RecipeIngredientItem = RecipeIngredientItem
+  { recipeIngredient :: RecipeIngredientRow,
     ingredient :: Maybe IngredientRow
   }
   deriving (Show)
 
 data RecipeWithIngredients = RecipeWithIngredients
   { recipe :: RecipeRow,
-    ingredients :: [RecipeIngredientWithIngredient]
+    ingredients :: [RecipeIngredientItem]
   }
   deriving (Show)
-
-recipeIngredientsInclude :: RecipeInclude
-recipeIngredientsInclude =
-  RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = True})}
 
 instance IncludesJoin RecipeInclude where
   includesJoin RecipeInclude {ingredients} = isJust ingredients
@@ -128,7 +123,7 @@ recipeFromRiGroup :: [RecipeRiJoinRow] -> RecipeWithIngredients
 recipeFromRiGroup rows@(firstRow : _) =
   RecipeWithIngredients
     { recipe = toRecipeRow firstRow,
-      ingredients = mapMaybe toRecipeIngredientJunction rows
+      ingredients = mapMaybe toRecipeIngredientItemShallow rows
     }
 recipeFromRiGroup [] =
   error "recipeFromRiGroup: empty group"
@@ -137,7 +132,7 @@ recipeFromFullGroup :: [RecipeIngredientJoinRow] -> RecipeWithIngredients
 recipeFromFullGroup rows@(firstRow : _) =
   RecipeWithIngredients
     { recipe = toRecipeRowFromFull firstRow,
-      ingredients = mapMaybe toRecipeIngredientWithIngredient rows
+      ingredients = mapMaybe toRecipeIngredientItem rows
     }
 recipeFromFullGroup [] =
   error "recipeFromFullGroup: empty group"
@@ -162,13 +157,13 @@ toRecipeRowFromFull row =
       description = row.recipeDescription
     }
 
-toRecipeIngredientJunction :: RecipeRiJoinRow -> Maybe RecipeIngredientWithIngredient
-toRecipeIngredientJunction row
+toRecipeIngredientItemShallow :: RecipeRiJoinRow -> Maybe RecipeIngredientItem
+toRecipeIngredientItemShallow row
   | Just ingredientId <- row.riIngredientId,
     Just amount <- row.riAmount =
       Just
-        RecipeIngredientWithIngredient
-          { junction =
+        RecipeIngredientItem
+          { recipeIngredient =
               RecipeIngredientRow
                 { recipeId = row.recipeId,
                   ingredientId,
@@ -179,13 +174,13 @@ toRecipeIngredientJunction row
           }
   | otherwise = Nothing
 
-toRecipeIngredientWithIngredient :: RecipeIngredientJoinRow -> Maybe RecipeIngredientWithIngredient
-toRecipeIngredientWithIngredient row
+toRecipeIngredientItem :: RecipeIngredientJoinRow -> Maybe RecipeIngredientItem
+toRecipeIngredientItem row
   | Just amount <- row.riAmount,
     Just ingredientId <- row.ingredientId =
       Just
-        RecipeIngredientWithIngredient
-          { junction =
+        RecipeIngredientItem
+          { recipeIngredient =
               RecipeIngredientRow
                 { recipeId = row.recipeId,
                   ingredientId,
@@ -209,7 +204,7 @@ instance {-# OVERLAPPING #-} ExecuteInclude RecipeTable RecipeInclude RecipeWith
   executeInclude pool include modifier =
     case include.ingredients of
       Nothing -> do
-        recipes <- findMany @RecipeTable @RecipeRow pool modifier
+        recipes <- Ops.findMany @RecipeTable @RecipeRow pool modifier
         pure $ map (wrapRoot include) recipes
       Just RecipeIngredientInclude {ingredient = False} -> do
         let chain = applyRootFilter buildRecipeRiJoin modifier
