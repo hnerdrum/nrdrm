@@ -1,0 +1,187 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+module ORM.Codegen.ValidateSpec
+  ( validateSpec,
+  )
+where
+
+import ORM.Codegen.IR
+import ORM.Codegen.Spec.Recipe (recipeSchema)
+import ORM.Codegen.Spec.Shelf (shelfSchema)
+import ORM.Codegen.Validate
+import Test.Hspec
+
+emptySchema :: [Model] -> [ModelInclude] -> Schema
+emptySchema models includes =
+  Schema {schemaEnums = [], schemaModels = models, schemaIncludes = includes}
+
+validateSpec :: Spec
+validateSpec =
+  describe "ORM.Codegen.Validate" $ do
+    describe "example specs" $ do
+      it "accepts the Shelf schema" $
+        validateSchema shelfSchema `shouldBe` []
+
+      it "accepts the Recipe schema" $
+        validateSchema recipeSchema `shouldBe` []
+
+    describe "primary keys" $ do
+      it "rejects a model with no primary key" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Widget",
+                      modelTable = "widget",
+                      modelFields = [text "name"],
+                      modelRelations = []
+                    }
+                ]
+                []
+        validateSchema schema
+          `shouldBe` [ModelMissingPrimaryKey "Widget"]
+
+      it "rejects a model with multiple primary keys" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Widget",
+                      modelTable = "widget",
+                      modelFields = [pk (uuid "id"), pk (uuid "otherId")],
+                      modelRelations = []
+                    }
+                ]
+                []
+        validateSchema schema
+          `shouldBe` [ModelMultiplePrimaryKeys "Widget"]
+
+    describe "enums" $ do
+      it "rejects a field referencing an unknown enum" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Item",
+                      modelTable = "item",
+                      modelFields = [pk (uuid "id"), enumField "unit" "Unit"],
+                      modelRelations = []
+                    }
+                ]
+                []
+        validateSchema schema
+          `shouldBe` [UnknownEnumType "Item" "unit" "Unit"]
+
+      it "rejects an enum with no variants" $ do
+        let schema =
+              Schema
+                { schemaEnums = [enum_ "Unit" []],
+                  schemaModels =
+                    [ Model
+                        { modelName = "Item",
+                          modelTable = "item",
+                          modelFields = [pk (uuid "id")],
+                          modelRelations = []
+                        }
+                    ],
+                  schemaIncludes = []
+                }
+        validateSchema schema
+          `shouldBe` [EnumHasNoVariants "Unit"]
+
+      it "rejects duplicate enum variant names" $ do
+        let schema =
+              Schema
+                { schemaEnums = [enum_ "Unit" [variant "G", variant "G"]],
+                  schemaModels =
+                    [ Model
+                        { modelName = "Item",
+                          modelTable = "item",
+                          modelFields = [pk (uuid "id")],
+                          modelRelations = []
+                        }
+                    ],
+                  schemaIncludes = []
+                }
+        validateSchema schema
+          `shouldBe` [DuplicateEnumVariant "Unit" "G"]
+
+    describe "relations" $ do
+      it "rejects a relation pointing at an unknown model" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Shelf",
+                      modelTable = "test_shelf",
+                      modelFields = [pk (uuid "id")],
+                      modelRelations =
+                        [ hasMany "shelfBooks" "Shelf" "Missing" "id" "shelfId"
+                        ]
+                    }
+                ]
+                []
+        validateSchema schema
+          `shouldBe` [UnknownRelationModel "shelfBooks" "to" "Missing"]
+
+      it "rejects a relation with an unknown field" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Shelf",
+                      modelTable = "test_shelf",
+                      modelFields = [pk (uuid "id")],
+                      modelRelations =
+                        [ hasMany "shelfBooks" "Shelf" "Book" "id" "shelfId"
+                        ]
+                    },
+                  Model
+                    { modelName = "Book",
+                      modelTable = "test_book",
+                      modelFields = [pk (uuid "id"), text "title"],
+                      modelRelations = []
+                    }
+                ]
+                []
+        validateSchema schema
+          `shouldBe` [UnknownRelationField "shelfBooks" "Book" "shelfId"]
+
+    describe "includes" $ do
+      it "rejects an include rooted at an unknown model" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Shelf",
+                      modelTable = "test_shelf",
+                      modelFields = [pk (uuid "id")],
+                      modelRelations = []
+                    }
+                ]
+                [ ModelInclude
+                    { includeName = "BadInclude",
+                      includeRootModel = "Nope",
+                      includeTree = []
+                    }
+                ]
+        validateSchema schema
+          `shouldBe` [UnknownIncludeRoot "BadInclude" "Nope"]
+
+      it "rejects an include that references an unknown relation" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Shelf",
+                      modelTable = "test_shelf",
+                      modelFields = [pk (uuid "id")],
+                      modelRelations = []
+                    }
+                ]
+                [ ModelInclude
+                    { includeName = "ShelfInclude",
+                      includeRootModel = "Shelf",
+                      includeTree =
+                        [ IncludeTree
+                            { includeRelation = "shelfBooks",
+                              includeChildren = []
+                            }
+                        ]
+                    }
+                ]
+        validateSchema schema
+          `shouldBe` [UnknownIncludeRelation "ShelfInclude" "Shelf" "shelfBooks"]
