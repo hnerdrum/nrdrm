@@ -97,6 +97,7 @@ tests:
       - ORM.OperationsSpec
       - ORM.JoinSpec
       - ORM.IncludeSpec
+      - ORM.Codegen.ValidateSpec
       - ORM.WidgetFixtures
       - ORM.ShelfFixtures
       - Schema.ShelfInclude
