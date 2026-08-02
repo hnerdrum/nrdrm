@@ -1,4 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Schema.Widget
   ( WidgetTable (..),
@@ -9,7 +11,7 @@ module Schema.Widget
     widgetCreatedAt,
     widgetUpdatedAt,
     widgetName,
-    widgetDescription,
+    widgetDescription
   )
 where
 
@@ -18,7 +20,7 @@ import Data.Time (UTCTime)
 import Data.UUID (UUID)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
-import ORM.Insert (Insertable (..), setMaybe, setNullable, setValue)
+import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe, setNullable)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe, setFieldNullable)
 
 data WidgetTable = WidgetTable
@@ -32,22 +34,24 @@ instance Entity WidgetTable where
 instance Insertable WidgetTable where
   type CreateInput WidgetTable = WidgetCreate
   toInsertBuilder input =
-    let WidgetCreate {id = wid, createdAt, updatedAt, name, description} = input
-     in setNullable widgetDescription description $
-          setMaybe widgetUpdatedAt updatedAt $
-            setMaybe widgetCreatedAt createdAt $
-              setMaybe widgetId wid $
-                setValue widgetName name
+    setMaybe widgetId input.id $
+      setMaybe widgetCreatedAt input.createdAt $
+      setMaybe widgetUpdatedAt input.updatedAt $
+      set widgetName input.name $
+      setNullable widgetDescription input.description $
+      emptyInsert @WidgetTable
+
 
 instance Updatable WidgetTable where
   type UpdateInput WidgetTable = WidgetUpdate
   updatedAtField = Just widgetUpdatedAt
   toUpdateBuilder input =
-    let WidgetUpdate {name, createdAt, updatedAt, description} = input
-     in setFieldNullable widgetDescription description $
-          setFieldMaybe widgetUpdatedAt updatedAt $
-            setFieldMaybe widgetCreatedAt createdAt $
-              setFieldMaybe widgetName name (emptyUpdate @WidgetTable)
+    setFieldMaybe widgetCreatedAt input.createdAt $
+      setFieldMaybe widgetUpdatedAt input.updatedAt $
+      setFieldMaybe widgetName input.name $
+      setFieldNullable widgetDescription input.description $
+      emptyUpdate @WidgetTable
+
 
 data WidgetRow = WidgetRow
   { id :: UUID,
@@ -58,6 +62,7 @@ data WidgetRow = WidgetRow
   }
   deriving (Show, Eq)
 
+
 data WidgetCreate = WidgetCreate
   { id :: Maybe UUID,
     createdAt :: Maybe UTCTime,
@@ -67,16 +72,19 @@ data WidgetCreate = WidgetCreate
   }
   deriving (Show, Eq)
 
+
 data WidgetUpdate = WidgetUpdate
-  { name :: Maybe Text,
-    createdAt :: Maybe UTCTime,
+  { createdAt :: Maybe UTCTime,
     updatedAt :: Maybe UTCTime,
+    name :: Maybe Text,
     description :: NullableValue Text
   }
   deriving (Show, Eq)
 
+
 instance FromRow WidgetRow where
   fromRow = WidgetRow <$> field <*> field <*> field <*> field <*> field
+
 
 widgetId :: Field WidgetTable UUID
 widgetId = Field "id" "id"
@@ -92,3 +100,4 @@ widgetName = Field "name" "name"
 
 widgetDescription :: Field WidgetTable Text
 widgetDescription = Field "description" "description"
+
