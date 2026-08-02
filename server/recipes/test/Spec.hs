@@ -1,5 +1,6 @@
 module Main (main) where
 
+import ORM.Codegen.EmitSpec (emitSpec)
 import ORM.Codegen.ValidateSpec (validateSpec)
 import ORM.IncludeSpec (includeSpec)
 import ORM.JoinSpec (joinSpec)
@@ -10,4 +11,5 @@ import Test.Hspec
 main :: IO ()
 main = hspec $ do
   validateSpec
+  emitSpec
   withTestDb $ operationsSpec >> joinSpec >> includeSpec
