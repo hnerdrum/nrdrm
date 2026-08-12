@@ -17,7 +17,7 @@ module Schema.Shelf
     bookShelfId,
     bookTitle,
     chapterId,
-    chapterBookId,
+    chapterBookRef,
     chapterHeading,
     shelfBooks,
     bookChapters,
@@ -72,7 +72,7 @@ instance Insertable ChapterTable where
   type CreateInput ChapterTable = ChapterCreate
   toInsertBuilder input =
     setMaybe chapterId input.id $
-      set chapterBookId input.bookRef $
+      set chapterBookRef input.bookRef $
         setValue chapterHeading input.heading
 
 data ShelfRow = ShelfRow
@@ -142,8 +142,8 @@ bookTitle = Field "title" "title"
 chapterId :: Field ChapterTable UUID
 chapterId = Field "id" "id"
 
-chapterBookId :: Field ChapterTable UUID
-chapterBookId = Field "chapterBookId" "book_id"
+chapterBookRef :: Field ChapterTable UUID
+chapterBookRef = Field "bookRef" "book_id"
 
 chapterHeading :: Field ChapterTable Text
 chapterHeading = Field "heading" "heading"
@@ -160,6 +160,6 @@ bookChapters :: HasMany BookTable ChapterTable UUID
 bookChapters =
   HasMany
     { localKey = bookId,
-      foreignKey = chapterBookId,
+      foreignKey = chapterBookRef,
       joinType = LeftJoin
     }
