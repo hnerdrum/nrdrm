@@ -2,17 +2,20 @@
 
 module ORM.Codegen.Emit.Schema
   ( emitModelModule,
+    emitHasMany,
+    emitBelongsTo,
   )
 where
 
 import Data.Char (toLower, toUpper)
+import Data.List (find)
 import Data.Maybe (isJust, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.IR
 
-emitModelModule :: Text -> Model -> Text
-emitModelModule moduleName model =
+emitModelModule :: Text -> Schema -> Model -> Text
+emitModelModule moduleName schema model =
   T.unlines $
     concat
       [ pragmas,
@@ -43,7 +46,9 @@ emitModelModule moduleName model =
           emitFromRow model,
           ""
         ],
-        concatMap (emitFieldDecl model) (modelFields model)
+        concatMap (emitFieldDecl model) (modelFields model),
+        map (emitHasMany schema) (hasManyRelations model),
+        map (emitBelongsTo schema) (belongsToRelations model)
       ]
   where
     tableName_ = tableTypeName model
@@ -62,6 +67,8 @@ emitExports model =
         updateTypeName model <> " (..)"
       ]
         ++ map (fieldBinder model) (modelFields model)
+        ++ map relName (hasManyRelations model)
+        ++ map relName (belongsToRelations model)
 
 pragmas :: [Text]
 pragmas =
@@ -82,7 +89,8 @@ imports model =
         "import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)",
         "import ORM.Core",
         insertImport model,
-        updateImport model
+        updateImport model,
+        relationImport model
       ]
 
 insertImport :: Model -> Text
@@ -105,6 +113,14 @@ updateImport model =
           ++ ["setFieldNullable" | needsNullable]
    in "import ORM.Update (" <> T.intercalate ", " parts <> ")"
 
+relationImport :: Model -> Text
+relationImport model =
+  case (needsHasMany model, needsBelongsTo model) of
+    (False, False) -> ""
+    (True, False) -> "import ORM.Relation (HasMany (..), JoinType (..))"
+    (False, True) -> "import ORM.Relation (BelongsTo (..), JoinType (..))"
+    (True, True) -> "import ORM.Relation (HasMany (..), BelongsTo (..), JoinType (..))"
+
 needsTime :: Model -> Bool
 needsTime = any ((== TyTimestamptz) . fieldType) . modelFields
 
@@ -117,6 +133,20 @@ needsUuid = any (isUuidType . fieldType) . modelFields
 hasRequiredCreateField :: Model -> Bool
 hasRequiredCreateField =
   any (\f -> createKind f == CreateRequired) . modelFields
+
+needsHasMany :: Model -> Bool
+needsHasMany = not . null . hasManyRelations
+
+hasManyRelations :: Model -> [RelationSpec]
+hasManyRelations =
+  filter ((== RelHasMany) . relKind) . modelRelations
+
+needsBelongsTo :: Model -> Bool
+needsBelongsTo = not . null . belongsToRelations
+
+belongsToRelations :: Model -> [RelationSpec]
+belongsToRelations =
+  filter ((== RelBelongsTo) . relKind) . modelRelations
 
 tableTypeName :: Model -> Text
 tableTypeName model = modelName model <> "Table"
@@ -273,6 +303,86 @@ emitUpdatable model =
     updatedAtBinder f
       | fieldUpdatedAt f = Just (fieldBinder model f)
       | otherwise = Nothing
+
+emitHasMany :: Schema -> RelationSpec -> Text
+emitHasMany schema rel =
+  case relKind rel of
+    RelBelongsTo ->
+      error "emitHasMany: expected RelHasMany"
+    RelHasMany ->
+      T.unlines
+        [ name <> " :: HasMany " <> parentTable <> " " <> childTable <> " " <> keyTy,
+          name <> " =",
+          "  HasMany",
+          "    { localKey = " <> localBinder <> ",",
+          "      foreignKey = " <> foreignBinder <> ",",
+          "      joinType = " <> joinTy,
+          "    }"
+        ]
+  where
+    name = relName rel
+    parent = lookupModel schema (relFromModel rel)
+    child = lookupModel schema (relToModel rel)
+    parentTable = tableTypeName parent
+    childTable = tableTypeName child
+    localField = lookupField parent (relLocalField rel)
+    foreignField = lookupField child (relForeignField rel)
+    localBinder = fieldBinder parent localField
+    foreignBinder = fieldBinder child foreignField
+    keyTy = hsType (fieldType localField)
+    joinTy = emitJoinType (relJoin rel)
+
+emitBelongsTo :: Schema -> RelationSpec -> Text
+emitBelongsTo schema rel =
+  case relKind rel of
+    RelHasMany ->
+      error "emitBelongsTo: expected RelBelongsTo"
+    RelBelongsTo ->
+      T.unlines
+        [ name <> " :: BelongsTo " <> childTable <> " " <> parentTable <> " " <> keyTy,
+          name <> " =",
+          "  BelongsTo",
+          "    { foreignKey = " <> foreignBinder <> ",",
+          "      references = " <> referencesBinder <> ",",
+          "      joinType = " <> joinTy,
+          "    }"
+        ]
+  where
+    name = relName rel
+    child = lookupModel schema (relFromModel rel)
+    parent = lookupModel schema (relToModel rel)
+    childTable = tableTypeName child
+    parentTable = tableTypeName parent
+    -- IR: relForeignField = FK on child; relLocalField = referenced field on parent
+    foreignField = lookupField child (relForeignField rel)
+    referencedField = lookupField parent (relLocalField rel)
+    foreignBinder = fieldBinder child foreignField
+    referencesBinder =
+      modelName parent <> "." <> fieldBinder parent referencedField
+    keyTy = hsType (fieldType foreignField)
+    joinTy = emitJoinType (relJoin rel)
+
+emitJoinType :: JoinKind -> Text
+emitJoinType JoinLeft = "LeftJoin"
+emitJoinType JoinInner = "InnerJoin"
+emitJoinType JoinRight = "RightJoin"
+
+lookupModel :: Schema -> Text -> Model
+lookupModel schema name =
+  case find ((== name) . modelName) (schemaModels schema) of
+    Just m -> m
+    Nothing -> error $ "emit: unknown model " <> T.unpack name
+
+lookupField :: Model -> Text -> FieldSpec
+lookupField model name =
+  case find ((== name) . fieldName) (modelFields model) of
+    Just f -> f
+    Nothing ->
+      error $
+        "emit: unknown field "
+          <> T.unpack name
+          <> " on "
+          <> T.unpack (modelName model)
 
 lowerFirst :: Text -> Text
 lowerFirst t = case T.uncons t of

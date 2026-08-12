@@ -1,0 +1,85 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TypeApplications #-}
+
+module Schema.Shelf
+  ( ShelfTable (..),
+    ShelfRow (..),
+    ShelfCreate (..),
+    ShelfUpdate (..),
+    shelfId,
+    shelfName,
+    shelfBooks
+  )
+where
+
+import Data.Text (Text)
+import Data.UUID (UUID)
+import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
+import ORM.Core
+import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
+import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
+import ORM.Relation (HasMany (..), JoinType (..))
+
+data ShelfTable = ShelfTable
+
+type instance PrimaryKeyType ShelfTable = UUID
+
+instance Entity ShelfTable where
+  tableName = "test_shelf"
+  primaryKey = shelfId
+
+instance Insertable ShelfTable where
+  type CreateInput ShelfTable = ShelfCreate
+  toInsertBuilder input =
+    setMaybe shelfId input.id $
+      set shelfName input.name $
+      emptyInsert @ShelfTable
+
+
+instance Updatable ShelfTable where
+  type UpdateInput ShelfTable = ShelfUpdate
+  updatedAtField = Nothing
+  toUpdateBuilder input =
+    setFieldMaybe shelfName input.name $
+      emptyUpdate @ShelfTable
+
+
+data ShelfRow = ShelfRow
+  { id :: UUID,
+    name :: Text
+  }
+  deriving (Show, Eq)
+
+
+data ShelfCreate = ShelfCreate
+  { id :: Maybe UUID,
+    name :: Text
+  }
+  deriving (Show, Eq)
+
+
+data ShelfUpdate = ShelfUpdate
+  { name :: Maybe Text
+  }
+  deriving (Show, Eq)
+
+
+instance FromRow ShelfRow where
+  fromRow = ShelfRow <$> field <*> field
+
+
+shelfId :: Field ShelfTable UUID
+shelfId = Field "id" "id"
+
+shelfName :: Field ShelfTable Text
+shelfName = Field "name" "name"
+
+shelfBooks :: HasMany ShelfTable BookTable UUID
+shelfBooks =
+  HasMany
+    { localKey = shelfId,
+      foreignKey = bookShelfId,
+      joinType = LeftJoin
+    }
+
