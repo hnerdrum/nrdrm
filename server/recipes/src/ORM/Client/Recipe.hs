@@ -34,22 +34,9 @@ import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder)
-import ORM.Schema.Recipe
-  ( RecipeCreate (..),
-    RecipeRow,
-    RecipeTable,
-    RecipeUpdate (..),
-  )
-import ORM.Schema.RecipeInclude
-  ( RecipeInclude (..),
-    RecipeIngredientInclude (..),
-    RecipeWithIngredients (..),
-  )
-import ORM.Schema.RecipeIngredient
-  ( RecipeIngredientCreate (..),
-    RecipeIngredientTable,
-    recipeIngredientRecipeId,
-  )
+import ORM.Schema.Recipe (RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
+import ORM.Schema.RecipeInclude (RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..))
+import ORM.Schema.RecipeIngredient (RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
 import ORM.Transaction (transaction)
 import qualified ORM.Update as Update
 

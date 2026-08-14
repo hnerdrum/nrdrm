@@ -1,5 +1,6 @@
 module Main (main) where
 
+import ORM.Codegen.EmitClientSpec (emitClientSpec)
 import ORM.Codegen.EmitFlatRowSpec (emitFlatRowSpec)
 import ORM.Codegen.EmitIncludeSpec (emitIncludeSpec)
 import ORM.Codegen.EmitSpec (emitSpec)
@@ -16,4 +17,5 @@ main = hspec $ do
   emitSpec
   emitFlatRowSpec
   emitIncludeSpec
+  emitClientSpec
   withTestDb $ operationsSpec >> joinSpec >> includeSpec
