@@ -99,6 +99,8 @@ tests:
       - ORM.IncludeSpec
       - ORM.Codegen.ValidateSpec
       - ORM.Codegen.EmitSpec
+      - ORM.Codegen.EmitFlatRowSpec
+      - ORM.Codegen.EmitIncludeSpec
       - ORM.WidgetFixtures
       - ORM.ShelfFixtures
       - Schema.ShelfInclude
