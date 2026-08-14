@@ -9,8 +9,9 @@ module ORM.Client.Recipe
     update,
     delete,
     withIngredients,
-    noInclude,
+    noInclude
   )
+
 where
 
 import Control.Monad (forM_)
@@ -32,23 +33,26 @@ import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
+import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
+import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..))
+import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
+import ORM.Transaction (transaction)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder)
-import ORM.Schema.Recipe (RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
-import ORM.Schema.RecipeInclude (RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..))
-import ORM.Schema.RecipeIngredient (RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
-import ORM.Transaction (transaction)
 import qualified ORM.Update as Update
 
 withIngredients :: RecipeInclude
 withIngredients =
   RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = True})}
 
+
 noInclude :: RecipeInclude
 noInclude = RecipeInclude {ingredients = Nothing}
 
+
 findAll :: Pool Connection -> RecipeInclude -> IO [RecipeWithIngredients]
 findAll = Include.findAll @RecipeTable
+
 
 findMany ::
   Pool Connection ->
@@ -57,11 +61,14 @@ findMany ::
   IO [RecipeWithIngredients]
 findMany = Include.findMany @RecipeTable
 
+
 findUnique :: Pool Connection -> RecipeInclude -> UUID -> IO (Maybe RecipeWithIngredients)
 findUnique = Include.findUnique @RecipeTable
 
+
 findUniqueOrError :: Pool Connection -> RecipeInclude -> UUID -> IO (Either ORMError RecipeWithIngredients)
 findUniqueOrError = Include.findUniqueOrError @RecipeTable
+
 
 create ::
   Pool Connection ->
@@ -80,6 +87,7 @@ create pool include input = do
           Insert.executeInsertConn conn $
             Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate recipeId ingredient)
         Include.findUniqueOrErrorConn @RecipeTable conn include recipeId
+
 
 update ::
   Pool Connection ->
@@ -106,10 +114,12 @@ update pool include recipeId input = do
                 Insert.toInsertBuilder @RecipeIngredientTable ri
         Include.findUniqueOrErrorConn @RecipeTable conn include recipeId
 
+
 delete :: Pool Connection -> UUID -> IO ()
 delete pool recipeId = do
   _ <- Ops.delete @RecipeTable pool recipeId
   pure ()
+
 
 toRecipeCreate :: UUID -> CreateRecipeInput -> RecipeCreate
 toRecipeCreate recipeId input =
@@ -121,6 +131,7 @@ toRecipeCreate recipeId input =
       description = Value input.description
     }
 
+
 toRecipeUpdate :: UTCTime -> UpdateRecipeInput -> RecipeUpdate
 toRecipeUpdate now input =
   RecipeUpdate
@@ -130,6 +141,7 @@ toRecipeUpdate now input =
       description = maybe Omit Value input.description
     }
 
+
 toRecipeIngredientCreate :: UUID -> CreateRecipeIngredientInput -> RecipeIngredientCreate
 toRecipeIngredientCreate recipeId input =
   RecipeIngredientCreate
@@ -138,6 +150,7 @@ toRecipeIngredientCreate recipeId input =
       amount = input.amount,
       unit = input.unit
     }
+
 
 toRecipeIngredientUpdate :: UUID -> UpdateRecipeIngredientInput -> Maybe RecipeIngredientCreate
 toRecipeIngredientUpdate recipeId input = do
@@ -150,3 +163,4 @@ toRecipeIngredientUpdate recipeId input = do
         amount,
         unit
       }
+
