@@ -1,4 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -20,6 +22,7 @@ import ORM.Core
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 import ORM.Relation (HasMany (..), JoinType (..))
+import Schema.Book (BookTable, bookShelfId)
 
 data ShelfTable = ShelfTable
 

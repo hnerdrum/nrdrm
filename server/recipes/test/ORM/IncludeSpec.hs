@@ -11,6 +11,8 @@ import Data.UUID (UUID, nil)
 import ORM.Include (findAll, findMany, findUnique)
 import ORM.Query (whereEq)
 import qualified ORM.ShelfFixtures as ShelfFixtures
+import Schema.Book (BookRow (..))
+import Schema.Chapter (ChapterRow (..))
 import Schema.Shelf (shelfName)
 import qualified Schema.Shelf as Shelf
 import Schema.ShelfInclude

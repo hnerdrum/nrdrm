@@ -1,6 +1,9 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -9,7 +12,9 @@ module Schema.ShelfInclude
   ( ShelfInclude (..),
     BookInclude (..),
     BookWithChapters (..),
-    ShelfWithBooks (..)
+    ShelfWithBooks (..),
+    ShelfBookJoinRow (..),
+    ShelfBookChapterJoinRow (..)
   )
 where
 

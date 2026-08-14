@@ -640,8 +640,11 @@ hasDeepNest incl =
 includePragmas :: [Text]
 includePragmas =
   [ "{-# LANGUAGE AllowAmbiguousTypes #-}",
+    "{-# LANGUAGE DuplicateRecordFields #-}",
     "{-# LANGUAGE FlexibleContexts #-}",
     "{-# LANGUAGE MultiParamTypeClasses #-}",
+    "{-# LANGUAGE NoFieldSelectors #-}",
+    "{-# LANGUAGE OverloadedRecordDot #-}",
     "{-# LANGUAGE TypeApplications #-}",
     "{-# LANGUAGE TypeFamilies #-}",
     "{-# LANGUAGE UndecidableInstances #-}",
@@ -654,7 +657,7 @@ emitIncludeExports schema incl =
     <> T.intercalate ",\n    " items
     <> "\n  )"
   where
-    ShallowJoin {sjChild} = shallowJoin schema incl
+    ShallowJoin {sjRoot, sjChild} = shallowJoin schema incl
     edge = case includeTree incl of
       (e : _) -> e
       [] -> error "emitIncludeExports: empty include tree"
@@ -666,10 +669,17 @@ emitIncludeExports schema incl =
       [ itdName d <> " (..)"
         | d <- collectResultTypes schema incl
       ]
+    flatExports =
+      shallowJoinRowName sjRoot sjChild <> " (..)"
+        : [ deepJoinRowName djRoot djChild djGrand <> " (..)"
+            | hasDeepNest incl,
+              let DeepJoin {djRoot, djChild, djGrand} = deepJoin schema incl
+          ]
     items =
       [includeName incl <> " (..)"]
         ++ nestedExport
         ++ resultExports
+        ++ flatExports
 
 emitIncludeImports :: Schema -> ModelInclude -> Text
 emitIncludeImports schema incl =

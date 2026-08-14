@@ -12,9 +12,10 @@ import Database.PostgreSQL.Simple.ToField (toField)
 import qualified ORM.JoinChain as JoinChain
 import ORM.Relation (HasMany (..), JoinType (..))
 import qualified ORM.ShelfFixtures as ShelfFixtures
+import qualified Schema.Book as Book
+import qualified Schema.Chapter as Chapter
 import qualified Schema.Shelf as Shelf
-import Schema.ShelfBookChapterRow (ShelfBookChapterJoinRow (..))
-import Schema.ShelfBookRow (ShelfBookJoinRow (..))
+import Schema.ShelfInclude (ShelfBookChapterJoinRow (..), ShelfBookJoinRow (..))
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
 
@@ -23,8 +24,8 @@ selectShelfBookColumns =
   JoinChain.selectColumns
     [ JoinChain.col "s" Shelf.shelfId,
       JoinChain.col "s" Shelf.shelfName,
-      JoinChain.col "b" Shelf.bookId,
-      JoinChain.col "b" Shelf.bookTitle
+      JoinChain.col "b" Book.bookId,
+      JoinChain.col "b" Book.bookTitle
     ]
 
 shelfBookJoin :: JoinChain.JoinChain Shelf.ShelfTable
@@ -100,12 +101,12 @@ joinSpec =
             JoinChain.selectColumns
               [ JoinChain.col "s" Shelf.shelfId,
                 JoinChain.col "s" Shelf.shelfName,
-                JoinChain.col "b" Shelf.bookId,
-                JoinChain.col "b" Shelf.bookTitle,
-                JoinChain.col "c" Shelf.chapterId,
-                JoinChain.col "c" Shelf.chapterHeading
+                JoinChain.col "b" Book.bookId,
+                JoinChain.col "b" Book.bookTitle,
+                JoinChain.col "c" Chapter.chapterId,
+                JoinChain.col "c" Chapter.chapterHeading
               ]
-              (JoinChain.addHasManyJoin Shelf.bookChapters "b" "c" shelfBookJoin)
+              (JoinChain.addHasManyJoin Book.bookChapters "b" "c" shelfBookJoin)
       rows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow pool shelfBookChapterJoin
       length rows `shouldBe` 2
       sort (map (.chapterHeading) rows) `shouldBe` sort [Just "Arrakis", Just "Caladan"]
