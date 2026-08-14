@@ -102,6 +102,7 @@ tests:
       - ORM.Codegen.EmitSpec
       - ORM.Codegen.EmitFlatRowSpec
       - ORM.Codegen.EmitIncludeSpec
+      - ORM.Codegen.EmitClientSpec
       - ORM.WidgetFixtures
       - ORM.ShelfFixtures
     ghc-options:

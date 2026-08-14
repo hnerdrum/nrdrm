@@ -6,8 +6,9 @@ module ORM.Client.Ingredient
     findAll,
     findUnique,
     findUniqueOrError,
-    delete,
+    delete
   )
+
 where
 
 import Data.Pool (Pool)
@@ -22,17 +23,23 @@ import qualified ORM.Update as Update
 create :: Pool Connection -> IngredientCreate -> IO (Either ORMError IngredientRow)
 create = Insert.insert @IngredientTable @IngredientRow
 
+
 update :: Pool Connection -> UUID -> IngredientUpdate -> IO (Either ORMError IngredientRow)
 update = Update.update @IngredientTable @IngredientRow
+
 
 findAll :: Pool Connection -> IO [IngredientRow]
 findAll = Ops.findAll @IngredientTable @IngredientRow
 
+
 findUnique :: Pool Connection -> UUID -> IO (Maybe IngredientRow)
 findUnique = Ops.findUnique @IngredientTable @IngredientRow
+
 
 findUniqueOrError :: Pool Connection -> UUID -> IO (Either ORMError IngredientRow)
 findUniqueOrError = Ops.findUniqueOrError @IngredientTable @IngredientRow
 
+
 delete :: Pool Connection -> UUID -> IO Int
 delete = Ops.delete @IngredientTable
+
