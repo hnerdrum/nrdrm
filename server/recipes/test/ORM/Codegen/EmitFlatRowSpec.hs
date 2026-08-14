@@ -6,7 +6,12 @@ module ORM.Codegen.EmitFlatRowSpec
 where
 
 import qualified Data.Text as T
-import ORM.Codegen.Emit.FlatRow (emitShallowColumnList, emitShallowFlatJoinRow)
+import ORM.Codegen.Emit.FlatRow
+  ( emitDeepColumnList,
+    emitDeepFlatJoinRow,
+    emitShallowColumnList,
+    emitShallowFlatJoinRow,
+  )
 import ORM.Codegen.IR (Schema (..))
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import Test.Hspec
@@ -23,6 +28,16 @@ emitFlatRowSpec =
       let incl = head (schemaIncludes shelfSchema)
       T.strip (emitShallowColumnList shelfSchema incl)
         `shouldBe` T.strip expectedShelfBookColumns
+
+    it "emits ShelfBookChapterJoinRow for ShelfInclude" $ do
+      let incl = head (schemaIncludes shelfSchema)
+      T.strip (emitDeepFlatJoinRow shelfSchema incl)
+        `shouldBe` T.strip expectedShelfBookChapterJoinRow
+
+    it "emits shelfBookChapterColumns for ShelfInclude" $ do
+      let incl = head (schemaIncludes shelfSchema)
+      T.strip (emitDeepColumnList shelfSchema incl)
+        `shouldBe` T.strip expectedShelfBookChapterColumns
 
 expectedShelfBookJoinRow :: T.Text
 expectedShelfBookJoinRow =
@@ -49,4 +64,32 @@ expectedShelfBookColumns =
       "    JoinChain.col \"b\" Book.bookId,",
       "    JoinChain.col \"b\" Book.bookTitle",
       "  ]"
+    ]
+
+expectedShelfBookChapterJoinRow :: T.Text
+expectedShelfBookChapterJoinRow =
+  T.unlines
+    [ "data ShelfBookChapterJoinRow = ShelfBookChapterJoinRow",
+      "  { shelfId :: UUID,",
+      "    shelfName :: Text,",
+      "    bookId :: Maybe UUID,",
+      "    bookTitle :: Maybe Text,",
+      "    chapterId :: Maybe UUID,",
+      "    chapterHeading :: Maybe Text",
+      "  }",
+      "  deriving (Show, Eq)",
+      "",
+      "instance FromRow ShelfBookChapterJoinRow where",
+      "  fromRow = ShelfBookChapterJoinRow <$> field <*> field <*> field <*> field <*> field <*> field"
+    ]
+
+expectedShelfBookChapterColumns :: T.Text
+expectedShelfBookChapterColumns =
+  T.unlines
+    [ "shelfBookChapterColumns :: [Text]",
+      "shelfBookChapterColumns =",
+      "  shelfBookColumns",
+      "    ++ [ JoinChain.col \"c\" Chapter.chapterId,",
+      "         JoinChain.col \"c\" Chapter.chapterHeading",
+      "       ]"
     ]

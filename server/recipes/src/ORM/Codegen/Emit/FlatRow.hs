@@ -3,10 +3,16 @@
 module ORM.Codegen.Emit.FlatRow
   ( emitShallowFlatJoinRow,
     emitShallowColumnList,
+    emitDeepFlatJoinRow,
+    emitDeepColumnList,
     shallowJoinRowName,
     shallowColumnListName,
+    deepJoinRowName,
+    deepColumnListName,
     shallowJoin,
     ShallowJoin (..),
+    deepJoin,
+    DeepJoin (..),
     modelAlias,
   )
 where
@@ -49,6 +55,92 @@ emitShallowColumnList schema incl =
           "  [ " <> T.intercalate ",\n    " cols,
           "  ]"
         ]
+
+emitDeepFlatJoinRow :: Schema -> ModelInclude -> Text
+emitDeepFlatJoinRow schema incl =
+  let DeepJoin {djRoot, djChild, djGrand, djRootFields, djChildFields, djGrandFields} =
+        deepJoin schema incl
+      rowName = deepJoinRowName djRoot djChild djGrand
+      allFields =
+        map (flatField djRoot False) djRootFields
+          ++ map (flatField djChild True) djChildFields
+          ++ map (flatField djGrand True) djGrandFields
+   in T.unlines
+        [ "data " <> rowName <> " = " <> rowName,
+          "  { " <> T.intercalate ",\n    " allFields,
+          "  }",
+          "  deriving (Show, Eq)",
+          "",
+          "instance FromRow " <> rowName <> " where",
+          "  fromRow = " <> rowName <> " <$> " <> fromRowBody (length allFields)
+        ]
+
+emitDeepColumnList :: Schema -> ModelInclude -> Text
+emitDeepColumnList schema incl =
+  let DeepJoin {djRoot, djChild, djGrand, djGrandFields} = deepJoin schema incl
+      name = deepColumnListName djRoot djChild djGrand
+      shallowName = shallowColumnListName djRoot djChild
+      grandCols = map (columnExpr djGrand) djGrandFields
+   in T.unlines
+        [ name <> " :: [Text]",
+          name <> " =",
+          "  " <> shallowName,
+          "    ++ [ " <> T.intercalate ",\n         " grandCols,
+          "       ]"
+        ]
+
+data DeepJoin = DeepJoin
+  { djRoot :: Model,
+    djChild :: Model,
+    djGrand :: Model,
+    djChildRel :: RelationSpec,
+    djGrandRel :: RelationSpec,
+    djRootFields :: [FieldSpec],
+    djChildFields :: [FieldSpec],
+    djGrandFields :: [FieldSpec]
+  }
+
+deepJoin :: Schema -> ModelInclude -> DeepJoin
+deepJoin schema incl =
+  case includeTree incl of
+    [] ->
+      error $
+        "deepJoin: include "
+          <> T.unpack (includeName incl)
+          <> " has empty tree"
+    (edge : _) ->
+      case includeChildren edge of
+        [] ->
+          error $
+            "deepJoin: include "
+              <> T.unpack (includeName incl)
+              <> " has no nested child edge"
+        (childEdge : _) ->
+          let root = lookupModel schema (includeRootModel incl)
+              childRel = lookupRelation root (includeRelation edge)
+              child = lookupModel schema (relToModel childRel)
+              grandRel = lookupRelation child (includeRelation childEdge)
+              grand = lookupModel schema (relToModel grandRel)
+           in DeepJoin
+                { djRoot = root,
+                  djChild = child,
+                  djGrand = grand,
+                  djChildRel = childRel,
+                  djGrandRel = grandRel,
+                  djRootFields = modelFields root,
+                  djChildFields =
+                    filter (not . isRelationFk childRel) (modelFields child),
+                  djGrandFields =
+                    filter (not . isRelationFk grandRel) (modelFields grand)
+                }
+
+deepJoinRowName :: Model -> Model -> Model -> Text
+deepJoinRowName root child grand =
+  modelName root <> modelName child <> modelName grand <> "JoinRow"
+
+deepColumnListName :: Model -> Model -> Model -> Text
+deepColumnListName root child grand =
+  lowerFirst (modelName root) <> modelName child <> modelName grand <> "Columns"
 
 data ShallowJoin = ShallowJoin
   { sjRoot :: Model,
