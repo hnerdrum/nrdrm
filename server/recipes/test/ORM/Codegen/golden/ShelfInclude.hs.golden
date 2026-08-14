@@ -1,0 +1,63 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+
+module Schema.ShelfInclude
+  ( ShelfInclude (..),
+    BookInclude (..),
+    ShelfBookJoinRow (..),
+    shelfBookColumns,
+    buildShelfBookJoin
+  )
+where
+
+import Data.Maybe (isJust)
+import Data.Text (Text)
+import Data.UUID (UUID)
+import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
+import ORM.Include (BuildJoinChain (..), IncludesJoin (..))
+import qualified ORM.JoinChain as JoinChain
+import Schema.Shelf (ShelfTable, shelfBooks)
+import qualified Schema.Shelf as Shelf
+import qualified Schema.Book as Book
+
+newtype BookInclude = BookInclude
+  { chapters :: Bool
+  }
+  deriving (Show, Eq)
+
+newtype ShelfInclude = ShelfInclude
+  { books :: Maybe BookInclude
+  }
+  deriving (Show, Eq)
+
+instance IncludesJoin ShelfInclude where
+  includesJoin ShelfInclude {books} = isJust books
+
+data ShelfBookJoinRow = ShelfBookJoinRow
+  { shelfId :: UUID,
+    shelfName :: Text,
+    bookId :: Maybe UUID,
+    bookTitle :: Maybe Text
+  }
+  deriving (Show, Eq)
+
+instance FromRow ShelfBookJoinRow where
+  fromRow = ShelfBookJoinRow <$> field <*> field <*> field <*> field
+
+shelfBookColumns :: [Text]
+shelfBookColumns =
+  [ JoinChain.col "s" Shelf.shelfId,
+    JoinChain.col "s" Shelf.shelfName,
+    JoinChain.col "b" Book.bookId,
+    JoinChain.col "b" Book.bookTitle
+  ]
+
+buildShelfBookJoin :: JoinChain.JoinChain ShelfTable
+buildShelfBookJoin =
+  JoinChain.selectColumns shelfBookColumns $
+    JoinChain.buildJoinChainFromHasMany shelfBooks "s" "b"
+
+instance BuildJoinChain ShelfTable ShelfInclude where
+  type JoinFlatRow ShelfInclude = ShelfBookJoinRow
+  buildJoinChain _ = buildShelfBookJoin
+
