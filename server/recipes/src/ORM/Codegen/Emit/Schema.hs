@@ -23,7 +23,7 @@ emitModelModule moduleName schema model =
           emitExports model,
           "where",
           "",
-          imports model,
+          imports moduleName schema model,
           "",
           "data " <> tableName_ <> " = " <> tableName_,
           "",
@@ -73,13 +73,15 @@ emitExports model =
 pragmas :: [Text]
 pragmas =
   [ "{-# LANGUAGE AllowAmbiguousTypes #-}",
+    "{-# LANGUAGE DuplicateRecordFields #-}",
+    "{-# LANGUAGE NoFieldSelectors #-}",
     "{-# LANGUAGE OverloadedRecordDot #-}",
     "{-# LANGUAGE TypeApplications #-}",
     ""
   ]
 
-imports :: Model -> Text
-imports model =
+imports :: Text -> Schema -> Model -> Text
+imports moduleName schema model =
   T.intercalate "\n" $
     filter
       (not . T.null)
@@ -92,6 +94,37 @@ imports model =
         updateImport model,
         relationImport model
       ]
+      ++ relationModelImports moduleName schema model
+
+relationModelImports :: Text -> Schema -> Model -> [Text]
+relationModelImports moduleName schema model =
+  concatMap hasManyImport (hasManyRelations model)
+    ++ concatMap belongsToImport (belongsToRelations model)
+  where
+    hasManyImport rel =
+      let child = lookupModel schema (relToModel rel)
+          foreignField = lookupField child (relForeignField rel)
+          childMod = siblingModule moduleName child
+       in [ "import "
+              <> childMod
+              <> " ("
+              <> tableTypeName child
+              <> ", "
+              <> fieldBinder child foreignField
+              <> ")"
+          ]
+    belongsToImport rel =
+      let parent = lookupModel schema (relToModel rel)
+          parentMod = siblingModule moduleName parent
+       in [ "import " <> parentMod <> " (" <> tableTypeName parent <> ")",
+            "import qualified " <> parentMod <> " as " <> modelName parent
+          ]
+
+siblingModule :: Text -> Model -> Text
+siblingModule moduleName model =
+  case T.breakOnEnd "." moduleName of
+    (prefix, _) | not (T.null prefix) -> prefix <> modelName model
+    _ -> modelName model
 
 insertImport :: Model -> Text
 insertImport model =

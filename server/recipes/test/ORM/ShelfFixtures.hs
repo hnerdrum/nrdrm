@@ -10,7 +10,9 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import Database.PostgreSQL.Simple
 import qualified ORM.Insert as Insert
-import Schema.Shelf
+import Schema.Book (BookCreate (..), BookRow (..), BookTable)
+import Schema.Chapter (ChapterCreate (..), ChapterRow (..), ChapterTable)
+import Schema.Shelf (ShelfCreate (..), ShelfRow (..), ShelfTable)
 import Support.Assert (assertRight)
 
 insertShelf :: Pool Connection -> Text -> IO ShelfRow
@@ -21,10 +23,10 @@ insertShelf pool name =
     >>= assertRight
 
 insertBook :: Pool Connection -> UUID -> Text -> IO BookRow
-insertBook pool shelfRef title =
+insertBook pool shelfId title =
   Insert.insert @BookTable @BookRow
     pool
-    BookCreate {id = Nothing, shelfRef, title}
+    BookCreate {id = Nothing, shelfId, title}
     >>= assertRight
 
 insertChapter :: Pool Connection -> UUID -> Text -> IO ChapterRow

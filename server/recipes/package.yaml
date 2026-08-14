@@ -89,8 +89,9 @@ tests:
     other-modules:
       - Schema.Widget
       - Schema.Shelf
-      - Schema.ShelfBookRow
-      - Schema.ShelfBookChapterRow
+      - Schema.Book
+      - Schema.Chapter
+      - Schema.ShelfInclude
       - Support.Assert
       - Support.TestDb
       - Support.TestMigrations
@@ -103,7 +104,6 @@ tests:
       - ORM.Codegen.EmitIncludeSpec
       - ORM.WidgetFixtures
       - ORM.ShelfFixtures
-      - Schema.ShelfInclude
     ghc-options:
       - -threaded
       - -rtsopts

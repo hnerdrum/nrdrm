@@ -36,6 +36,7 @@ emitSpec = do
     it "includes HasMany in a Shelf model module" $ do
       let actual = emitModelModule "Schema.Shelf" shelfSchema shelfModel
       actual `shouldSatisfy` T.isInfixOf "import ORM.Relation (HasMany (..), JoinType (..))"
+      actual `shouldSatisfy` T.isInfixOf "import Schema.Book (BookTable, bookShelfId)"
       actual `shouldSatisfy` T.isInfixOf "    shelfBooks"
       T.strip (emitHasMany shelfSchema shelfBooksRel)
         `shouldSatisfy` (`T.isInfixOf` T.strip actual)
@@ -52,6 +53,16 @@ emitSpec = do
     it "emits Shelf matching the golden file" $ do
       expected <- T.readFile "test/ORM/Codegen/golden/Shelf.hs.golden"
       let actual = emitModelModule "Schema.Shelf" shelfSchema shelfModel
+      T.strip actual `shouldBe` T.strip expected
+
+    it "emits Book matching the golden file" $ do
+      expected <- T.readFile "test/ORM/Codegen/golden/Book.hs.golden"
+      let actual = emitModelModule "Schema.Book" shelfSchema bookModel
+      T.strip actual `shouldBe` T.strip expected
+
+    it "emits Chapter matching the golden file" $ do
+      expected <- T.readFile "test/ORM/Codegen/golden/Chapter.hs.golden"
+      let actual = emitModelModule "Schema.Chapter" shelfSchema chapterModel
       T.strip actual `shouldBe` T.strip expected
 
   describe "ORM.Codegen.Emit.Schema.emitHasMany" $ do
@@ -121,6 +132,12 @@ bookModel =
   case find ((== "Book") . modelName) (schemaModels shelfSchema) of
     Just m -> m
     Nothing -> error "bookModel: Book missing"
+
+chapterModel :: Model
+chapterModel =
+  case find ((== "Chapter") . modelName) (schemaModels shelfSchema) of
+    Just m -> m
+    Nothing -> error "chapterModel: Chapter missing"
 
 bookChaptersRel :: RelationSpec
 bookChaptersRel =
