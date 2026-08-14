@@ -48,7 +48,7 @@ import ORM.Schema.RecipeInclude
 import ORM.Schema.RecipeIngredient
   ( RecipeIngredientCreate (..),
     RecipeIngredientTable,
-    riRecipeId,
+    recipeIngredientRecipeId,
   )
 import ORM.Transaction (transaction)
 import qualified ORM.Update as Update
@@ -113,7 +113,7 @@ update pool include recipeId input = do
           Just ingredients -> do
             _ <-
               Delete.deleteConn conn $
-                Delete.whereDelete (fieldColumn riRecipeId <> " = ?") [toField recipeId] (Delete.emptyDelete @RecipeIngredientTable)
+                Delete.whereDelete (fieldColumn recipeIngredientRecipeId <> " = ?") [toField recipeId] (Delete.emptyDelete @RecipeIngredientTable)
             forM_ (mapMaybe (toRecipeIngredientUpdate recipeId) ingredients) $ \ri ->
               Insert.executeInsertConn conn $
                 Insert.toInsertBuilder @RecipeIngredientTable ri

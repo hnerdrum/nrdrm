@@ -1,24 +1,29 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 
 module ORM.Schema.RecipeIngredient
   ( RecipeIngredientTable (..),
     RecipeIngredientRow (..),
     RecipeIngredientCreate (..),
-    riRecipeId,
-    riIngredientId,
-    riAmount,
-    riUnit,
-    riIngredient,
+    RecipeIngredientUpdate (..),
+    recipeIngredientRecipeId,
+    recipeIngredientIngredientId,
+    recipeIngredientAmount,
+    recipeIngredientUnit,
+    riIngredient
   )
 where
 
-import Data.Text (Text)
 import Data.UUID (UUID)
-import Database.Ingredient (Unit, unitToString)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
 import ORM.Insert (Insertable (..), emptyInsert, set)
+import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 import ORM.Relation (BelongsTo (..), JoinType (..))
+import Database.Ingredient (Unit)
 import ORM.Schema.Ingredient (IngredientTable)
 import qualified ORM.Schema.Ingredient as Ingredient
 
@@ -28,7 +33,27 @@ type instance PrimaryKeyType RecipeIngredientTable = UUID
 
 instance Entity RecipeIngredientTable where
   tableName = "recipe_ingredient"
-  primaryKey = riRecipeId
+  primaryKey = recipeIngredientRecipeId
+
+instance Insertable RecipeIngredientTable where
+  type CreateInput RecipeIngredientTable = RecipeIngredientCreate
+  toInsertBuilder input =
+    set recipeIngredientRecipeId input.recipeId $
+      set recipeIngredientIngredientId input.ingredientId $
+      set recipeIngredientAmount input.amount $
+      set recipeIngredientUnit input.unit $
+      emptyInsert @RecipeIngredientTable
+
+
+instance Updatable RecipeIngredientTable where
+  type UpdateInput RecipeIngredientTable = RecipeIngredientUpdate
+  updatedAtField = Nothing
+  toUpdateBuilder input =
+    setFieldMaybe recipeIngredientIngredientId input.ingredientId $
+      setFieldMaybe recipeIngredientAmount input.amount $
+      setFieldMaybe recipeIngredientUnit input.unit $
+      emptyUpdate @RecipeIngredientTable
+
 
 data RecipeIngredientRow = RecipeIngredientRow
   { recipeId :: UUID,
@@ -36,7 +61,8 @@ data RecipeIngredientRow = RecipeIngredientRow
     amount :: Int,
     unit :: Unit
   }
-  deriving (Show)
+  deriving (Show, Eq)
+
 
 data RecipeIngredientCreate = RecipeIngredientCreate
   { recipeId :: UUID,
@@ -44,35 +70,38 @@ data RecipeIngredientCreate = RecipeIngredientCreate
     amount :: Int,
     unit :: Unit
   }
-  deriving (Show)
+  deriving (Show, Eq)
 
-instance Insertable RecipeIngredientTable where
-  type CreateInput RecipeIngredientTable = RecipeIngredientCreate
-  toInsertBuilder input =
-    set riUnit (unitToString input.unit) $
-      set riAmount input.amount $
-        set riIngredientId input.ingredientId $
-          set riRecipeId input.recipeId (emptyInsert @RecipeIngredientTable)
+
+data RecipeIngredientUpdate = RecipeIngredientUpdate
+  { ingredientId :: Maybe UUID,
+    amount :: Maybe Int,
+    unit :: Maybe Unit
+  }
+  deriving (Show, Eq)
+
 
 instance FromRow RecipeIngredientRow where
   fromRow = RecipeIngredientRow <$> field <*> field <*> field <*> field
 
-riRecipeId :: Field RecipeIngredientTable UUID
-riRecipeId = Field "recipeId" "recipe_id"
 
-riIngredientId :: Field RecipeIngredientTable UUID
-riIngredientId = Field "ingredientId" "ingredient_id"
+recipeIngredientRecipeId :: Field RecipeIngredientTable UUID
+recipeIngredientRecipeId = Field "recipeId" "recipe_id"
 
-riAmount :: Field RecipeIngredientTable Int
-riAmount = Field "amount" "amount"
+recipeIngredientIngredientId :: Field RecipeIngredientTable UUID
+recipeIngredientIngredientId = Field "ingredientId" "ingredient_id"
 
-riUnit :: Field RecipeIngredientTable Text
-riUnit = Field "unit" "unit"
+recipeIngredientAmount :: Field RecipeIngredientTable Int
+recipeIngredientAmount = Field "amount" "amount"
+
+recipeIngredientUnit :: Field RecipeIngredientTable Unit
+recipeIngredientUnit = Field "unit" "unit"
 
 riIngredient :: BelongsTo RecipeIngredientTable IngredientTable UUID
 riIngredient =
   BelongsTo
-    { foreignKey = riIngredientId,
+    { foreignKey = recipeIngredientIngredientId,
       references = Ingredient.ingredientId,
       joinType = LeftJoin
     }
+

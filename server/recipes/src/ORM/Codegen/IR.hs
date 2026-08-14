@@ -23,6 +23,7 @@ module ORM.Codegen.IR
     withDefault,
     column,
     enum_,
+    enumImportFrom,
     variant,
     variantMap,
     hasMany,
@@ -41,7 +42,8 @@ data Schema = Schema
 
 data EnumSpec = EnumSpec
   { enumName :: Text,
-    enumVariants :: [EnumVariant]
+    enumVariants :: [EnumVariant],
+    enumImport :: Maybe Text
   }
   deriving (Show, Eq)
 
@@ -157,7 +159,10 @@ column col f = f {fieldColumn = col}
 
 enum_ :: Text -> [EnumVariant] -> EnumSpec
 enum_ name variants =
-  EnumSpec {enumName = name, enumVariants = variants}
+  EnumSpec {enumName = name, enumVariants = variants, enumImport = Nothing}
+
+enumImportFrom :: Text -> EnumSpec -> EnumSpec
+enumImportFrom moduleName e = e {enumImport = Just moduleName}
 
 variant :: Text -> EnumVariant
 variant name = EnumVariant {variantName = name, variantDbValue = Nothing}

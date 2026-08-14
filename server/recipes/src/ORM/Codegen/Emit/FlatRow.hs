@@ -14,10 +14,14 @@ module ORM.Codegen.Emit.FlatRow
     deepJoin,
     DeepJoin (..),
     modelAlias,
+    rootJoinAlias,
+    childJoinAlias,
+    grandJoinAlias,
+    columnExprWithAlias,
   )
 where
 
-import Data.Char (toLower, toUpper)
+import Data.Char (isUpper, toLower, toUpper)
 import Data.List (find)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -47,8 +51,8 @@ emitShallowColumnList schema incl =
         shallowJoin schema incl
       name = shallowColumnListName sjRoot sjChild
       cols =
-        map (columnExpr sjRoot) sjRootFields
-          ++ map (columnExpr sjChild) sjChildFields
+        map (columnExprWithAlias (rootJoinAlias sjRoot) sjRoot) sjRootFields
+          ++ map (columnExprWithAlias (childJoinAlias sjRoot sjChild) sjChild) sjChildFields
    in T.unlines
         [ name <> " :: [Text]",
           name <> " =",
@@ -80,7 +84,10 @@ emitDeepColumnList schema incl =
   let DeepJoin {djRoot, djChild, djGrand, djGrandFields} = deepJoin schema incl
       name = deepColumnListName djRoot djChild djGrand
       shallowName = shallowColumnListName djRoot djChild
-      grandCols = map (columnExpr djGrand) djGrandFields
+      grandCols =
+        map
+          (columnExprWithAlias (grandJoinAlias djRoot djChild djGrand) djGrand)
+          djGrandFields
    in T.unlines
         [ name <> " :: [Text]",
           name <> " =",
@@ -175,29 +182,56 @@ shallowColumnListName :: Model -> Model -> Text
 shallowColumnListName root child =
   lowerFirst (modelName root) <> modelName child <> "Columns"
 
-columnExpr :: Model -> FieldSpec -> Text
-columnExpr model f =
+columnExprWithAlias :: Text -> Model -> FieldSpec -> Text
+columnExprWithAlias alias model f =
   "JoinChain.col \""
-    <> modelAlias model
+    <> alias
     <> "\" "
     <> modelName model
     <> "."
     <> fieldBinder model f
 
 modelAlias :: Model -> Text
-modelAlias model =
-  T.toLower (T.take 1 (modelName model))
+modelAlias = rootJoinAlias
+
+rootJoinAlias :: Model -> Text
+rootJoinAlias model = T.toLower (T.take 1 (modelName model))
+
+childJoinAlias :: Model -> Model -> Text
+childJoinAlias root child =
+  let rootAlias = rootJoinAlias root
+   in if rootAlias == T.toLower (T.take 1 (modelName child))
+        then abbrevCamelAlias (modelName child)
+        else T.toLower (T.take 1 (modelName child))
+
+grandJoinAlias :: Model -> Model -> Model -> Text
+grandJoinAlias root child grand =
+  let taken = [rootJoinAlias root, childJoinAlias root child]
+      first = T.toLower (T.take 1 (modelName grand))
+   in if first `elem` taken
+        then abbrevCamelAlias (modelName grand)
+        else first
+
+abbrevCamelAlias :: Text -> Text
+abbrevCamelAlias name =
+  case T.uncons name of
+    Nothing -> name
+    Just (c, rest) ->
+      case T.find isUpper rest of
+        Just u -> T.cons (toLower c) (T.singleton (toLower u))
+        Nothing -> T.singleton (toLower c)
 
 shallowJoinRowName :: Model -> Model -> Text
 shallowJoinRowName root child =
   modelName root <> modelName child <> "JoinRow"
 
 flatField :: Model -> Bool -> FieldSpec -> Text
-flatField model asMaybe f =
+flatField model asJoinSide f =
   binder <> " :: " <> ty
   where
     binder = fieldBinder model f
     base = hsType (fieldType f)
+    asMaybe = asJoinSide || fieldNullable f
     ty = if asMaybe then "Maybe " <> base else base
 
 isRelationFk :: RelationSpec -> FieldSpec -> Bool

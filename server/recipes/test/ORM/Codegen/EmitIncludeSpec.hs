@@ -21,6 +21,7 @@ import ORM.Codegen.Emit.Include
     emitShallowNestHelpers,
   )
 import ORM.Codegen.IR (Schema (..))
+import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import Test.Hspec
 
@@ -81,6 +82,12 @@ emitIncludeSpec =
       expected <- TIO.readFile "test/ORM/Codegen/golden/ShelfInclude.hs.golden"
       let incl = head (schemaIncludes shelfSchema)
           actual = emitIncludeModule "Schema.ShelfInclude" shelfSchema incl
+      T.strip actual `shouldBe` T.strip expected
+
+    it "emits RecipeInclude module matching the golden file" $ do
+      expected <- TIO.readFile "test/ORM/Codegen/golden/RecipeInclude.hs.golden"
+      let incl = head (schemaIncludes recipeSchema)
+          actual = emitIncludeModule "ORM.Schema.RecipeInclude" recipeSchema incl
       T.strip actual `shouldBe` T.strip expected
 
 expectedShelfIncludeADTs :: T.Text
