@@ -17,11 +17,13 @@ where
 
 import Data.Char (toLower, toUpper)
 import Data.List (find)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.Emit.FlatRow
   ( DeepJoin (..),
     ShallowJoin (..),
+    childJoinAlias,
     deepColumnListName,
     deepJoin,
     deepJoinRowName,
@@ -29,7 +31,8 @@ import ORM.Codegen.Emit.FlatRow
     emitDeepFlatJoinRow,
     emitShallowColumnList,
     emitShallowFlatJoinRow,
-    modelAlias,
+    grandJoinAlias,
+    rootJoinAlias,
     shallowColumnListName,
     shallowJoin,
     shallowJoinRowName,
@@ -161,7 +164,7 @@ emitDeepRootFromGroupFn schema incl =
     toRootDeepFn = toRowFn djRoot <> "From" <> modelName djGrand
     childField = includeFieldName djRoot djChildRel
     childGroupFn = fromGroupName schema djChild nestedKids
-    childPkBinder = fieldBinder djChild (primaryKeyField djChild)
+    childPkBinder = fieldBinder djChild (childGroupKeyField djChild djChildRel)
 
 emitDeepChildFromGroupFn :: Schema -> ModelInclude -> Text
 emitDeepChildFromGroupFn schema incl =
@@ -172,22 +175,25 @@ emitDeepChildFromGroupFn schema incl =
       "      Just",
       "        " <> childResult,
       "          { " <> childVar <> " = " <> toChildDeepFn <> " firstRow,",
-      "            " <> grandField <> " = mapMaybe " <> toGrandFn <> " rows",
+      "            " <> grandField <> " = " <> grandExpr,
       "          }",
       "  | otherwise = Nothing",
       groupFn <> " [] = Nothing"
     ]
   where
-    DeepJoin {djRoot, djChild, djGrand, djGrandRel} = deepJoin schema incl
+    DeepJoin {djRoot, djChild, djGrand, djChildRel, djGrandRel} = deepJoin schema incl
     flatRow = deepJoinRowName djRoot djChild djGrand
     nestedKids = includeChildren (head (includeTree incl))
     childResult = resultTypeName schema djChild nestedKids
     groupFn = fromGroupName schema djChild nestedKids
     childVar = lowerFirst (modelName djChild)
-    childPkBinder = fieldBinder djChild (primaryKeyField djChild)
+    childPkBinder = fieldBinder djChild (childGroupKeyField djChild djChildRel)
     toChildDeepFn = toRowFn djChild <> "From" <> modelName djGrand
     grandField = includeFieldName djChild djGrandRel
     toGrandFn = toRowFn djGrand
+    grandExpr = case relKind djGrandRel of
+      RelBelongsTo -> toGrandFn <> " firstRow"
+      RelHasMany -> "mapMaybe " <> toGrandFn <> " rows"
 
 emitToRootRowFromDeep :: Schema -> ModelInclude -> Text
 emitToRootRowFromDeep schema incl =
@@ -253,23 +259,35 @@ emitToGrandRow schema incl =
     flatRow = deepJoinRowName djRoot djChild djGrand
     grandRow = modelName djGrand <> "Row"
     toFn = toRowFn djGrand
-    justBinds =
-      [ "Just " <> patVar djGrand f <> " <- row." <> fieldBinder djGrand f
-        | f <- djGrandFields
-      ]
-        ++ [ "Just " <> patVar djChild childPkField <> " <- row." <> fieldBinder djChild childPkField
-             | let childPkField = primaryKeyField djChild
-           ]
-    fkField =
+    (justBinds, assigns) = case relKind djGrandRel of
+      RelBelongsTo ->
+        ( [ "Just " <> patVar djGrand f <> " <- row." <> fieldBinder djGrand f
+            | f <- djGrandFields
+          ],
+          [ fieldName f <> " = " <> patVar djGrand f
+            | f <- djGrandFields
+          ]
+        )
+      RelHasMany ->
+        ( grandJustBinds ++ childPkBind,
+          grandAssigns ++ [fieldName grandFkField <> " = " <> patVar djChild childPkField]
+        )
+    childPkField = primaryKeyField djChild
+    grandFkField =
       case find ((== relForeignField djGrandRel) . fieldName) (modelFields djGrand) of
         Just f -> f
         Nothing -> error "emitToGrandRow: missing FK on grand"
-    childPk = primaryKeyField djChild
-    assigns =
+    grandJustBinds =
+      [ "Just " <> patVar djGrand f <> " <- row." <> fieldBinder djGrand f
+        | f <- djGrandFields
+      ]
+    childPkBind =
+      [ "Just " <> patVar djChild childPkField <> " <- row." <> fieldBinder djChild childPkField
+      ]
+    grandAssigns =
       [ fieldName f <> " = " <> patVar djGrand f
         | f <- djGrandFields
       ]
-        ++ [fieldName fkField <> " = " <> patVar djChild childPk]
 
 fromGroupName :: Schema -> Model -> [IncludeTree] -> Text
 fromGroupName schema root edges =
@@ -458,9 +476,9 @@ emitShallowJoinBuilder schema incl =
           "    JoinChain.buildJoinChainFromHasMany "
             <> relName sjRel
             <> " \""
-            <> modelAlias sjRoot
+            <> rootJoinAlias sjRoot
             <> "\" \""
-            <> modelAlias sjChild
+            <> childJoinAlias sjRoot sjChild
             <> "\""
         ]
   where
@@ -480,9 +498,9 @@ emitDeepJoinBuilder schema incl =
           "    JoinChain.addBelongsToJoin "
             <> relName djGrandRel
             <> " \""
-            <> modelAlias djChild
+            <> childJoinAlias djRoot djChild
             <> "\" \""
-            <> modelAlias djGrand
+            <> grandJoinAlias djRoot djChild djGrand
             <> "\" "
             <> shallowBuilder
         ]
@@ -494,9 +512,9 @@ emitDeepJoinBuilder schema incl =
           "    JoinChain.addHasManyJoin "
             <> relName djGrandRel
             <> " \""
-            <> modelAlias djChild
+            <> childJoinAlias djRoot djChild
             <> "\" \""
-            <> modelAlias djGrand
+            <> grandJoinAlias djRoot djChild djGrand
             <> "\" "
             <> shallowBuilder
         ]
@@ -601,7 +619,7 @@ emitIncludeModule moduleName schema incl =
           emitIncludeExports schema incl,
           "where",
           "",
-          emitIncludeImports schema incl,
+          emitIncludeImports moduleName schema incl,
           ""
         ],
         [ emitIncludeADTs schema incl,
@@ -681,13 +699,13 @@ emitIncludeExports schema incl =
         ++ resultExports
         ++ flatExports
 
-emitIncludeImports :: Schema -> ModelInclude -> Text
-emitIncludeImports schema incl =
+emitIncludeImports :: Text -> Schema -> ModelInclude -> Text
+emitIncludeImports moduleName schema incl =
   T.intercalate "\n" $
     filter
       (not . T.null)
       [ "import Data.Maybe (fromMaybe, isJust, mapMaybe)",
-        "import Data.Text (Text)",
+        if needsText then "import Data.Text (Text)" else "",
         if needsUuid then "import Data.UUID (UUID)" else "",
         if needsTime then "import Data.Time (UTCTime)" else "",
         "import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)",
@@ -708,11 +726,12 @@ emitIncludeImports schema incl =
         "import qualified " <> childMod <> " as " <> modelName sjChild,
         grandQualified
       ]
+      ++ enumImports schema incl
   where
     ShallowJoin {sjRoot, sjChild, sjRel, sjRootFields, sjChildFields} =
       shallowJoin schema incl
-    rootMod = "Schema." <> modelName sjRoot
-    childMod = "Schema." <> modelName sjChild
+    rootMod = schemaModulePrefix moduleName <> modelName sjRoot
+    childMod = schemaModulePrefix moduleName <> modelName sjChild
     deep = hasDeepNest incl
     dj =
       if deep
@@ -733,6 +752,7 @@ emitIncludeImports schema incl =
       sjRootFields
         ++ sjChildFields
         ++ [f | deep, f <- deepChildFields ++ djGrandFields]
+    needsText = any ((== TyText) . fieldType) allFields
     needsUuid = any ((== TyUuid) . fieldType) allFields
     needsTime = any ((== TyTimestamptz) . fieldType) allFields
     rootImport =
@@ -759,7 +779,8 @@ emitIncludeImports schema incl =
     grandImport =
       if deep && modelName djGrand /= modelName sjChild
         then
-          "import Schema."
+          "import "
+            <> schemaModulePrefix moduleName
             <> modelName djGrand
             <> " ("
             <> modelName djGrand
@@ -767,8 +788,43 @@ emitIncludeImports schema incl =
         else ""
     grandQualified =
       if deep && modelName djGrand /= modelName sjChild
-        then "import qualified Schema." <> modelName djGrand <> " as " <> modelName djGrand
+        then
+          "import qualified "
+            <> schemaModulePrefix moduleName
+            <> modelName djGrand
+            <> " as "
+            <> modelName djGrand
         else ""
+
+schemaModulePrefix :: Text -> Text
+schemaModulePrefix moduleName =
+  case T.breakOnEnd "." moduleName of
+    (prefix, _) | not (T.null prefix) -> prefix
+    _ -> ""
+
+enumImports :: Schema -> ModelInclude -> [Text]
+enumImports schema incl =
+  [ "import " <> imp <> " (" <> enumName e <> ")"
+    | e <- schemaEnums schema,
+      enumName e `elem` usedEnumNames schema incl,
+      Just imp <- [enumImport e]
+  ]
+
+usedEnumNames :: Schema -> ModelInclude -> [Text]
+usedEnumNames schema incl =
+  [ name
+    | f <- includeFields schema incl,
+      TyEnum name <- [fieldType f]
+  ]
+
+includeFields :: Schema -> ModelInclude -> [FieldSpec]
+includeFields schema incl =
+  let ShallowJoin {sjRootFields, sjChildFields} = shallowJoin schema incl
+   in if hasDeepNest incl
+        then
+          let DeepJoin {djGrandFields, djChildFields = deepChildFields} = deepJoin schema incl
+           in sjRootFields ++ sjChildFields ++ deepChildFields ++ djGrandFields
+        else sjRootFields ++ sjChildFields
 
 collectIncludeTypes :: Schema -> ModelInclude -> [IncludeTypeDecl]
 collectIncludeTypes schema incl =
@@ -887,6 +943,14 @@ includeFieldName parent rel =
   case T.stripPrefix (lowerFirst (modelName parent)) (relName rel) of
     Just rest | not (T.null rest) -> lowerFirst rest
     _ -> lowerFirst (relToModel rel)
+
+childGroupKeyField :: Model -> RelationSpec -> FieldSpec
+childGroupKeyField child childRel =
+  let childPk = primaryKeyField child
+   in if fieldName childPk == relForeignField childRel
+        then fromMaybe childPk $
+          find ((/= fieldName childPk) . fieldName) (modelFields child)
+        else childPk
 
 lookupModel :: Schema -> Text -> Model
 lookupModel schema name =

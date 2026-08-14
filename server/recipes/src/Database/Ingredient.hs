@@ -15,8 +15,9 @@ import Database.PostgreSQL.Simple.FromField
     ResultError (ConversionFailed, UnexpectedNull),
     returnError,
   )
+import Database.PostgreSQL.Simple.ToField (ToField (..))
 
-data Unit = G | Ml | Tsp | Tbsp | Qty deriving (Show)
+data Unit = G | Ml | Tsp | Tbsp | Qty deriving (Show, Eq)
 
 $(deriveJSON defaultOptions ''Unit)
 
@@ -49,6 +50,9 @@ instance FromField Unit where
     | bs == Just "tbsp" = pure Tbsp
     | bs == Just "qty" = pure Qty
     | otherwise = returnError ConversionFailed f ""
+
+instance ToField Unit where
+  toField = toField . unitToString
 
 unitToString :: Unit -> Text
 unitToString G = "g"

@@ -27,7 +27,7 @@ import qualified ORM.Client.Recipe as Recipe
 import ORM.Schema.Ingredient (IngredientRow (..))
 import ORM.Schema.Recipe (RecipeRow (..))
 import ORM.Schema.RecipeInclude
-  ( RecipeIngredientItem (..),
+  ( RecipeIngredientWithIngredient (..),
     RecipeWithIngredients (..),
   )
 import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..))
@@ -77,12 +77,12 @@ fromRecipeWithIngredients (RecipeWithIngredients (RecipeRow rid _ _ rname rdesc)
     { id = rid,
       name = rname,
       description = rdesc,
-      ingredients = mapMaybe fromRecipeIngredientItem ingredients
+      ingredients = mapMaybe fromRecipeIngredientWithIngredient ingredients
     }
 
-fromRecipeIngredientItem :: RecipeIngredientItem -> Maybe RecipeIngredient
-fromRecipeIngredientItem
-  ( RecipeIngredientItem
+fromRecipeIngredientWithIngredient :: RecipeIngredientWithIngredient -> Maybe RecipeIngredient
+fromRecipeIngredientWithIngredient
+  ( RecipeIngredientWithIngredient
       (RecipeIngredientRow _ _ amount unit)
       (Just (IngredientRow iid _ _ iname))
     ) =
@@ -93,4 +93,4 @@ fromRecipeIngredientItem
           amount,
           unit
         }
-fromRecipeIngredientItem _ = Nothing
+fromRecipeIngredientWithIngredient _ = Nothing

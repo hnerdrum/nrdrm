@@ -1,7 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
 
 module ORM.Schema.Ingredient
   ( IngredientTable (..),
@@ -11,7 +12,7 @@ module ORM.Schema.Ingredient
     ingredientId,
     ingredientCreatedAt,
     ingredientUpdatedAt,
-    ingredientName,
+    ingredientName
   )
 where
 
@@ -20,7 +21,7 @@ import Data.Time (UTCTime)
 import Data.UUID (UUID)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
-import ORM.Insert (Insertable (..), setMaybe, setValue)
+import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 
 data IngredientTable = IngredientTable
@@ -34,18 +35,22 @@ instance Entity IngredientTable where
 instance Insertable IngredientTable where
   type CreateInput IngredientTable = IngredientCreate
   toInsertBuilder input =
-    setMaybe ingredientUpdatedAt input.updatedAt $
+    setMaybe ingredientId input.id $
       setMaybe ingredientCreatedAt input.createdAt $
-        setMaybe ingredientId input.id $
-          setValue ingredientName input.name
+      setMaybe ingredientUpdatedAt input.updatedAt $
+      set ingredientName input.name $
+      emptyInsert @IngredientTable
+
 
 instance Updatable IngredientTable where
   type UpdateInput IngredientTable = IngredientUpdate
   updatedAtField = Just ingredientUpdatedAt
   toUpdateBuilder input =
-    setFieldMaybe ingredientUpdatedAt input.updatedAt $
-      setFieldMaybe ingredientCreatedAt input.createdAt $
-        setFieldMaybe ingredientName input.name (emptyUpdate @IngredientTable)
+    setFieldMaybe ingredientCreatedAt input.createdAt $
+      setFieldMaybe ingredientUpdatedAt input.updatedAt $
+      setFieldMaybe ingredientName input.name $
+      emptyUpdate @IngredientTable
+
 
 data IngredientRow = IngredientRow
   { id :: UUID,
@@ -55,6 +60,7 @@ data IngredientRow = IngredientRow
   }
   deriving (Show, Eq)
 
+
 data IngredientCreate = IngredientCreate
   { id :: Maybe UUID,
     createdAt :: Maybe UTCTime,
@@ -63,15 +69,18 @@ data IngredientCreate = IngredientCreate
   }
   deriving (Show, Eq)
 
+
 data IngredientUpdate = IngredientUpdate
-  { name :: Maybe Text,
-    createdAt :: Maybe UTCTime,
-    updatedAt :: Maybe UTCTime
+  { createdAt :: Maybe UTCTime,
+    updatedAt :: Maybe UTCTime,
+    name :: Maybe Text
   }
   deriving (Show, Eq)
 
+
 instance FromRow IngredientRow where
   fromRow = IngredientRow <$> field <*> field <*> field <*> field
+
 
 ingredientId :: Field IngredientTable UUID
 ingredientId = Field "id" "id"
@@ -84,3 +93,4 @@ ingredientUpdatedAt = Field "updatedAt" "updated_at"
 
 ingredientName :: Field IngredientTable Text
 ingredientName = Field "name" "name"
+

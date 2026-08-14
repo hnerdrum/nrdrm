@@ -85,7 +85,7 @@ imports moduleName schema model =
   T.intercalate "\n" $
     filter
       (not . T.null)
-      [ "import Data.Text (Text)",
+      [ if needsText model then "import Data.Text (Text)" else "",
         if needsTime model then "import Data.Time (UTCTime)" else "",
         if needsUuid model then "import Data.UUID (UUID)" else "",
         "import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)",
@@ -94,7 +94,22 @@ imports moduleName schema model =
         updateImport model,
         relationImport model
       ]
+      ++ enumImports schema model
       ++ relationModelImports moduleName schema model
+
+enumImports :: Schema -> Model -> [Text]
+enumImports schema model =
+  [ "import " <> imp <> " (" <> enumName e <> ")"
+    | e <- schemaEnums schema,
+      enumName e `elem` usedEnumNames,
+      Just imp <- [enumImport e]
+  ]
+  where
+    usedEnumNames =
+      [ name
+        | f <- modelFields model,
+          TyEnum name <- [fieldType f]
+      ]
 
 relationModelImports :: Text -> Schema -> Model -> [Text]
 relationModelImports moduleName schema model =
@@ -129,7 +144,7 @@ siblingModule moduleName model =
 insertImport :: Model -> Text
 insertImport model =
   let needsNullable = any fieldNullable (modelFields model)
-      needsMaybe = True
+      needsMaybe = any ((== CreateMaybe) . createKind) (modelFields model)
       parts =
         ["Insertable (..)", "emptyInsert"]
           ++ ["set" | hasRequiredCreateField model]
@@ -140,9 +155,10 @@ insertImport model =
 updateImport :: Model -> Text
 updateImport model =
   let needsNullable = any fieldNullable (updateFields model)
+      needsMaybe = (not . all fieldNullable) (updateFields model)
       parts =
         ["Updatable (..)", "emptyUpdate"]
-          ++ ["setFieldMaybe"]
+          ++ ["setFieldMaybe" | needsMaybe]
           ++ ["setFieldNullable" | needsNullable]
    in "import ORM.Update (" <> T.intercalate ", " parts <> ")"
 
@@ -156,6 +172,12 @@ relationImport model =
 
 needsTime :: Model -> Bool
 needsTime = any ((== TyTimestamptz) . fieldType) . modelFields
+
+needsText :: Model -> Bool
+needsText = any (isTextType . fieldType) . modelFields
+  where
+    isTextType TyText = True
+    isTextType _ = False
 
 needsUuid :: Model -> Bool
 needsUuid = any (isUuidType . fieldType) . modelFields
@@ -223,7 +245,8 @@ data CreateKind = CreateMaybe | CreateNullable | CreateRequired
 
 createKind :: FieldSpec -> CreateKind
 createKind f
-  | fieldIsPrimaryKey f = CreateMaybe
+  | fieldIsPrimaryKey f && isJust (fieldDefault f) = CreateMaybe
+  | fieldIsPrimaryKey f = CreateRequired
   | isJust (fieldDefault f) = CreateMaybe
   | fieldNullable f = CreateNullable
   | otherwise = CreateRequired

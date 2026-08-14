@@ -21,7 +21,7 @@ shelfModel =
     { modelName = "Shelf",
       modelTable = "test_shelf",
       modelFields =
-        [ pk (uuid "id"),
+        [ pk (withDefault DefaultUuidV4 (uuid "id")),
           text "name"
         ],
       modelRelations =
@@ -35,7 +35,7 @@ bookModel =
     { modelName = "Book",
       modelTable = "test_book",
       modelFields =
-        [ pk (uuid "id"),
+        [ pk (withDefault DefaultUuidV4 (uuid "id")),
           column "shelf_id" (uuid "shelfId"),
           text "title"
         ],
@@ -50,7 +50,7 @@ chapterModel =
     { modelName = "Chapter",
       modelTable = "test_chapter",
       modelFields =
-        [ pk (uuid "id"),
+        [ pk (withDefault DefaultUuidV4 (uuid "id")),
           column "book_id" (uuid "bookRef"),
           text "heading"
         ],

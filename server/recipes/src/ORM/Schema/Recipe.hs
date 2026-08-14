@@ -1,7 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
 
 module ORM.Schema.Recipe
   ( RecipeTable (..),
@@ -13,7 +14,7 @@ module ORM.Schema.Recipe
     recipeUpdatedAt,
     recipeName,
     recipeDescription,
-    recipeIngredients,
+    recipeIngredients
   )
 where
 
@@ -22,10 +23,10 @@ import Data.Time (UTCTime)
 import Data.UUID (UUID)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
-import ORM.Insert (Insertable (..), setMaybe, setNullable, setValue)
-import ORM.Relation (HasMany (..), JoinType (..))
-import ORM.Schema.RecipeIngredient (RecipeIngredientTable, riRecipeId)
+import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe, setNullable)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe, setFieldNullable)
+import ORM.Relation (HasMany (..), JoinType (..))
+import ORM.Schema.RecipeIngredient (RecipeIngredientTable, recipeIngredientRecipeId)
 
 data RecipeTable = RecipeTable
 
@@ -38,20 +39,24 @@ instance Entity RecipeTable where
 instance Insertable RecipeTable where
   type CreateInput RecipeTable = RecipeCreate
   toInsertBuilder input =
-    setNullable recipeDescription input.description $
+    setMaybe recipeId input.id $
+      setMaybe recipeCreatedAt input.createdAt $
       setMaybe recipeUpdatedAt input.updatedAt $
-        setMaybe recipeCreatedAt input.createdAt $
-          setMaybe recipeId input.id $
-            setValue recipeName input.name
+      set recipeName input.name $
+      setNullable recipeDescription input.description $
+      emptyInsert @RecipeTable
+
 
 instance Updatable RecipeTable where
   type UpdateInput RecipeTable = RecipeUpdate
   updatedAtField = Just recipeUpdatedAt
   toUpdateBuilder input =
-    setFieldNullable recipeDescription input.description $
+    setFieldMaybe recipeCreatedAt input.createdAt $
       setFieldMaybe recipeUpdatedAt input.updatedAt $
-        setFieldMaybe recipeCreatedAt input.createdAt $
-          setFieldMaybe recipeName input.name (emptyUpdate @RecipeTable)
+      setFieldMaybe recipeName input.name $
+      setFieldNullable recipeDescription input.description $
+      emptyUpdate @RecipeTable
+
 
 data RecipeRow = RecipeRow
   { id :: UUID,
@@ -60,7 +65,8 @@ data RecipeRow = RecipeRow
     name :: Text,
     description :: Maybe Text
   }
-  deriving (Show)
+  deriving (Show, Eq)
+
 
 data RecipeCreate = RecipeCreate
   { id :: Maybe UUID,
@@ -71,16 +77,19 @@ data RecipeCreate = RecipeCreate
   }
   deriving (Show, Eq)
 
+
 data RecipeUpdate = RecipeUpdate
-  { name :: Maybe Text,
-    createdAt :: Maybe UTCTime,
+  { createdAt :: Maybe UTCTime,
     updatedAt :: Maybe UTCTime,
+    name :: Maybe Text,
     description :: NullableValue Text
   }
   deriving (Show, Eq)
 
+
 instance FromRow RecipeRow where
   fromRow = RecipeRow <$> field <*> field <*> field <*> field <*> field
+
 
 recipeId :: Field RecipeTable UUID
 recipeId = Field "id" "id"
@@ -101,6 +110,7 @@ recipeIngredients :: HasMany RecipeTable RecipeIngredientTable UUID
 recipeIngredients =
   HasMany
     { localKey = recipeId,
-      foreignKey = riRecipeId,
+      foreignKey = recipeIngredientRecipeId,
       joinType = LeftJoin
     }
+

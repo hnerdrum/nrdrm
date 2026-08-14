@@ -43,10 +43,13 @@ emitSpec = do
 
     it "includes BelongsTo in a RecipeIngredient model module" $ do
       let actual =
-            emitModelModule "Schema.RecipeIngredient" recipeSchema recipeIngredientModel
+            emitModelModule "ORM.Schema.RecipeIngredient" recipeSchema recipeIngredientModel
       actual
         `shouldSatisfy` T.isInfixOf "import ORM.Relation (BelongsTo (..), JoinType (..))"
+      actual
+        `shouldSatisfy` T.isInfixOf "import ORM.Schema.Ingredient (IngredientTable)"
       actual `shouldSatisfy` T.isInfixOf "    riIngredient"
+      actual `shouldSatisfy` T.isInfixOf "import Database.Ingredient (Unit)"
       T.strip (emitBelongsTo recipeSchema riIngredientRel)
         `shouldSatisfy` (`T.isInfixOf` T.strip actual)
 
@@ -63,6 +66,22 @@ emitSpec = do
     it "emits Chapter matching the golden file" $ do
       expected <- T.readFile "test/ORM/Codegen/golden/Chapter.hs.golden"
       let actual = emitModelModule "Schema.Chapter" shelfSchema chapterModel
+      T.strip actual `shouldBe` T.strip expected
+
+    it "emits Ingredient matching the golden file" $ do
+      expected <- T.readFile "test/ORM/Codegen/golden/Ingredient.hs.golden"
+      let actual = emitModelModule "ORM.Schema.Ingredient" recipeSchema ingredientModel
+      T.strip actual `shouldBe` T.strip expected
+
+    it "emits Recipe matching the golden file" $ do
+      expected <- T.readFile "test/ORM/Codegen/golden/Recipe.hs.golden"
+      let actual = emitModelModule "ORM.Schema.Recipe" recipeSchema recipeModel
+      T.strip actual `shouldBe` T.strip expected
+
+    it "emits RecipeIngredient matching the golden file" $ do
+      expected <- T.readFile "test/ORM/Codegen/golden/RecipeIngredient.hs.golden"
+      let actual =
+            emitModelModule "ORM.Schema.RecipeIngredient" recipeSchema recipeIngredientModel
       T.strip actual `shouldBe` T.strip expected
 
   describe "ORM.Codegen.Emit.Schema.emitHasMany" $ do
@@ -156,6 +175,18 @@ expectedBookChapters =
       "      joinType = LeftJoin",
       "    }"
     ]
+
+recipeModel :: Model
+recipeModel =
+  case find ((== "Recipe") . modelName) (schemaModels recipeSchema) of
+    Just m -> m
+    Nothing -> error "recipeModel: Recipe missing"
+
+ingredientModel :: Model
+ingredientModel =
+  case find ((== "Ingredient") . modelName) (schemaModels recipeSchema) of
+    Just m -> m
+    Nothing -> error "ingredientModel: Ingredient missing"
 
 recipeIngredientModel :: Model
 recipeIngredientModel =

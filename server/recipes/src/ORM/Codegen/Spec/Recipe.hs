@@ -17,14 +17,15 @@ recipeSchema =
 
 unitEnum :: EnumSpec
 unitEnum =
-  enum_
-    "Unit"
-    [ variantMap "G" "g",
-      variantMap "Ml" "ml",
-      variantMap "Tsp" "tsp",
-      variantMap "Tbsp" "tbsp",
-      variantMap "Qty" "qty"
-    ]
+  enumImportFrom "Database.Ingredient" $
+    enum_
+      "Unit"
+      [ variantMap "G" "g",
+        variantMap "Ml" "ml",
+        variantMap "Tsp" "tsp",
+        variantMap "Tbsp" "tbsp",
+        variantMap "Qty" "qty"
+      ]
 
 recipeModel :: Model
 recipeModel =
