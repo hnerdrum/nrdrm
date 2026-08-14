@@ -38,6 +38,8 @@ dependencies:
   - hlint
   - monad-logger-aeson
   - either
+  - directory
+  - filepath
 
 ghc-options:
   - -Wall
@@ -64,6 +66,15 @@ library:
     - TypeOperators
 
 executables:
+  orm-codegen:
+    main: Main.hs
+    source-dirs: tools/orm-codegen
+    ghc-options:
+      - -Wall
+    dependencies:
+      - base
+      - recipes
+      - text
   server-exe:
     main: Main.hs
     source-dirs: app

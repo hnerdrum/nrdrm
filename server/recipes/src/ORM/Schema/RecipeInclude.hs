@@ -2,11 +2,11 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE NoFieldSelectors #-}
 
 module ORM.Schema.RecipeInclude
   ( RecipeInclude (..),
@@ -14,15 +14,14 @@ module ORM.Schema.RecipeInclude
     RecipeIngredientWithIngredient (..),
     RecipeWithIngredients (..),
     RecipeRecipeIngredientJoinRow (..),
-    RecipeRecipeIngredientIngredientJoinRow (..),
+    RecipeRecipeIngredientIngredientJoinRow (..)
   )
 where
 
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Text (Text)
-import Data.Time (UTCTime)
 import Data.UUID (UUID)
-import Database.Ingredient (Unit)
+import Data.Time (UTCTime)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Group (groupByKey)
 import ORM.Include
@@ -34,12 +33,13 @@ import ORM.Include
   )
 import qualified ORM.JoinChain as JoinChain
 import ORM.Operations (findManyConn)
-import ORM.Schema.Ingredient (IngredientRow (..))
-import qualified ORM.Schema.Ingredient as Ingredient
-import ORM.Schema.Recipe (RecipeRow (..), RecipeTable, recipeIngredients)
-import qualified ORM.Schema.Recipe as Recipe
+import ORM.Schema.Recipe (RecipeTable, RecipeRow (..), recipeIngredients)
 import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..), riIngredient)
+import ORM.Schema.Ingredient (IngredientRow (..))
+import qualified ORM.Schema.Recipe as Recipe
 import qualified ORM.Schema.RecipeIngredient as RecipeIngredient
+import qualified ORM.Schema.Ingredient as Ingredient
+import Database.Ingredient (Unit)
 
 newtype RecipeIngredientInclude = RecipeIngredientInclude
   { ingredient :: Bool
@@ -186,7 +186,7 @@ recipeWithIngredientFromRecipeGroup [] =
   error "recipeWithIngredientFromRecipeGroup: empty group"
 
 recipeIngredientWithIngredientFromGroup :: [RecipeRecipeIngredientIngredientJoinRow] -> Maybe RecipeIngredientWithIngredient
-recipeIngredientWithIngredientFromGroup (firstRow : _)
+recipeIngredientWithIngredientFromGroup rows@(firstRow : _)
   | Just _ <- firstRow.recipeIngredientIngredientId =
       Just
         RecipeIngredientWithIngredient
@@ -231,3 +231,4 @@ instance {-# OVERLAPPING #-} ExecuteInclude RecipeTable RecipeInclude RecipeWith
         let chain = applyRootFilter buildRecipeRecipeIngredientIngredientJoin modifier
         flatRows <- JoinChain.runJoinChainConn @RecipeRecipeIngredientIngredientJoinRow conn chain
         pure $ nestRecipeRecipeIngredientIngredientRows flatRows
+
