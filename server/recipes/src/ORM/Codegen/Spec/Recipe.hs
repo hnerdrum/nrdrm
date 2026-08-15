@@ -64,7 +64,8 @@ recipeIngredientModel =
     { modelName = "RecipeIngredient",
       modelTable = "recipe_ingredient",
       modelFields =
-        [ pk (column "recipe_id" (uuid "recipeId")),
+        [ pk (withDefault DefaultUuidV4 (uuid "id")),
+          column "recipe_id" (uuid "recipeId"),
           column "ingredient_id" (uuid "ingredientId"),
           int "amount",
           enumField "unit" "Unit"

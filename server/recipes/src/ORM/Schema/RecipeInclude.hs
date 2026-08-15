@@ -72,6 +72,7 @@ data RecipeRecipeIngredientJoinRow = RecipeRecipeIngredientJoinRow
     recipeUpdatedAt :: UTCTime,
     recipeName :: Text,
     recipeDescription :: Maybe Text,
+    recipeIngredientId :: Maybe UUID,
     recipeIngredientIngredientId :: Maybe UUID,
     recipeIngredientAmount :: Maybe Int,
     recipeIngredientUnit :: Maybe Unit
@@ -79,7 +80,7 @@ data RecipeRecipeIngredientJoinRow = RecipeRecipeIngredientJoinRow
   deriving (Show, Eq)
 
 instance FromRow RecipeRecipeIngredientJoinRow where
-  fromRow = RecipeRecipeIngredientJoinRow <$> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field
+  fromRow = RecipeRecipeIngredientJoinRow <$> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field
 
 recipeRecipeIngredientColumns :: [Text]
 recipeRecipeIngredientColumns =
@@ -88,6 +89,7 @@ recipeRecipeIngredientColumns =
     JoinChain.col "r" Recipe.recipeUpdatedAt,
     JoinChain.col "r" Recipe.recipeName,
     JoinChain.col "r" Recipe.recipeDescription,
+    JoinChain.col "ri" RecipeIngredient.recipeIngredientId,
     JoinChain.col "ri" RecipeIngredient.recipeIngredientIngredientId,
     JoinChain.col "ri" RecipeIngredient.recipeIngredientAmount,
     JoinChain.col "ri" RecipeIngredient.recipeIngredientUnit
@@ -104,6 +106,7 @@ data RecipeRecipeIngredientIngredientJoinRow = RecipeRecipeIngredientIngredientJ
     recipeUpdatedAt :: UTCTime,
     recipeName :: Text,
     recipeDescription :: Maybe Text,
+    recipeIngredientId :: Maybe UUID,
     recipeIngredientIngredientId :: Maybe UUID,
     recipeIngredientAmount :: Maybe Int,
     recipeIngredientUnit :: Maybe Unit,
@@ -115,7 +118,7 @@ data RecipeRecipeIngredientIngredientJoinRow = RecipeRecipeIngredientIngredientJ
   deriving (Show, Eq)
 
 instance FromRow RecipeRecipeIngredientIngredientJoinRow where
-  fromRow = RecipeRecipeIngredientIngredientJoinRow <$> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field
+  fromRow = RecipeRecipeIngredientIngredientJoinRow <$> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field
 
 recipeRecipeIngredientIngredientColumns :: [Text]
 recipeRecipeIngredientIngredientColumns =
@@ -166,10 +169,11 @@ toRecipeRow row = RecipeRow {id = row.recipeId, createdAt = row.recipeCreatedAt,
 
 toRecipeIngredientRow :: RecipeRecipeIngredientJoinRow -> Maybe RecipeIngredientRow
 toRecipeIngredientRow row
-  | Just ingredientId <- row.recipeIngredientIngredientId,
+  | Just rid <- row.recipeIngredientId,
+    Just ingredientId <- row.recipeIngredientIngredientId,
     Just amount <- row.recipeIngredientAmount,
     Just unit <- row.recipeIngredientUnit =
-      Just RecipeIngredientRow {ingredientId = ingredientId, amount = amount, unit = unit, recipeId = row.recipeId}
+      Just RecipeIngredientRow {id = rid, ingredientId = ingredientId, amount = amount, unit = unit, recipeId = row.recipeId}
   | otherwise = Nothing
 
 nestRecipeRecipeIngredientIngredientRows :: [RecipeRecipeIngredientIngredientJoinRow] -> [RecipeWithIngredients]
@@ -180,14 +184,14 @@ recipeWithIngredientFromRecipeGroup :: [RecipeRecipeIngredientIngredientJoinRow]
 recipeWithIngredientFromRecipeGroup rows@(firstRow : _) =
   RecipeWithIngredients
     { recipe = toRecipeRowFromIngredient firstRow,
-      ingredients = mapMaybe recipeIngredientWithIngredientFromGroup $ groupByKey (.recipeIngredientIngredientId) rows
+      ingredients = mapMaybe recipeIngredientWithIngredientFromGroup $ groupByKey (.recipeIngredientId) rows
     }
 recipeWithIngredientFromRecipeGroup [] =
   error "recipeWithIngredientFromRecipeGroup: empty group"
 
 recipeIngredientWithIngredientFromGroup :: [RecipeRecipeIngredientIngredientJoinRow] -> Maybe RecipeIngredientWithIngredient
 recipeIngredientWithIngredientFromGroup rows@(firstRow : _)
-  | Just _ <- firstRow.recipeIngredientIngredientId =
+  | Just _ <- firstRow.recipeIngredientId =
       Just
         RecipeIngredientWithIngredient
           { recipeIngredient = toRecipeIngredientRowFromIngredient firstRow,
@@ -202,7 +206,8 @@ toRecipeRowFromIngredient row = RecipeRow {id = row.recipeId, createdAt = row.re
 toRecipeIngredientRowFromIngredient :: RecipeRecipeIngredientIngredientJoinRow -> RecipeIngredientRow
 toRecipeIngredientRowFromIngredient row =
   RecipeIngredientRow
-    { ingredientId = fromMaybe (error "toRecipeIngredientRowFromIngredient: missing ingredientId") row.recipeIngredientIngredientId,
+    { id = fromMaybe (error "toRecipeIngredientRowFromIngredient: missing id") row.recipeIngredientId,
+      ingredientId = fromMaybe (error "toRecipeIngredientRowFromIngredient: missing ingredientId") row.recipeIngredientIngredientId,
       amount = fromMaybe (error "toRecipeIngredientRowFromIngredient: missing amount") row.recipeIngredientAmount,
       unit = fromMaybe (error "toRecipeIngredientRowFromIngredient: missing unit") row.recipeIngredientUnit,
       recipeId = row.recipeId

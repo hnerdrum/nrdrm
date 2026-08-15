@@ -83,7 +83,7 @@ fromRecipeWithIngredients (RecipeWithIngredients (RecipeRow rid _ _ rname rdesc)
 fromRecipeIngredientWithIngredient :: RecipeIngredientWithIngredient -> Maybe RecipeIngredient
 fromRecipeIngredientWithIngredient
   ( RecipeIngredientWithIngredient
-      (RecipeIngredientRow _ _ amount unit)
+      (RecipeIngredientRow _ _ _ amount unit)
       (Just (IngredientRow iid _ _ iname))
     ) =
     Just

@@ -9,6 +9,7 @@ module ORM.Schema.RecipeIngredient
     RecipeIngredientRow (..),
     RecipeIngredientCreate (..),
     RecipeIngredientUpdate (..),
+    recipeIngredientId,
     recipeIngredientRecipeId,
     recipeIngredientIngredientId,
     recipeIngredientAmount,
@@ -20,7 +21,7 @@ where
 import Data.UUID (UUID)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
-import ORM.Insert (Insertable (..), emptyInsert, set)
+import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 import ORM.Relation (BelongsTo (..), JoinType (..))
 import Database.Ingredient (Unit)
@@ -33,12 +34,13 @@ type instance PrimaryKeyType RecipeIngredientTable = UUID
 
 instance Entity RecipeIngredientTable where
   tableName = "recipe_ingredient"
-  primaryKey = recipeIngredientRecipeId
+  primaryKey = recipeIngredientId
 
 instance Insertable RecipeIngredientTable where
   type CreateInput RecipeIngredientTable = RecipeIngredientCreate
   toInsertBuilder input =
-    set recipeIngredientRecipeId input.recipeId $
+    setMaybe recipeIngredientId input.id $
+      set recipeIngredientRecipeId input.recipeId $
       set recipeIngredientIngredientId input.ingredientId $
       set recipeIngredientAmount input.amount $
       set recipeIngredientUnit input.unit $
@@ -49,14 +51,16 @@ instance Updatable RecipeIngredientTable where
   type UpdateInput RecipeIngredientTable = RecipeIngredientUpdate
   updatedAtField = Nothing
   toUpdateBuilder input =
-    setFieldMaybe recipeIngredientIngredientId input.ingredientId $
+    setFieldMaybe recipeIngredientRecipeId input.recipeId $
+      setFieldMaybe recipeIngredientIngredientId input.ingredientId $
       setFieldMaybe recipeIngredientAmount input.amount $
       setFieldMaybe recipeIngredientUnit input.unit $
       emptyUpdate @RecipeIngredientTable
 
 
 data RecipeIngredientRow = RecipeIngredientRow
-  { recipeId :: UUID,
+  { id :: UUID,
+    recipeId :: UUID,
     ingredientId :: UUID,
     amount :: Int,
     unit :: Unit
@@ -65,7 +69,8 @@ data RecipeIngredientRow = RecipeIngredientRow
 
 
 data RecipeIngredientCreate = RecipeIngredientCreate
-  { recipeId :: UUID,
+  { id :: Maybe UUID,
+    recipeId :: UUID,
     ingredientId :: UUID,
     amount :: Int,
     unit :: Unit
@@ -74,7 +79,8 @@ data RecipeIngredientCreate = RecipeIngredientCreate
 
 
 data RecipeIngredientUpdate = RecipeIngredientUpdate
-  { ingredientId :: Maybe UUID,
+  { recipeId :: Maybe UUID,
+    ingredientId :: Maybe UUID,
     amount :: Maybe Int,
     unit :: Maybe Unit
   }
@@ -82,8 +88,11 @@ data RecipeIngredientUpdate = RecipeIngredientUpdate
 
 
 instance FromRow RecipeIngredientRow where
-  fromRow = RecipeIngredientRow <$> field <*> field <*> field <*> field
+  fromRow = RecipeIngredientRow <$> field <*> field <*> field <*> field <*> field
 
+
+recipeIngredientId :: Field RecipeIngredientTable UUID
+recipeIngredientId = Field "id" "id"
 
 recipeIngredientRecipeId :: Field RecipeIngredientTable UUID
 recipeIngredientRecipeId = Field "recipeId" "recipe_id"
