@@ -1,3 +1,5 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 
 module ORM.Client.Recipe
@@ -8,6 +10,9 @@ module ORM.Client.Recipe
     create,
     update,
     delete,
+    RecipeWriteCreate (..),
+    RecipeWriteUpdate (..),
+    RecipeIngredientNestedCreate (..),
     withIngredients,
     noInclude
   )
@@ -15,31 +20,60 @@ module ORM.Client.Recipe
 where
 
 import Control.Monad (forM_)
-import Data.Maybe (mapMaybe)
 import Data.Pool (Pool)
 import Data.Time (UTCTime, getCurrentTime)
 import Data.UUID (UUID)
 import qualified Data.UUID.V4 as V4
 import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.ToField (toField)
-import Database.Recipe
-  ( CreateRecipeIngredientInput (..),
-    CreateRecipeInput (..),
-    UpdateRecipeIngredientInput (..),
-    UpdateRecipeInput (..),
-  )
-import ORM.Core (NullableValue (..), fieldColumn)
+import ORM.Core (fieldColumn)
 import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
 import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
 import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..))
-import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientId)
+import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
 import ORM.Transaction (transaction)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder)
 import qualified ORM.Update as Update
+import ORM.Schema.Unit (Unit)
+
+data RecipeWriteCreate = RecipeWriteCreate
+  { root :: RecipeCreate
+  , ingredients :: [RecipeIngredientNestedCreate]
+  }
+  deriving (Show, Eq)
+
+data RecipeIngredientNestedCreate = RecipeIngredientNestedCreate
+  { ingredientId :: UUID, amount :: Int, unit :: Unit
+  }
+  deriving (Show, Eq)
+
+
+
+data RecipeWriteUpdate = RecipeWriteUpdate
+  { root :: RecipeUpdate
+  , ingredients :: Maybe [RecipeIngredientNestedCreate]
+  }
+  deriving (Show, Eq)
+
+
+toRecipeIngredientCreate :: UUID -> RecipeIngredientNestedCreate -> RecipeIngredientCreate
+toRecipeIngredientCreate parentId nested =
+  RecipeIngredientCreate
+    { id = Nothing,
+      ingredientId = nested.ingredientId,
+      amount = nested.amount,
+      unit = nested.unit,
+      recipeId = parentId
+    }
+
+
+applyUpdatedAt :: UTCTime -> RecipeUpdate -> RecipeUpdate
+applyUpdatedAt now input = input { updatedAt = Just now }
+
 
 withIngredients :: RecipeInclude
 withIngredients =
@@ -73,94 +107,50 @@ findUniqueOrError = Include.findUniqueOrError @RecipeTable
 create ::
   Pool Connection ->
   RecipeInclude ->
-  CreateRecipeInput ->
+  RecipeWriteCreate ->
   IO (Either ORMError RecipeWithIngredients)
 create pool include input = do
-  recipeId <- V4.nextRandom
+  rootId <- maybe V4.nextRandom pure input.root.id
+  let rootInput :: RecipeCreate
+      rootInput = input.root { id = Just rootId }
   transaction pool $ \conn -> do
-    recipeResult <-
-      Insert.insertConn @RecipeTable @RecipeRow conn (toRecipeCreate recipeId input)
-    case recipeResult of
+    rootResult <-
+      Insert.insertConn @RecipeTable @RecipeRow conn rootInput
+    case rootResult of
       Left err -> pure (Left err)
       Right _ -> do
-        forM_ input.ingredients $ \ingredient ->
+        forM_ input.ingredients $ \nested ->
           Insert.executeInsertConn conn $
-            Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate recipeId ingredient)
-        Include.findUniqueOrErrorConn @RecipeTable conn include recipeId
+            Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate rootId nested)
+        Include.findUniqueOrErrorConn @RecipeTable conn include rootId
 
 
 update ::
   Pool Connection ->
   RecipeInclude ->
   UUID ->
-  UpdateRecipeInput ->
+  RecipeWriteUpdate ->
   IO (Either ORMError RecipeWithIngredients)
-update pool include recipeId input = do
+update pool include rootId input = do
   now <- getCurrentTime
   transaction pool $ \conn -> do
     updateResult <-
-      Update.updateConn @RecipeTable @RecipeRow conn recipeId (toRecipeUpdate now input)
+      Update.updateConn @RecipeTable @RecipeRow conn rootId (applyUpdatedAt now input.root)
     case updateResult of
       Left err -> pure (Left err)
       Right _ -> do
         case input.ingredients of
           Nothing -> pure ()
-          Just ingredients -> do
+          Just nestedItems -> do
             _ <-
               Delete.deleteConn conn $
-                Delete.whereDelete (fieldColumn recipeIngredientId <> " = ?") [toField recipeId] (Delete.emptyDelete @RecipeIngredientTable)
-            forM_ (mapMaybe (toRecipeIngredientUpdate recipeId) ingredients) $ \ri ->
+                Delete.whereDelete (fieldColumn recipeIngredientRecipeId <> " = ?") [toField rootId] (Delete.emptyDelete @RecipeIngredientTable)
+            forM_ nestedItems $ \nested ->
               Insert.executeInsertConn conn $
-                Insert.toInsertBuilder @RecipeIngredientTable ri
-        Include.findUniqueOrErrorConn @RecipeTable conn include recipeId
+                Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate rootId nested)
+        Include.findUniqueOrErrorConn @RecipeTable conn include rootId
 
 
 delete :: Pool Connection -> UUID -> IO Int
 delete = Ops.delete @RecipeTable
-
-
-toRecipeCreate :: UUID -> CreateRecipeInput -> RecipeCreate
-toRecipeCreate recipeId input =
-  RecipeCreate
-    { id = Just recipeId,
-      createdAt = Nothing,
-      updatedAt = Nothing,
-      name = input.name,
-      description = Value input.description
-    }
-
-
-toRecipeUpdate :: UTCTime -> UpdateRecipeInput -> RecipeUpdate
-toRecipeUpdate now input =
-  RecipeUpdate
-    { name = input.name,
-      createdAt = Nothing,
-      updatedAt = Just now,
-      description = maybe Omit Value input.description
-    }
-
-
-toRecipeIngredientCreate :: UUID -> CreateRecipeIngredientInput -> RecipeIngredientCreate
-toRecipeIngredientCreate recipeId input =
-  RecipeIngredientCreate
-    { id = Nothing,
-      recipeId,
-      ingredientId = input.id,
-      amount = input.amount,
-      unit = input.unit
-    }
-
-
-toRecipeIngredientUpdate :: UUID -> UpdateRecipeIngredientInput -> Maybe RecipeIngredientCreate
-toRecipeIngredientUpdate recipeId input = do
-  amount <- input.amount
-  unit <- input.unit
-  pure
-    RecipeIngredientCreate
-      { id = Nothing,
-        recipeId,
-        ingredientId = input.id,
-        amount,
-        unit
-      }
 

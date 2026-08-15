@@ -3,12 +3,13 @@
 module ORM.Codegen.Emit.Client
   ( emitSimpleClientModule,
     emitIncludeReadClientModule,
-    emitRecipeClientModule,
+    emitWriteClientModule,
   )
 where
 
 import Data.Char (toLower, toUpper)
 import Data.List (find)
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.IR
@@ -106,30 +107,25 @@ emitIncludeReadClientModule moduleName schema incl =
           not (null (includeChildren edge))
       ]
 
-emitRecipeClientModule :: Text -> Schema -> ModelInclude -> Text
-emitRecipeClientModule moduleName schema incl =
-  T.unlines
-    [ "{-# LANGUAGE TypeApplications #-}",
+emitWriteClientModule :: Text -> Schema -> ModelInclude -> Text
+emitWriteClientModule moduleName schema incl =
+  T.unlines $
+    [ "{-# LANGUAGE DuplicateRecordFields #-}",
+      "{-# LANGUAGE OverloadedRecordDot #-}",
+      "{-# LANGUAGE TypeApplications #-}",
       "",
       "module " <> moduleName,
-      emitRecipeExports schema incl,
+      emitWriteExports schema incl root child rel,
       "where",
       "",
       "import Control.Monad (forM_)",
-      "import Data.Maybe (mapMaybe)",
       "import Data.Pool (Pool)",
       "import Data.Time (UTCTime, getCurrentTime)",
       "import Data.UUID (UUID)",
       "import qualified Data.UUID.V4 as V4",
       "import Database.PostgreSQL.Simple (Connection)",
       "import Database.PostgreSQL.Simple.ToField (toField)",
-      "import Database.Recipe",
-      "  ( CreateRecipeIngredientInput (..),",
-      "    CreateRecipeInput (..),",
-      "    UpdateRecipeIngredientInput (..),",
-      "    UpdateRecipeInput (..),",
-      "  )",
-      "import ORM.Core (NullableValue (..), fieldColumn)",
+      "import ORM.Core (fieldColumn)",
       "import qualified ORM.Delete as Delete",
       "import ORM.Errors (ORMError)",
       "import qualified ORM.Include as Include",
@@ -161,50 +157,255 @@ emitRecipeClientModule moduleName schema incl =
         <> " (..), "
         <> tableTypeName child
         <> ", "
-        <> deleteField
+        <> wipeField
         <> ")",
       "import ORM.Transaction (transaction)",
       "import qualified ORM.Operations as Ops",
       "import ORM.Query (QueryBuilder)",
-      "import qualified ORM.Update as Update",
-      "",
-      emitFullIncludePreset schema incl,
-      "",
-      emitNoIncludePreset schema incl,
-      "",
-      emitIncludeFindAll root incl,
-      "",
-      emitIncludeFindMany root incl,
-      "",
-      emitIncludeFindUnique root incl,
-      "",
-      emitIncludeFindUniqueOrError root incl,
-      "",
-      emitRecipeCreate root incl child,
-      "",
-      emitRecipeUpdate root incl child deleteField,
-      "",
-      emitRecipeDelete root,
-      "",
-      emitToRecipeCreate root,
-      "",
-      emitToRecipeUpdate root,
-      "",
-      emitToRecipeIngredientCreate child,
-      "",
-      emitToRecipeIngredientUpdate child
+      "import qualified ORM.Update as Update"
     ]
+      ++ nestedEnumImports schema child
+      ++ [ "",
+           emitWriteCreateType root child rel,
+           "",
+           emitWriteUpdateType root child rel,
+           "",
+           emitNestedToChildCreate child rel,
+           "",
+           applyUpdatedAtHelper root,
+           "",
+           emitFullIncludePreset schema incl,
+           "",
+           emitNoIncludePreset schema incl,
+           "",
+           emitIncludeFindAll root incl,
+           "",
+           emitIncludeFindMany root incl,
+           "",
+           emitIncludeFindUnique root incl,
+           "",
+           emitIncludeFindUniqueOrError root incl,
+           "",
+           emitWriteCreate root incl child rel,
+           "",
+           emitWriteUpdate root incl child rel wipeField,
+           "",
+           emitDeleteFn root
+         ]
   where
     root = lookupModel schema (includeRootModel incl)
-    child = hasManyChild schema root (head (includeTree incl))
-    deleteField = fieldBinder child (primaryKeyField child)
+    (rel, child) = replaceChildRelation schema root incl
+    wipeField = fieldBinder child (lookupField child (relForeignField rel))
     includeTypeExports =
       [ modelName nested <> "Include (..)"
         | edge <- includeTree incl,
-          let rel = lookupRelation root (includeRelation edge),
-          let nested = lookupModel schema (relToModel rel),
+          let childRel = lookupRelation root (includeRelation edge),
+          let nested = lookupModel schema (relToModel childRel),
           not (null (includeChildren edge))
       ]
+
+emitWriteExports :: Schema -> ModelInclude -> Model -> Model -> RelationSpec -> Text
+emitWriteExports schema incl root child _rel =
+  T.unlines
+    [ "  ( findAll,",
+      "    findMany,",
+      "    findUnique,",
+      "    findUniqueOrError,",
+      "    create,",
+      "    update,",
+      "    delete,",
+      "    " <> writeCreateTypeName root <> " (..),",
+      "    " <> writeUpdateTypeName root <> " (..),",
+      "    " <> nestedCreateTypeName child <> " (..),",
+      "    " <> fullPresetName schema incl <> ",",
+      "    noInclude",
+      "  )"
+    ]
+
+emitWriteCreateType :: Model -> Model -> RelationSpec -> Text
+emitWriteCreateType root child rel =
+  T.unlines
+    [ "data " <> writeCreateTypeName root <> " = " <> writeCreateTypeName root,
+      "  { root :: " <> createTypeName root,
+      "  , " <> childrenFieldName root rel <> " :: [" <> nestedCreateTypeName child <> "]",
+      "  }",
+      "  deriving (Show, Eq)",
+      "",
+      emitNestedCreateType child rel
+    ]
+
+emitWriteUpdateType :: Model -> Model -> RelationSpec -> Text
+emitWriteUpdateType root child rel =
+  T.unlines
+    [ "data " <> writeUpdateTypeName root <> " = " <> writeUpdateTypeName root,
+      "  { root :: " <> updateTypeName root,
+      "  , " <> childrenFieldName root rel <> " :: Maybe [" <> nestedCreateTypeName child <> "]",
+      "  }",
+      "  deriving (Show, Eq)"
+    ]
+
+emitNestedCreateType :: Model -> RelationSpec -> Text
+emitNestedCreateType child rel =
+  T.unlines
+    [ "data " <> nestedCreateTypeName child <> " = " <> nestedCreateTypeName child,
+      "  { " <> T.intercalate ", " (nestedFieldLines child rel),
+      "  }",
+      "  deriving (Show, Eq)"
+    ]
+
+nestedFieldLines :: Model -> RelationSpec -> [Text]
+nestedFieldLines child rel =
+  [ fieldName f <> " :: " <> hsType (fieldType f)
+    | f <- modelFields child,
+      not (fieldIsPrimaryKey f),
+      fieldName f /= relForeignField rel
+  ]
+
+emitNestedToChildCreate :: Model -> RelationSpec -> Text
+emitNestedToChildCreate child rel =
+  T.unlines $
+    [ "to" <> createTypeName child <> " :: UUID -> " <> nestedCreateTypeName child <> " -> " <> createTypeName child,
+      "to" <> createTypeName child <> " parentId nested =",
+      "  " <> createTypeName child,
+      "    { id = Nothing,"
+    ]
+      ++ [ "      " <> fieldName f <> " = nested." <> fieldName f <> ","
+           | f <- modelFields child,
+             not (fieldIsPrimaryKey f),
+             fieldName f /= relForeignField rel
+         ]
+      ++ ["      " <> relForeignField rel <> " = parentId", "    }"]
+
+emitWriteCreate :: Model -> ModelInclude -> Model -> RelationSpec -> Text
+emitWriteCreate root incl child rel =
+  let childrenField = childrenFieldName root rel
+      toChild = "to" <> createTypeName child
+   in T.unlines
+        [ "create ::",
+          "  Pool Connection ->",
+          "  " <> includeName incl <> " ->",
+          "  " <> writeCreateTypeName root <> " ->",
+          "  IO (Either ORMError " <> includeResultName root incl <> ")",
+          "create pool include input = do",
+          "  rootId <- maybe V4.nextRandom pure input.root.id",
+          "  let rootInput :: " <> createTypeName root,
+          "      rootInput = input.root { id = Just rootId }",
+          "  transaction pool $ \\conn -> do",
+          "    rootResult <-",
+          "      Insert.insertConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn rootInput",
+          "    case rootResult of",
+          "      Left err -> pure (Left err)",
+          "      Right _ -> do",
+          "        forM_ input." <> childrenField <> " $ \\nested ->",
+          "          Insert.executeInsertConn conn $",
+          "            Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
+          "        Include.findUniqueOrErrorConn @" <> tableTypeName root <> " conn include rootId"
+        ]
+
+emitWriteUpdate :: Model -> ModelInclude -> Model -> RelationSpec -> Text -> Text
+emitWriteUpdate root incl child rel wipeField =
+  let childrenField = childrenFieldName root rel
+      toChild = "to" <> createTypeName child
+   in T.unlines
+        [ "update ::",
+          "  Pool Connection ->",
+          "  " <> includeName incl <> " ->",
+          "  UUID ->",
+          "  " <> writeUpdateTypeName root <> " ->",
+          "  IO (Either ORMError " <> includeResultName root incl <> ")",
+          "update pool include rootId input = do",
+          "  now <- getCurrentTime",
+          "  transaction pool $ \\conn -> do",
+          "    updateResult <-",
+          "      Update.updateConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn rootId (applyUpdatedAt now input.root)",
+          "    case updateResult of",
+          "      Left err -> pure (Left err)",
+          "      Right _ -> do",
+          "        case input." <> childrenField <> " of",
+          "          Nothing -> pure ()",
+          "          Just nestedItems -> do",
+          "            _ <-",
+          "              Delete.deleteConn conn $",
+          "                Delete.whereDelete (fieldColumn " <> wipeField <> " <> \" = ?\") [toField rootId] (Delete.emptyDelete @" <> tableTypeName child <> ")",
+          "            forM_ nestedItems $ \\nested ->",
+          "              Insert.executeInsertConn conn $",
+          "                Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
+          "        Include.findUniqueOrErrorConn @" <> tableTypeName root <> " conn include rootId"
+        ]
+
+writeCreateTypeName :: Model -> Text
+writeCreateTypeName model = modelName model <> "WriteCreate"
+
+writeUpdateTypeName :: Model -> Text
+writeUpdateTypeName model = modelName model <> "WriteUpdate"
+
+nestedCreateTypeName :: Model -> Text
+nestedCreateTypeName model = modelName model <> "NestedCreate"
+
+childrenFieldName :: Model -> RelationSpec -> Text
+childrenFieldName = includeFieldName
+
+replaceChildRelation :: Schema -> Model -> ModelInclude -> (RelationSpec, Model)
+replaceChildRelation schema root incl =
+  case [ (rel, lookupModel schema (relToModel rel))
+         | edge <- includeTree incl,
+           let rel = lookupRelation root (includeRelation edge),
+           relReplaceChildren rel
+       ] of
+    (found : _) -> found
+    [] ->
+      error $
+        "emitWriteClientModule: include "
+          <> T.unpack (includeName incl)
+          <> " has no replaceChildren relation"
+
+lookupField :: Model -> Text -> FieldSpec
+lookupField model name =
+  case find ((== name) . fieldName) (modelFields model) of
+    Just f -> f
+    Nothing ->
+      error $
+        "emit Client: unknown field "
+          <> T.unpack name
+          <> " on "
+          <> T.unpack (modelName model)
+
+hsType :: FieldType -> Text
+hsType TyText = "Text"
+hsType TyUuid = "UUID"
+hsType TyInt = "Int"
+hsType TyTimestamptz = "UTCTime"
+hsType (TyEnum name) = name
+
+applyUpdatedAtHelper :: Model -> Text
+applyUpdatedAtHelper model =
+  case find fieldUpdatedAt (modelFields model) of
+    Just f ->
+      T.unlines
+        [ "applyUpdatedAt :: UTCTime -> " <> updateTypeName model <> " -> " <> updateTypeName model,
+          "applyUpdatedAt now input = input { " <> fieldName f <> " = Just now }"
+        ]
+    Nothing ->
+      T.unlines
+        [ "applyUpdatedAt :: UTCTime -> " <> updateTypeName model <> " -> " <> updateTypeName model,
+          "applyUpdatedAt _ input = input"
+        ]
+
+nestedEnumImports :: Schema -> Model -> [Text]
+nestedEnumImports schema child =
+  nubImports
+    [ "import ORM.Schema." <> enumName e <> " (" <> enumName e <> ")"
+      | f <- modelFields child,
+        TyEnum wanted <- [fieldType f],
+        e <- schemaEnums schema,
+        enumName e == wanted,
+        isNothing (enumImport e)
+    ]
+  where
+    nubImports = foldr go []
+      where
+        go imp acc | imp `elem` acc = acc
+        go imp acc = imp : acc
 
 emitSimpleExports :: Text
 emitSimpleExports =
@@ -225,21 +426,6 @@ emitIncludeReadExports schema incl =
       "    findMany,",
       "    findUnique,",
       "    findUniqueOrError,",
-      "    " <> fullPresetName schema incl <> ",",
-      "    noInclude",
-      "  )"
-    ]
-
-emitRecipeExports :: Schema -> ModelInclude -> Text
-emitRecipeExports schema incl =
-  T.unlines
-    [ "  ( findAll,",
-      "    findMany,",
-      "    findUnique,",
-      "    findUniqueOrError,",
-      "    create,",
-      "    update,",
-      "    delete,",
       "    " <> fullPresetName schema incl <> ",",
       "    noInclude",
       "  )"
@@ -346,118 +532,6 @@ includeResultName model incl =
   where
     stubSchema = Schema {schemaEnums = [], schemaModels = [model], schemaIncludes = [incl]}
 
-emitRecipeCreate :: Model -> ModelInclude -> Model -> Text
-emitRecipeCreate root incl child =
-  T.unlines
-    [ "create ::",
-      "  Pool Connection ->",
-      "  " <> includeName incl <> " ->",
-      "  CreateRecipeInput ->",
-      "  IO (Either ORMError " <> includeResultName root incl <> ")",
-      "create pool include input = do",
-      "  recipeId <- V4.nextRandom",
-      "  transaction pool $ \\conn -> do",
-      "    recipeResult <-",
-      "      Insert.insertConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn (toRecipeCreate recipeId input)",
-      "    case recipeResult of",
-      "      Left err -> pure (Left err)",
-      "      Right _ -> do",
-      "        forM_ input.ingredients $ \\ingredient ->",
-      "          Insert.executeInsertConn conn $",
-      "            Insert.toInsertBuilder @" <> tableTypeName child <> " (toRecipeIngredientCreate recipeId ingredient)",
-      "        Include.findUniqueOrErrorConn @" <> tableTypeName root <> " conn include recipeId"
-    ]
-
-emitRecipeUpdate :: Model -> ModelInclude -> Model -> Text -> Text
-emitRecipeUpdate root incl child deleteField =
-  T.unlines
-    [ "update ::",
-      "  Pool Connection ->",
-      "  " <> includeName incl <> " ->",
-      "  UUID ->",
-      "  UpdateRecipeInput ->",
-      "  IO (Either ORMError " <> includeResultName root incl <> ")",
-      "update pool include recipeId input = do",
-      "  now <- getCurrentTime",
-      "  transaction pool $ \\conn -> do",
-      "    updateResult <-",
-      "      Update.updateConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn recipeId (toRecipeUpdate now input)",
-      "    case updateResult of",
-      "      Left err -> pure (Left err)",
-      "      Right _ -> do",
-      "        case input.ingredients of",
-      "          Nothing -> pure ()",
-      "          Just ingredients -> do",
-      "            _ <-",
-      "              Delete.deleteConn conn $",
-      "                Delete.whereDelete (fieldColumn " <> deleteField <> " <> \" = ?\") [toField recipeId] (Delete.emptyDelete @" <> tableTypeName child <> ")",
-      "            forM_ (mapMaybe (toRecipeIngredientUpdate recipeId) ingredients) $ \\ri ->",
-      "              Insert.executeInsertConn conn $",
-      "                Insert.toInsertBuilder @" <> tableTypeName child <> " ri",
-      "        Include.findUniqueOrErrorConn @" <> tableTypeName root <> " conn include recipeId"
-    ]
-
-emitRecipeDelete :: Model -> Text
-emitRecipeDelete = emitDeleteFn
-
-emitToRecipeCreate :: Model -> Text
-emitToRecipeCreate model =
-  T.unlines
-    [ "toRecipeCreate :: UUID -> CreateRecipeInput -> " <> createTypeName model,
-      "toRecipeCreate recipeId input =",
-      "  " <> createTypeName model,
-      "    { id = Just recipeId,",
-      "      createdAt = Nothing,",
-      "      updatedAt = Nothing,",
-      "      name = input.name,",
-      "      description = Value input.description",
-      "    }"
-    ]
-
-emitToRecipeUpdate :: Model -> Text
-emitToRecipeUpdate model =
-  T.unlines
-    [ "toRecipeUpdate :: UTCTime -> UpdateRecipeInput -> " <> updateTypeName model,
-      "toRecipeUpdate now input =",
-      "  " <> updateTypeName model,
-      "    { name = input.name,",
-      "      createdAt = Nothing,",
-      "      updatedAt = Just now,",
-      "      description = maybe Omit Value input.description",
-      "    }"
-    ]
-
-emitToRecipeIngredientCreate :: Model -> Text
-emitToRecipeIngredientCreate model =
-  T.unlines
-    [ "toRecipeIngredientCreate :: UUID -> CreateRecipeIngredientInput -> " <> createTypeName model,
-      "toRecipeIngredientCreate recipeId input =",
-      "  " <> createTypeName model,
-      "    { id = Nothing,",
-      "      recipeId,",
-      "      ingredientId = input.id,",
-      "      amount = input.amount,",
-      "      unit = input.unit",
-      "    }"
-    ]
-
-emitToRecipeIngredientUpdate :: Model -> Text
-emitToRecipeIngredientUpdate model =
-  T.unlines
-    [ "toRecipeIngredientUpdate :: UUID -> UpdateRecipeIngredientInput -> Maybe " <> createTypeName model,
-      "toRecipeIngredientUpdate recipeId input = do",
-      "  amount <- input.amount",
-      "  unit <- input.unit",
-      "  pure",
-      "    " <> createTypeName model,
-      "      { id = Nothing,",
-      "        recipeId,",
-      "        ingredientId = input.id,",
-      "        amount,",
-      "        unit",
-      "      }"
-    ]
-
 fullIncludeValue :: Schema -> ModelInclude -> Text
 fullIncludeValue schema incl =
   includeName incl
@@ -533,11 +607,6 @@ resultTypeName _schema model edges =
     fieldOf edge =
       includeFieldName model (lookupRelation model (includeRelation edge))
 
-hasManyChild :: Schema -> Model -> IncludeTree -> Model
-hasManyChild schema parent edge =
-  let rel = lookupRelation parent (includeRelation edge)
-   in lookupModel schema (relToModel rel)
-
 schemaModule :: Text -> Model -> Text
 schemaModule clientModule model =
   clientSchemaPrefix clientModule <> modelName model
@@ -567,12 +636,6 @@ updateTypeName model = modelName model <> "Update"
 fieldBinder :: Model -> FieldSpec -> Text
 fieldBinder model f =
   lowerFirst (modelName model) <> upperFirst (fieldName f)
-
-primaryKeyField :: Model -> FieldSpec
-primaryKeyField model =
-  case filter fieldIsPrimaryKey (modelFields model) of
-    [f] -> f
-    _ -> error "emit Client: model must have exactly one primary key"
 
 lookupModel :: Schema -> Text -> Model
 lookupModel schema name =

@@ -2,7 +2,7 @@
 
 module ORM.Schema.Unit
   ( Unit (..),
-    unitToString,
+    unitToString
   )
 where
 
@@ -18,6 +18,7 @@ import Database.PostgreSQL.Simple.ToField (ToField (..), toField)
 data Unit = G | Ml | Tsp | Tbsp | Qty
   deriving (Show, Eq)
 
+
 instance FromField Unit where
   fromField f bs
     | isNothing bs = returnError UnexpectedNull f ""
@@ -28,8 +29,10 @@ instance FromField Unit where
     | bs == Just "qty" = pure Qty
     | otherwise = returnError ConversionFailed f ""
 
+
 instance ToField Unit where
   toField = toField . unitToString
+
 
 unitToString :: Unit -> Text
 unitToString G = "g"
@@ -37,3 +40,4 @@ unitToString Ml = "ml"
 unitToString Tsp = "tsp"
 unitToString Tbsp = "tbsp"
 unitToString Qty = "qty"
+

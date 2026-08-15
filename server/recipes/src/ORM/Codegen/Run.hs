@@ -15,8 +15,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import ORM.Codegen.Emit.Client
-  ( emitRecipeClientModule,
-    emitSimpleClientModule,
+  ( emitSimpleClientModule,
+    emitWriteClientModule,
   )
 import ORM.Codegen.Emit.Include (emitIncludeModule)
 import ORM.Codegen.Emit.Schema (emitEnumModule, emitModelModule)
@@ -126,9 +126,9 @@ recipeProdOutputs =
          genGolden "IngredientClient.hs" $
            emitSimpleClientModule "ORM.Client.Ingredient" ingredientModel,
          gen "src/ORM/Client/Recipe.hs" $
-           emitRecipeClientModule "ORM.Client.Recipe" recipeSchema recipeInclude,
+           emitWriteClientModule "ORM.Client.Recipe" recipeSchema recipeInclude,
          genGolden "RecipeClient.hs" $
-           emitRecipeClientModule "ORM.Client.Recipe" recipeSchema recipeInclude
+           emitWriteClientModule "ORM.Client.Recipe" recipeSchema recipeInclude
        ]
   where
     recipeInclude = head (schemaIncludes recipeSchema)

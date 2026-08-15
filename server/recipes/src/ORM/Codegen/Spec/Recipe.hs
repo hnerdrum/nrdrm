@@ -39,7 +39,8 @@ recipeModel =
           nullable (text "description")
         ],
       modelRelations =
-        [ hasMany "recipeIngredients" "Recipe" "RecipeIngredient" "id" "recipeId"
+        [ replaceChildren $
+            hasMany "recipeIngredients" "Recipe" "RecipeIngredient" "id" "recipeId"
         ]
     }
 

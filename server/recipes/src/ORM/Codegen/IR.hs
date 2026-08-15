@@ -28,6 +28,7 @@ module ORM.Codegen.IR
     variantMap,
     hasMany,
     belongsTo,
+    replaceChildren,
   )
 where
 
@@ -98,7 +99,8 @@ data RelationSpec = RelationSpec
     relToModel :: Text,
     relLocalField :: Text,
     relForeignField :: Text,
-    relJoin :: JoinKind
+    relJoin :: JoinKind,
+    relReplaceChildren :: Bool
   }
   deriving (Show, Eq)
 
@@ -180,7 +182,8 @@ hasMany name fromModel toModel localFld foreignFld =
       relToModel = toModel,
       relLocalField = localFld,
       relForeignField = foreignFld,
-      relJoin = JoinLeft
+      relJoin = JoinLeft,
+      relReplaceChildren = False
     }
 
 belongsTo :: Text -> Text -> Text -> Text -> Text -> RelationSpec
@@ -192,5 +195,9 @@ belongsTo name fromModel toModel foreignFld referencedFld =
       relToModel = toModel,
       relLocalField = referencedFld,
       relForeignField = foreignFld,
-      relJoin = JoinLeft
+      relJoin = JoinLeft,
+      relReplaceChildren = False
     }
+
+replaceChildren :: RelationSpec -> RelationSpec
+replaceChildren rel = rel {relReplaceChildren = True}
