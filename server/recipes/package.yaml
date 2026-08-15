@@ -110,6 +110,7 @@ tests:
       - ORM.JoinSpec
       - ORM.IncludeSpec
       - ORM.Codegen.ValidateSpec
+      - ORM.Codegen.JoinAliasSpec
       - ORM.Codegen.EmitSpec
       - ORM.Codegen.EmitFlatRowSpec
       - ORM.Codegen.EmitIncludeSpec

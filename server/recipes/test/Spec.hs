@@ -4,6 +4,7 @@ import ORM.Codegen.EmitClientSpec (emitClientSpec)
 import ORM.Codegen.EmitFlatRowSpec (emitFlatRowSpec)
 import ORM.Codegen.EmitIncludeSpec (emitIncludeSpec)
 import ORM.Codegen.EmitSpec (emitSpec)
+import ORM.Codegen.JoinAliasSpec (joinAliasSpec)
 import ORM.Codegen.ValidateSpec (validateSpec)
 import ORM.IncludeSpec (includeSpec)
 import ORM.JoinSpec (joinSpec)
@@ -14,6 +15,7 @@ import Test.Hspec
 main :: IO ()
 main = hspec $ do
   validateSpec
+  joinAliasSpec
   emitSpec
   emitFlatRowSpec
   emitIncludeSpec

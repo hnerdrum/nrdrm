@@ -23,7 +23,6 @@ import qualified Data.Text as T
 import ORM.Codegen.Emit.FlatRow
   ( DeepJoin (..),
     ShallowJoin (..),
-    childJoinAlias,
     deepColumnListName,
     deepJoin,
     deepJoinRowName,
@@ -31,13 +30,12 @@ import ORM.Codegen.Emit.FlatRow
     emitDeepFlatJoinRow,
     emitShallowColumnList,
     emitShallowFlatJoinRow,
-    grandJoinAlias,
-    rootJoinAlias,
     shallowColumnListName,
     shallowJoin,
     shallowJoinRowName,
   )
 import ORM.Codegen.IR
+import ORM.Codegen.JoinAlias (IncludeAliases (..), assignIncludeAliases)
 
 data IncludeTypeDecl = IncludeTypeDecl
   { itdName :: Text,
@@ -476,13 +474,15 @@ emitShallowJoinBuilder schema incl =
           "    JoinChain.buildJoinChainFromHasMany "
             <> relName sjRel
             <> " \""
-            <> rootJoinAlias sjRoot
+            <> rootAlias
             <> "\" \""
-            <> childJoinAlias sjRoot sjChild
+            <> childAlias
             <> "\""
         ]
   where
     ShallowJoin {sjRoot, sjChild, sjRel} = shallowJoin schema incl
+    IncludeAliases {iaRoot = rootAlias, iaChild = childAlias} =
+      assignIncludeAliases schema incl
     builderName = shallowJoinBuilderName sjRoot sjChild
     rootTable = modelName sjRoot <> "Table"
     colsName = shallowColumnListName sjRoot sjChild
@@ -498,9 +498,9 @@ emitDeepJoinBuilder schema incl =
           "    JoinChain.addBelongsToJoin "
             <> relName djGrandRel
             <> " \""
-            <> childJoinAlias djRoot djChild
+            <> childAlias
             <> "\" \""
-            <> grandJoinAlias djRoot djChild djGrand
+            <> grandAlias
             <> "\" "
             <> shallowBuilder
         ]
@@ -512,14 +512,22 @@ emitDeepJoinBuilder schema incl =
           "    JoinChain.addHasManyJoin "
             <> relName djGrandRel
             <> " \""
-            <> childJoinAlias djRoot djChild
+            <> childAlias
             <> "\" \""
-            <> grandJoinAlias djRoot djChild djGrand
+            <> grandAlias
             <> "\" "
             <> shallowBuilder
         ]
   where
     DeepJoin {djRoot, djChild, djGrand, djGrandRel} = deepJoin schema incl
+    childAlias = iaChild (assignIncludeAliases schema incl)
+    grandAlias =
+      case iaGrand (assignIncludeAliases schema incl) of
+        Just alias -> alias
+        Nothing ->
+          error $
+            "emitDeepJoinBuilder: expected deep include for "
+              <> T.unpack (includeName incl)
     builderName = deepJoinBuilderName djRoot djChild djGrand
     shallowBuilder = shallowJoinBuilderName djRoot djChild
     rootTable = modelName djRoot <> "Table"
@@ -948,8 +956,9 @@ childGroupKeyField :: Model -> RelationSpec -> FieldSpec
 childGroupKeyField child childRel =
   let childPk = primaryKeyField child
    in if fieldName childPk == relForeignField childRel
-        then fromMaybe childPk $
-          find ((/= fieldName childPk) . fieldName) (modelFields child)
+        then
+          fromMaybe childPk $
+            find ((/= fieldName childPk) . fieldName) (modelFields child)
         else childPk
 
 lookupModel :: Schema -> Text -> Model

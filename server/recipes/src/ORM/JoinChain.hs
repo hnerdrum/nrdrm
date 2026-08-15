@@ -19,6 +19,7 @@ module ORM.JoinChain
     runJoinChain,
     runJoinChainConn,
     rootAlias,
+    limitJoin,
   )
 where
 
@@ -49,7 +50,8 @@ data JoinChain root = JoinChain
     jcJoins :: [JoinedTable],
     jcSelect :: [Text],
     jcWhere :: [Text],
-    jcParams :: [Action]
+    jcParams :: [Action],
+    jcLimit :: Maybe Int
   }
   deriving (Show)
 
@@ -65,7 +67,8 @@ startJoinChain alias =
       jcJoins = [],
       jcSelect = [],
       jcWhere = [],
-      jcParams = []
+      jcParams = [],
+      jcLimit = Nothing
     }
 
 buildJoinChainFromHasMany ::
@@ -148,6 +151,9 @@ whereJoin condition params chain =
       jcParams = jcParams chain ++ params
     }
 
+limitJoin :: Int -> JoinChain root -> JoinChain root
+limitJoin n chain = chain {jcLimit = Just n}
+
 col :: Text -> Field table a -> Text
 col alias field = alias <> "." <> fieldColumn field
 
@@ -187,7 +193,11 @@ buildJoinQuery jc =
         if null (jcWhere jc)
           then ""
           else " WHERE " <> Text.intercalate " AND " (jcWhere jc)
-      queryText = "SELECT " <> selectClause <> fromClause <> whereClause
+      limitClause =
+        case jcLimit jc of
+          Nothing -> ""
+          Just n -> " LIMIT " <> Text.pack (show n)
+      queryText = "SELECT " <> selectClause <> fromClause <> whereClause <> limitClause
    in (Query (TE.encodeUtf8 queryText), jcParams jc)
 
 runJoinChainConn ::
