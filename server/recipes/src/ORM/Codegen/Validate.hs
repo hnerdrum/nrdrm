@@ -26,6 +26,7 @@ data ValidationError
   | UnknownIncludeRoot Text Text
   | UnknownIncludeRelation Text Text Text
   | JoinAliasExhausted Text Text
+  | ReplaceChildrenNotHasMany Text
   deriving (Show, Eq)
 
 validateSchema :: Schema -> [ValidationError]
@@ -94,11 +95,18 @@ validateRelation schema rel =
           ]
       fieldErrs = case (fromOk, toOk, relKind rel) of
         (Just fromModel, Just toModel, RelHasMany) ->
-          requireField (relName rel) (modelName fromModel) (relLocalField rel) fromModel ++ requireField (relName rel) (modelName toModel) (relForeignField rel) toModel
+          requireField (relName rel) (modelName fromModel) (relLocalField rel) fromModel
+            ++ requireField (relName rel) (modelName toModel) (relForeignField rel) toModel
         (Just fromModel, Just toModel, RelBelongsTo) ->
-          requireField (relName rel) (modelName fromModel) (relForeignField rel) fromModel ++ requireField (relName rel) (modelName toModel) (relLocalField rel) toModel
+          requireField (relName rel) (modelName fromModel) (relForeignField rel) fromModel
+            ++ requireField (relName rel) (modelName toModel) (relLocalField rel) toModel
         _ -> []
-   in modelErrs ++ fieldErrs
+      replaceErrs =
+        [ ReplaceChildrenNotHasMany (relName rel)
+          | relReplaceChildren rel,
+            relKind rel /= RelHasMany
+        ]
+   in modelErrs ++ fieldErrs ++ replaceErrs
 
 validateInclude :: Schema -> ModelInclude -> [ValidationError]
 validateInclude schema incl =

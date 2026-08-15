@@ -9,8 +9,8 @@ import Data.List (find)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import ORM.Codegen.Emit.Client
-  ( emitRecipeClientModule,
-    emitSimpleClientModule,
+  ( emitSimpleClientModule,
+    emitWriteClientModule,
   )
 import ORM.Codegen.IR
   ( Model (..),
@@ -33,7 +33,7 @@ emitClientSpec =
     it "emits Recipe Client matching the golden file" $ do
       expected <- TIO.readFile "test/ORM/Codegen/golden/RecipeClient.hs.golden"
       let incl = head (schemaIncludes recipeSchema)
-          actual = emitRecipeClientModule "ORM.Client.Recipe" recipeSchema incl
+          actual = emitWriteClientModule "ORM.Client.Recipe" recipeSchema incl
       T.strip actual `shouldBe` T.strip expected
 
 ingredientModel :: Model
