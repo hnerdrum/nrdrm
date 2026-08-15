@@ -111,25 +111,38 @@ findAll pool include =
 
 findUniqueConn ::
   forall root include result.
-  ( ExecuteInclude root include result,
-    Entity root,
-    ToField (PrimaryKeyType root)
+  ( Entity root,
+    ToField (PrimaryKeyType root),
+    BuildJoinChain root include,
+    NestInclude include result,
+    FromRow (JoinFlatRow include),
+    FromRow (RootRow include)
   ) =>
   Connection ->
   include ->
   PrimaryKeyType root ->
   IO (Maybe result)
-findUniqueConn conn include pk = do
-  results <- findManyConn @root conn include (whereEq (primaryKey @root) pk)
-  pure $ case results of
-    [] -> Nothing
-    (row : _) -> Just row
+findUniqueConn conn include pk
+  | includesJoin include = do
+      let chain =
+            JoinChain.limitJoin 1 $
+              applyRootFilter (buildJoinChain include) (whereEq (primaryKey @root) pk)
+      flatRows <- JoinChain.runJoinChainConn @(JoinFlatRow include) conn chain
+      pure $ case nestRows include flatRows of
+        [] -> Nothing
+        (row : _) -> Just row
+  | otherwise = do
+      mRoot <- Ops.findUniqueConn @root @(RootRow include) conn pk
+      pure $ fmap (wrapRoot include) mRoot
 
 findUnique ::
   forall root include result.
-  ( ExecuteInclude root include result,
-    Entity root,
-    ToField (PrimaryKeyType root)
+  ( Entity root,
+    ToField (PrimaryKeyType root),
+    BuildJoinChain root include,
+    NestInclude include result,
+    FromRow (JoinFlatRow include),
+    FromRow (RootRow include)
   ) =>
   Pool Connection ->
   include ->
@@ -140,10 +153,13 @@ findUnique pool include pk =
 
 findUniqueOrErrorConn ::
   forall root include result.
-  ( ExecuteInclude root include result,
-    Entity root,
+  ( Entity root,
     ToField (PrimaryKeyType root),
-    Show (PrimaryKeyType root)
+    Show (PrimaryKeyType root),
+    BuildJoinChain root include,
+    NestInclude include result,
+    FromRow (JoinFlatRow include),
+    FromRow (RootRow include)
   ) =>
   Connection ->
   include ->
@@ -161,10 +177,13 @@ findUniqueOrErrorConn conn include pk = do
 
 findUniqueOrError ::
   forall root include result.
-  ( ExecuteInclude root include result,
-    Entity root,
+  ( Entity root,
     ToField (PrimaryKeyType root),
-    Show (PrimaryKeyType root)
+    Show (PrimaryKeyType root),
+    BuildJoinChain root include,
+    NestInclude include result,
+    FromRow (JoinFlatRow include),
+    FromRow (RootRow include)
   ) =>
   Pool Connection ->
   include ->

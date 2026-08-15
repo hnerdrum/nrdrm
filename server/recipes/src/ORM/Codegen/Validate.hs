@@ -10,6 +10,7 @@ import Data.List (find, nub)
 import Data.Maybe (catMaybes, isNothing)
 import Data.Text (Text)
 import ORM.Codegen.IR
+import ORM.Codegen.JoinAlias (allocateJoinAlias, includeModelsInOrder)
 
 data ValidationError
   = DuplicateModelName Text
@@ -24,6 +25,7 @@ data ValidationError
   | UnknownRelationField Text Text Text
   | UnknownIncludeRoot Text Text
   | UnknownIncludeRelation Text Text Text
+  | JoinAliasExhausted Text Text
   deriving (Show, Eq)
 
 validateSchema :: Schema -> [ValidationError]
@@ -104,7 +106,10 @@ validateInclude schema incl =
     Nothing ->
       [UnknownIncludeRoot (includeName incl) (includeRootModel incl)]
     Just root ->
-      validateIncludeTree schema (includeName incl) root (includeTree incl)
+      let treeErrs = validateIncludeTree schema (includeName incl) root (includeTree incl)
+       in if null treeErrs
+            then treeErrs ++ validateIncludeJoinAliases schema incl
+            else treeErrs
 
 validateIncludeTree :: Schema -> Text -> Model -> [IncludeTree] -> [ValidationError]
 validateIncludeTree schema includeName current = concatMap go
@@ -131,6 +136,19 @@ findRelation model name =
 requireField :: Text -> Text -> Text -> Model -> [ValidationError]
 requireField relName modelName wantedField model =
   [UnknownRelationField relName modelName wantedField | not (any ((== wantedField) . fieldName) (modelFields model))]
+
+validateIncludeJoinAliases :: Schema -> ModelInclude -> [ValidationError]
+validateIncludeJoinAliases schema incl =
+  if null (includeTree incl)
+    then []
+    else go (includeModelsInOrder schema incl) []
+  where
+    go [] _ = []
+    go (model : rest) taken =
+      case allocateJoinAlias model taken of
+        Nothing ->
+          [JoinAliasExhausted (includeName incl) (modelName model)]
+        Just alias -> go rest (alias : taken)
 
 duplicates :: (Eq a) => [a] -> [a]
 duplicates xs = nub [x | x <- xs, length (filter (== x) xs) > 1]

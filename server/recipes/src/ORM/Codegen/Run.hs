@@ -5,6 +5,7 @@ module ORM.Codegen.Run
     allOutputs,
     checkOutputs,
     writeOutputs,
+    codegenSchemas,
   )
 where
 
@@ -30,6 +31,9 @@ import ORM.Codegen.Spec.Shelf (shelfSchema)
 import ORM.Codegen.Spec.Widget (widgetModel)
 import System.Directory (createDirectoryIfMissing, doesFileExist)
 import System.FilePath (takeDirectory, (</>))
+
+codegenSchemas :: [Schema]
+codegenSchemas = [widgetSchema, shelfSchema, recipeSchema]
 
 data GenOutput = GenOutput
   { outputPath :: FilePath,
