@@ -6,8 +6,8 @@
 
 module ORM.Delete
   ( DeleteBuilder,
-    delete,
-    deleteConn,
+    deleteWhere,
+    deleteWhereConn,
     deleteReturning,
     deleteReturningConn,
     whereDelete,
@@ -47,22 +47,22 @@ whereDelete condition params builder =
       dbWhereParams = dbWhereParams builder ++ params
     }
 
-delete ::
+deleteWhere ::
   forall table.
   (Entity table) =>
   Pool Connection ->
   DeleteBuilder table ->
   IO Int
-delete pool builder =
-  withResource pool $ \conn -> deleteConn conn builder
+deleteWhere pool builder =
+  withResource pool $ \conn -> deleteWhereConn conn builder
 
-deleteConn ::
+deleteWhereConn ::
   forall table.
   (Entity table) =>
   Connection ->
   DeleteBuilder table ->
   IO Int
-deleteConn conn builder = do
+deleteWhereConn conn builder = do
   let whereClause =
         if null (dbWhere builder)
           then ""

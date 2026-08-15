@@ -107,6 +107,7 @@ tests:
       - Support.TestDb
       - Support.TestMigrations
       - ORM.OperationsSpec
+      - ORM.ErrorsSpec
       - ORM.JoinSpec
       - ORM.IncludeSpec
       - ORM.Codegen.ValidateSpec

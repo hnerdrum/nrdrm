@@ -50,13 +50,13 @@ $(deriveJSON defaultOptions ''Recipe)
 
 getAllRecipes :: Pool Connection -> IO [Recipe]
 getAllRecipes pool = do
-  recipes <- Recipe.findAll pool Recipe.withIngredients
+  recipes <- Recipe.findAllWith pool Recipe.withIngredients
   pure $ map fromRecipeWithIngredients recipes
 
 getRecipe :: Pool Connection -> UUID -> IO (Either AppError Recipe)
 getRecipe pool recipeId =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> Recipe.findUniqueOrError pool Recipe.withIngredients recipeId
+    <$> Recipe.findUniqueOrErrorWith pool Recipe.withIngredients recipeId
 
 createRecipe :: Pool Connection -> CreateRecipeInput -> IO (Either AppError Recipe)
 createRecipe pool input =
@@ -116,7 +116,7 @@ toRecipeIngredientNestedUpdate input = do
 
 deleteRecipe :: Pool Connection -> UUID -> IO ()
 deleteRecipe pool recipeId = do
-  _ <- Recipe.delete pool recipeId
+  _ <- Recipe.deleteById pool recipeId
   pure ()
 
 fromRecipeError :: ORMError -> AppError
@@ -124,6 +124,8 @@ fromRecipeError err =
   case err of
     RecordNotFound message -> AppError NotFoundError message (object [])
     MultipleRecordsFound message -> AppError MultipleEntitiesError message (object [])
+    UniqueViolation message -> AppError ConflictError message (object [])
+    DatabaseError message -> AppError InternalError message (object [])
 
 fromRecipeWithIngredients :: RecipeWithIngredients -> Recipe
 fromRecipeWithIngredients (RecipeWithIngredients (RecipeRow rid _ _ rname rdesc) ingredients) =

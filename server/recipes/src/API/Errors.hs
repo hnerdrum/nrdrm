@@ -17,6 +17,7 @@ import Servant
     err401,
     err404,
     err409,
+    err500,
     throwError,
   )
 
@@ -34,4 +35,6 @@ fromAppError err = fromDomainError err.error err.message
 fromDomainError :: DomainError -> Text -> ServerError
 fromDomainError NotFoundError msg = err404 {errBody = encodeUtf8 (fromStrict msg)}
 fromDomainError MultipleEntitiesError msg = err409 {errBody = encodeUtf8 (fromStrict msg)}
+fromDomainError ConflictError msg = err409 {errBody = encodeUtf8 (fromStrict msg)}
+fromDomainError InternalError msg = err500 {errBody = encodeUtf8 (fromStrict msg)}
 fromDomainError WrongPwdError msg = err401 {errBody = encodeUtf8 (fromStrict msg)}

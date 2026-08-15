@@ -6,7 +6,9 @@ module ORM
     findFirst,
     findFirstOrError,
     count,
-    delete,
+    deleteById,
+    deleteWhere,
+    offset,
     ORMError (..),
     selectAll,
     select,
@@ -81,10 +83,10 @@ where
 import Database.PostgreSQL.Simple.ToField (toField)
 import ORM.Column
 import ORM.Core
-import ORM.Delete hiding (delete)
+import ORM.Delete
 import ORM.Errors
 import ORM.Group
-import ORM.Include hiding (findAll, findMany, findUnique, findUniqueOrError)
+import ORM.Include
 import ORM.Insert
 import ORM.JoinChain
 import ORM.Operations

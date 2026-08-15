@@ -10,10 +10,10 @@ import Data.UUID (UUID, nil)
 import ORM (NullableValue (..), ORMError (..))
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
-import ORM.Query (whereEq)
+import ORM.Query (OrderDirection (Asc), limit, offset, orderBy, whereEq)
 import qualified ORM.Update as Update
 import qualified ORM.WidgetFixtures as WidgetFixtures
-import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable (..), WidgetUpdate (..), widgetName)
+import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable (..), WidgetUpdate (..), widgetCreatedAt, widgetName)
 import Support.Assert (assertJust, assertRight)
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
@@ -163,13 +163,24 @@ operationsSpec =
           >>= assertRight
       updated.description `shouldBe` Nothing
 
-    it "delete removes a widget by id" $ \TestEnv {envPool = pool} -> do
+    it "findMany supports offset" $ \TestEnv {envPool = pool} -> do
+      _ <- WidgetFixtures.insertWidget pool "alpha"
+      _ <- WidgetFixtures.insertWidget pool "alpha"
+      _ <- WidgetFixtures.insertWidget pool "alpha"
+      allAlpha <- Ops.findMany @WidgetTable @WidgetRow pool $ whereEq widgetName "alpha"
+      paged <-
+        Ops.findMany @WidgetTable @WidgetRow pool $
+          offset 1 . limit 1 . orderBy widgetCreatedAt Asc . whereEq widgetName "alpha"
+      length allAlpha `shouldBe` 3
+      length paged `shouldBe` 1
+
+    it "deleteById removes a widget by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "doomed"
-      deleted <- Ops.delete @WidgetTable pool widget.id
+      deleted <- Ops.deleteById @WidgetTable pool widget.id
       deleted `shouldBe` 1
       found <- Ops.findUnique @WidgetTable @WidgetRow pool widget.id
       found `shouldBe` Nothing
 
-    it "delete returns 0 when no row matches" $ \TestEnv {envPool = pool} -> do
-      deleted <- Ops.delete @WidgetTable pool (nil :: UUID)
+    it "deleteById returns 0 when no row matches" $ \TestEnv {envPool = pool} -> do
+      deleted <- Ops.deleteById @WidgetTable pool (nil :: UUID)
       deleted `shouldBe` 0
