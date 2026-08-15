@@ -37,6 +37,7 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..), NullableValue (..), PrimaryKeyType)
 import ORM.Errors (ORMError (..))
 import qualified ORM.Operations as Ops
+import ORM.Sql (catchSql)
 
 class (Entity table) => Updatable table where
   type UpdateInput table
@@ -154,11 +155,12 @@ updateBuilderConn ::
   UpdateBuilder table ->
   IO (Either ORMError result)
 updateBuilderConn conn builder = do
-  results <- updateReturningConn conn builder
-  case results of
-    [] -> pure $ Left $ RecordNotFound "No record found to update"
-    [row] -> pure $ Right row
-    _ -> pure $ Left $ MultipleRecordsFound "Update affected multiple rows"
+  result <- catchSql (updateReturningConn conn builder)
+  case result of
+    Left err -> pure $ Left err
+    Right [] -> pure $ Left $ RecordNotFound "No record found to update"
+    Right [row] -> pure $ Right row
+    Right _ -> pure $ Left $ MultipleRecordsFound "Update affected multiple rows"
 
 updateReturning ::
   forall table result.

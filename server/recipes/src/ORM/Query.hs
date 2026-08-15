@@ -14,6 +14,7 @@ module ORM.Query
     whereEq,
     orderBy,
     limit,
+    offset,
     OrderDirection (..),
     runQuery,
     runQueryConn,
@@ -41,7 +42,8 @@ data QueryBuilder table = QueryBuilder
     qbWhere :: [Text],
     qbParams :: [Action],
     qbOrderBy :: Maybe (Text, OrderDirection),
-    qbLimit :: Maybe Int
+    qbLimit :: Maybe Int,
+    qbOffset :: Maybe Int
   }
 
 data OrderDirection = Asc | Desc
@@ -53,7 +55,8 @@ selectAll =
       qbWhere = [],
       qbParams = [],
       qbOrderBy = Nothing,
-      qbLimit = Nothing
+      qbLimit = Nothing,
+      qbOffset = Nothing
     }
 
 select :: forall table. (Entity table) => QueryBuilder table
@@ -79,6 +82,9 @@ orderBy field dir qb =
 limit :: Int -> QueryBuilder table -> QueryBuilder table
 limit n qb = qb {qbLimit = Just n}
 
+offset :: Int -> QueryBuilder table -> QueryBuilder table
+offset n qb = qb {qbOffset = Just n}
+
 queryWhereConditions :: QueryBuilder table -> [Text]
 queryWhereConditions = qbWhere
 
@@ -91,7 +97,8 @@ buildQuery qb =
       whereClause = buildWhereClause (qbWhere qb)
       orderClause = buildOrderClause (qbOrderBy qb)
       limitClause = buildLimitClause (qbLimit qb)
-      finalQuery = baseQuery <> whereClause <> orderClause <> limitClause
+      offsetClause = buildOffsetClause (qbOffset qb)
+      finalQuery = baseQuery <> whereClause <> orderClause <> limitClause <> offsetClause
    in (Query (TE.encodeUtf8 finalQuery), qbParams qb)
 
 buildCountQuery :: QueryBuilder table -> (Query, [Action])
@@ -113,6 +120,10 @@ buildOrderClause (Just (col, dir)) =
 buildLimitClause :: Maybe Int -> Text
 buildLimitClause Nothing = ""
 buildLimitClause (Just n) = " LIMIT " <> T.pack (show n)
+
+buildOffsetClause :: Maybe Int -> Text
+buildOffsetClause Nothing = ""
+buildOffsetClause (Just n) = " OFFSET " <> T.pack (show n)
 
 runQueryConn :: (FromRow result) => Connection -> QueryBuilder table -> IO [result]
 runQueryConn conn qb = do

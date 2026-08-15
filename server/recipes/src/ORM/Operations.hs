@@ -15,7 +15,8 @@ module ORM.Operations
     findFirst,
     findFirstOrError,
     count,
-    delete,
+    deleteById,
+    deleteByIdConn,
     ORMError (..),
   )
 where
@@ -147,13 +148,22 @@ count ::
 count pool modifier =
   runCountQuery pool (modifier (selectAll @table))
 
-delete ::
+deleteById ::
   forall table.
   (Entity table, ToField (PrimaryKeyType table)) =>
   Pool Connection ->
   PrimaryKeyType table ->
   IO Int
-delete pool pkValue =
+deleteById pool pkValue =
+  withResource pool $ \conn -> deleteByIdConn @table conn pkValue
+
+deleteByIdConn ::
+  forall table.
+  (Entity table, ToField (PrimaryKeyType table)) =>
+  Connection ->
+  PrimaryKeyType table ->
+  IO Int
+deleteByIdConn conn pkValue =
   let pkField = primaryKey @table
       builder = Delete.whereDelete (fieldColumn pkField <> " = ?") [toField pkValue] (Delete.emptyDelete @table)
-   in Delete.delete pool builder
+   in Delete.deleteWhereConn conn builder

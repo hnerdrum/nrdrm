@@ -65,7 +65,7 @@ updateIngredient pool ingredientId input =
 
 deleteIngredient :: Pool Connection -> UUID -> IO ()
 deleteIngredient pool ingredientId = do
-  _ <- Ingredient.delete pool ingredientId
+  _ <- Ingredient.deleteById pool ingredientId
   return ()
 
 fromIngredientRow :: IngredientRow -> Ingredient
@@ -97,3 +97,5 @@ fromIngredientError err =
   case err of
     RecordNotFound ingredientId -> AppError NotFoundError "Ingredient could not be found" (object ["ingredientId" .= ingredientId])
     MultipleRecordsFound ingredientId -> AppError MultipleEntitiesError "Found multiple ingredients with matching ID" (object ["ingredientId" .= ingredientId])
+    UniqueViolation message -> AppError ConflictError message (object [])
+    DatabaseError message -> AppError InternalError message (object [])

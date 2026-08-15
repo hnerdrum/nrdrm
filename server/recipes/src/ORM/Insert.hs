@@ -35,6 +35,7 @@ import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..), NullableValue (..))
 import ORM.Errors (ORMError (..))
+import ORM.Sql (catchSql)
 
 class (Entity table) => Insertable table where
   type CreateInput table
@@ -80,15 +81,16 @@ insertBuilderConn ::
   InsertBuilder table ->
   IO (Either ORMError result)
 insertBuilderConn conn builder = do
-  result <- insertReturningConn conn builder
+  result <- catchSql (insertReturningConn conn builder)
   case result of
-    [] ->
+    Left err -> pure $ Left err
+    Right [] ->
       pure $
         Left $
           RecordNotFound $
             "INSERT into " <> ibTable builder <> " returned no rows"
-    [row] -> pure $ Right row
-    _ -> pure $ Left $ MultipleRecordsFound "Insert returned multiple rows"
+    Right [row] -> pure $ Right row
+    Right _ -> pure $ Left $ MultipleRecordsFound "Insert returned multiple rows"
 
 insertReturning ::
   forall table result.

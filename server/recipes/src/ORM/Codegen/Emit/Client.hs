@@ -44,15 +44,27 @@ emitSimpleClientModule moduleName model =
       "",
       emitCreateFn model,
       "",
+      emitCreateConnFn model,
+      "",
       emitUpdateFn model,
+      "",
+      emitUpdateConnFn model,
       "",
       emitFindAllFn model,
       "",
+      emitFindAllConnFn model,
+      "",
       emitFindUniqueFn model,
+      "",
+      emitFindUniqueConnFn model,
       "",
       emitFindUniqueOrErrorFn model,
       "",
-      emitDeleteFn model
+      emitFindUniqueOrErrorConnFn model,
+      "",
+      emitDeleteFn model,
+      "",
+      emitDeleteByIdConnFn model
     ]
 
 emitIncludeReadClientModule :: Text -> Schema -> ModelInclude -> Text
@@ -91,11 +103,19 @@ emitIncludeReadClientModule moduleName schema incl =
       "",
       emitIncludeFindAll root incl,
       "",
+      emitIncludeFindAllWithConn root incl,
+      "",
       emitIncludeFindMany root incl,
+      "",
+      emitIncludeFindManyWithConn root incl,
       "",
       emitIncludeFindUnique root incl,
       "",
-      emitIncludeFindUniqueOrError root incl
+      emitIncludeFindUniqueWithConn root incl,
+      "",
+      emitIncludeFindUniqueOrError root incl,
+      "",
+      emitIncludeFindUniqueOrErrorWithConn root incl
     ]
   where
     root = lookupModel schema (includeRootModel incl)
@@ -180,17 +200,27 @@ emitWriteClientModule moduleName schema incl =
            "",
            emitIncludeFindAll root incl,
            "",
+           emitIncludeFindAllWithConn root incl,
+           "",
            emitIncludeFindMany root incl,
+           "",
+           emitIncludeFindManyWithConn root incl,
            "",
            emitIncludeFindUnique root incl,
            "",
+           emitIncludeFindUniqueWithConn root incl,
+           "",
            emitIncludeFindUniqueOrError root incl,
+           "",
+           emitIncludeFindUniqueOrErrorWithConn root incl,
            "",
            emitWriteCreate root incl child rel,
            "",
            emitWriteUpdate root incl child rel wipeField,
            "",
-           emitDeleteFn root
+           emitDeleteFn root,
+           "",
+           emitDeleteByIdConnFn root
          ]
   where
     root = lookupModel schema (includeRootModel incl)
@@ -207,13 +237,20 @@ emitWriteClientModule moduleName schema incl =
 emitWriteExports :: Schema -> ModelInclude -> Model -> Model -> RelationSpec -> Text
 emitWriteExports schema incl root child _rel =
   T.unlines
-    [ "  ( findAll,",
-      "    findMany,",
-      "    findUnique,",
-      "    findUniqueOrError,",
+    [ "  ( findAllWith,",
+      "    findManyWith,",
+      "    findUniqueWith,",
+      "    findUniqueOrErrorWith,",
+      "    findAllWithConn,",
+      "    findManyWithConn,",
+      "    findUniqueWithConn,",
+      "    findUniqueOrErrorWithConn,",
       "    create,",
+      "    createConn,",
       "    update,",
-      "    delete,",
+      "    updateConn,",
+      "    deleteById,",
+      "    deleteByIdConn,",
       "    " <> writeCreateTypeName root <> " (..),",
       "    " <> writeUpdateTypeName root <> " (..),",
       "    " <> nestedCreateTypeName child <> " (..),",
@@ -280,58 +317,83 @@ emitWriteCreate :: Model -> ModelInclude -> Model -> RelationSpec -> Text
 emitWriteCreate root incl child rel =
   let childrenField = childrenFieldName root rel
       toChild = "to" <> createTypeName child
-   in T.unlines
-        [ "create ::",
-          "  Pool Connection ->",
-          "  " <> includeName incl <> " ->",
-          "  " <> writeCreateTypeName root <> " ->",
-          "  IO (Either ORMError " <> includeResultName root incl <> ")",
-          "create pool include input = do",
-          "  rootId <- maybe V4.nextRandom pure input.root.id",
+      resultName = includeResultName root incl
+      createBody =
+        [ "  rootId <- maybe V4.nextRandom pure input.root.id",
           "  let rootInput :: " <> createTypeName root,
           "      rootInput = input.root { id = Just rootId }",
-          "  transaction pool $ \\conn -> do",
-          "    rootResult <-",
-          "      Insert.insertConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn rootInput",
-          "    case rootResult of",
-          "      Left err -> pure (Left err)",
-          "      Right _ -> do",
-          "        forM_ input." <> childrenField <> " $ \\nested ->",
-          "          Insert.executeInsertConn conn $",
-          "            Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
-          "        Include.findUniqueOrErrorConn @" <> tableTypeName root <> " conn include rootId"
+          "  rootResult <-",
+          "    Insert.insertConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn rootInput",
+          "  case rootResult of",
+          "    Left err -> pure (Left err)",
+          "    Right _ -> do",
+          "      forM_ input." <> childrenField <> " $ \\nested ->",
+          "        Insert.executeInsertConn conn $",
+          "          Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
+          "      Include.findUniqueOrErrorWithConn @" <> tableTypeName root <> " conn include rootId"
         ]
+   in T.unlines $
+        [ "createConn ::",
+          "  Connection ->",
+          "  " <> includeName incl <> " ->",
+          "  " <> writeCreateTypeName root <> " ->",
+          "  IO (Either ORMError " <> resultName <> ")",
+          "createConn conn include input = do"
+        ]
+          ++ createBody
+          ++ [ "",
+               "create ::",
+               "  Pool Connection ->",
+               "  " <> includeName incl <> " ->",
+               "  " <> writeCreateTypeName root <> " ->",
+               "  IO (Either ORMError " <> resultName <> ")",
+               "create pool include input =",
+               "  transaction pool $ \\conn -> createConn conn include input"
+             ]
 
 emitWriteUpdate :: Model -> ModelInclude -> Model -> RelationSpec -> Text -> Text
 emitWriteUpdate root incl child rel wipeField =
   let childrenField = childrenFieldName root rel
       toChild = "to" <> createTypeName child
-   in T.unlines
-        [ "update ::",
-          "  Pool Connection ->",
+      resultName = includeResultName root incl
+      updateBody =
+        [ "  now <- getCurrentTime",
+          "  updateResult <-",
+          "    Update.updateConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn rootId (applyUpdatedAt now input.root)",
+          "  case updateResult of",
+          "    Left err -> pure (Left err)",
+          "    Right _ -> do",
+          "      case input." <> childrenField <> " of",
+          "        Nothing -> pure ()",
+          "        Just nestedItems -> do",
+          "          _ <-",
+          "            Delete.deleteWhereConn conn $",
+          "              Delete.whereDelete (fieldColumn " <> wipeField <> " <> \" = ?\") [toField rootId] (Delete.emptyDelete @" <> tableTypeName child <> ")",
+          "          forM_ nestedItems $ \\nested ->",
+          "            Insert.executeInsertConn conn $",
+          "              Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
+          "      Include.findUniqueOrErrorWithConn @" <> tableTypeName root <> " conn include rootId"
+        ]
+   in T.unlines $
+        [ "updateConn ::",
+          "  Connection ->",
           "  " <> includeName incl <> " ->",
           "  UUID ->",
           "  " <> writeUpdateTypeName root <> " ->",
-          "  IO (Either ORMError " <> includeResultName root incl <> ")",
-          "update pool include rootId input = do",
-          "  now <- getCurrentTime",
-          "  transaction pool $ \\conn -> do",
-          "    updateResult <-",
-          "      Update.updateConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn rootId (applyUpdatedAt now input.root)",
-          "    case updateResult of",
-          "      Left err -> pure (Left err)",
-          "      Right _ -> do",
-          "        case input." <> childrenField <> " of",
-          "          Nothing -> pure ()",
-          "          Just nestedItems -> do",
-          "            _ <-",
-          "              Delete.deleteConn conn $",
-          "                Delete.whereDelete (fieldColumn " <> wipeField <> " <> \" = ?\") [toField rootId] (Delete.emptyDelete @" <> tableTypeName child <> ")",
-          "            forM_ nestedItems $ \\nested ->",
-          "              Insert.executeInsertConn conn $",
-          "                Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
-          "        Include.findUniqueOrErrorConn @" <> tableTypeName root <> " conn include rootId"
+          "  IO (Either ORMError " <> resultName <> ")",
+          "updateConn conn include rootId input = do"
         ]
+          ++ updateBody
+          ++ [ "",
+               "update ::",
+               "  Pool Connection ->",
+               "  " <> includeName incl <> " ->",
+               "  UUID ->",
+               "  " <> writeUpdateTypeName root <> " ->",
+               "  IO (Either ORMError " <> resultName <> ")",
+               "update pool include rootId input =",
+               "  transaction pool $ \\conn -> updateConn conn include rootId input"
+             ]
 
 writeCreateTypeName :: Model -> Text
 writeCreateTypeName model = modelName model <> "WriteCreate"
@@ -411,21 +473,31 @@ emitSimpleExports :: Text
 emitSimpleExports =
   T.unlines
     [ "  ( create,",
+      "    createConn,",
       "    update,",
+      "    updateConn,",
       "    findAll,",
+      "    findAllConn,",
       "    findUnique,",
+      "    findUniqueConn,",
       "    findUniqueOrError,",
-      "    delete",
+      "    findUniqueOrErrorConn,",
+      "    deleteById,",
+      "    deleteByIdConn",
       "  )"
     ]
 
 emitIncludeReadExports :: Schema -> ModelInclude -> Text
 emitIncludeReadExports schema incl =
   T.unlines
-    [ "  ( findAll,",
-      "    findMany,",
-      "    findUnique,",
-      "    findUniqueOrError,",
+    [ "  ( findAllWith,",
+      "    findManyWith,",
+      "    findUniqueWith,",
+      "    findUniqueOrErrorWith,",
+      "    findAllWithConn,",
+      "    findManyWithConn,",
+      "    findUniqueWithConn,",
+      "    findUniqueOrErrorWithConn,",
       "    " <> fullPresetName schema incl <> ",",
       "    noInclude",
       "  )"
@@ -438,11 +510,25 @@ emitCreateFn model =
       "create = Insert.insert @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
+emitCreateConnFn :: Model -> Text
+emitCreateConnFn model =
+  T.unlines
+    [ "createConn :: Connection -> " <> createTypeName model <> " -> IO (Either ORMError " <> rowTypeName model <> ")",
+      "createConn = Insert.insertConn @" <> tableTypeName model <> " @" <> rowTypeName model
+    ]
+
 emitUpdateFn :: Model -> Text
 emitUpdateFn model =
   T.unlines
     [ "update :: Pool Connection -> UUID -> " <> updateTypeName model <> " -> IO (Either ORMError " <> rowTypeName model <> ")",
       "update = Update.update @" <> tableTypeName model <> " @" <> rowTypeName model
+    ]
+
+emitUpdateConnFn :: Model -> Text
+emitUpdateConnFn model =
+  T.unlines
+    [ "updateConn :: Connection -> UUID -> " <> updateTypeName model <> " -> IO (Either ORMError " <> rowTypeName model <> ")",
+      "updateConn = Update.updateConn @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
 emitFindAllFn :: Model -> Text
@@ -452,11 +538,25 @@ emitFindAllFn model =
       "findAll = Ops.findAll @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
+emitFindAllConnFn :: Model -> Text
+emitFindAllConnFn model =
+  T.unlines
+    [ "findAllConn :: Connection -> IO [" <> rowTypeName model <> "]",
+      "findAllConn = Ops.findAllConn @" <> tableTypeName model <> " @" <> rowTypeName model
+    ]
+
 emitFindUniqueFn :: Model -> Text
 emitFindUniqueFn model =
   T.unlines
     [ "findUnique :: Pool Connection -> UUID -> IO (Maybe " <> rowTypeName model <> ")",
       "findUnique = Ops.findUnique @" <> tableTypeName model <> " @" <> rowTypeName model
+    ]
+
+emitFindUniqueConnFn :: Model -> Text
+emitFindUniqueConnFn model =
+  T.unlines
+    [ "findUniqueConn :: Connection -> UUID -> IO (Maybe " <> rowTypeName model <> ")",
+      "findUniqueConn = Ops.findUniqueConn @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
 emitFindUniqueOrErrorFn :: Model -> Text
@@ -466,11 +566,25 @@ emitFindUniqueOrErrorFn model =
       "findUniqueOrError = Ops.findUniqueOrError @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
+emitFindUniqueOrErrorConnFn :: Model -> Text
+emitFindUniqueOrErrorConnFn model =
+  T.unlines
+    [ "findUniqueOrErrorConn :: Connection -> UUID -> IO (Either ORMError " <> rowTypeName model <> ")",
+      "findUniqueOrErrorConn = Ops.findUniqueOrErrorConn @" <> tableTypeName model <> " @" <> rowTypeName model
+    ]
+
 emitDeleteFn :: Model -> Text
 emitDeleteFn model =
   T.unlines
-    [ "delete :: Pool Connection -> UUID -> IO Int",
-      "delete = Ops.delete @" <> tableTypeName model
+    [ "deleteById :: Pool Connection -> UUID -> IO Int",
+      "deleteById = Ops.deleteById @" <> tableTypeName model
+    ]
+
+emitDeleteByIdConnFn :: Model -> Text
+emitDeleteByIdConnFn model =
+  T.unlines
+    [ "deleteByIdConn :: Connection -> UUID -> IO Int",
+      "deleteByIdConn = Ops.deleteByIdConn @" <> tableTypeName model
     ]
 
 emitFullIncludePreset :: Schema -> ModelInclude -> Text
@@ -491,19 +605,39 @@ emitNoIncludePreset schema incl =
 emitIncludeFindAll :: Model -> ModelInclude -> Text
 emitIncludeFindAll model incl =
   T.unlines
-    [ "findAll :: Pool Connection -> " <> includeName incl <> " -> IO [" <> includeResultName model incl <> "]",
-      "findAll = Include.findAll @" <> tableTypeName model
+    [ "findAllWith :: Pool Connection -> " <> includeName incl <> " -> IO [" <> includeResultName model incl <> "]",
+      "findAllWith = Include.findAllWith @" <> tableTypeName model
+    ]
+
+emitIncludeFindAllWithConn :: Model -> ModelInclude -> Text
+emitIncludeFindAllWithConn model incl =
+  T.unlines
+    [ "findAllWithConn :: Connection -> " <> includeName incl <> " -> IO [" <> includeResultName model incl <> "]",
+      "findAllWithConn = Include.findAllWithConn @" <> tableTypeName model
     ]
 
 emitIncludeFindMany :: Model -> ModelInclude -> Text
 emitIncludeFindMany model incl =
   T.unlines
-    [ "findMany ::",
+    [ "findManyWith ::",
       "  Pool Connection ->",
       "  " <> includeName incl <> " ->",
       "  (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ") ->",
       "  IO [" <> resultName <> "]",
-      "findMany = Include.findMany @" <> tableTypeName model
+      "findManyWith = Include.findManyWith @" <> tableTypeName model
+    ]
+  where
+    resultName = includeResultName model incl
+
+emitIncludeFindManyWithConn :: Model -> ModelInclude -> Text
+emitIncludeFindManyWithConn model incl =
+  T.unlines
+    [ "findManyWithConn ::",
+      "  Connection ->",
+      "  " <> includeName incl <> " ->",
+      "  (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ") ->",
+      "  IO [" <> resultName <> "]",
+      "findManyWithConn = Include.findManyWithConn @" <> tableTypeName model
     ]
   where
     resultName = includeResultName model incl
@@ -511,8 +645,17 @@ emitIncludeFindMany model incl =
 emitIncludeFindUnique :: Model -> ModelInclude -> Text
 emitIncludeFindUnique model incl =
   T.unlines
-    [ "findUnique :: Pool Connection -> " <> includeName incl <> " -> UUID -> IO (Maybe " <> resultName <> ")",
-      "findUnique = Include.findUnique @" <> tableTypeName model
+    [ "findUniqueWith :: Pool Connection -> " <> includeName incl <> " -> UUID -> IO (Maybe " <> resultName <> ")",
+      "findUniqueWith = Include.findUniqueWith @" <> tableTypeName model
+    ]
+  where
+    resultName = includeResultName model incl
+
+emitIncludeFindUniqueWithConn :: Model -> ModelInclude -> Text
+emitIncludeFindUniqueWithConn model incl =
+  T.unlines
+    [ "findUniqueWithConn :: Connection -> " <> includeName incl <> " -> UUID -> IO (Maybe " <> resultName <> ")",
+      "findUniqueWithConn = Include.findUniqueWithConn @" <> tableTypeName model
     ]
   where
     resultName = includeResultName model incl
@@ -520,8 +663,17 @@ emitIncludeFindUnique model incl =
 emitIncludeFindUniqueOrError :: Model -> ModelInclude -> Text
 emitIncludeFindUniqueOrError model incl =
   T.unlines
-    [ "findUniqueOrError :: Pool Connection -> " <> includeName incl <> " -> UUID -> IO (Either ORMError " <> resultName <> ")",
-      "findUniqueOrError = Include.findUniqueOrError @" <> tableTypeName model
+    [ "findUniqueOrErrorWith :: Pool Connection -> " <> includeName incl <> " -> UUID -> IO (Either ORMError " <> resultName <> ")",
+      "findUniqueOrErrorWith = Include.findUniqueOrErrorWith @" <> tableTypeName model
+    ]
+  where
+    resultName = includeResultName model incl
+
+emitIncludeFindUniqueOrErrorWithConn :: Model -> ModelInclude -> Text
+emitIncludeFindUniqueOrErrorWithConn model incl =
+  T.unlines
+    [ "findUniqueOrErrorWithConn :: Connection -> " <> includeName incl <> " -> UUID -> IO (Either ORMError " <> resultName <> ")",
+      "findUniqueOrErrorWithConn = Include.findUniqueOrErrorWithConn @" <> tableTypeName model
     ]
   where
     resultName = includeResultName model incl

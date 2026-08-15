@@ -15,7 +15,12 @@ data AppError = AppError
     context :: Value
   }
 
-data DomainError = NotFoundError | MultipleEntitiesError | WrongPwdError
+data DomainError
+  = NotFoundError
+  | MultipleEntitiesError
+  | ConflictError
+  | InternalError
+  | WrongPwdError
 
 addErrorContext :: Value -> AppError -> AppError
 addErrorContext newContext appError = appError {context = mergeValues appError.context newContext}
