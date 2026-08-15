@@ -2,14 +2,16 @@
 
 module ORM.Codegen.Emit.Schema
   ( emitModelModule,
+    emitEnumModule,
     emitHasMany,
     emitBelongsTo,
+    enumImportLine,
   )
 where
 
 import Data.Char (toLower, toUpper)
 import Data.List (find)
-import Data.Maybe (isJust, mapMaybe)
+import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.IR
@@ -94,15 +96,14 @@ imports moduleName schema model =
         updateImport model,
         relationImport model
       ]
-      ++ enumImports schema model
+      ++ enumImports moduleName schema model
       ++ relationModelImports moduleName schema model
 
-enumImports :: Schema -> Model -> [Text]
-enumImports schema model =
-  [ "import " <> imp <> " (" <> enumName e <> ")"
+enumImports :: Text -> Schema -> Model -> [Text]
+enumImports moduleName schema model =
+  [ enumImportLine (schemaEnumPrefix moduleName) e
     | e <- schemaEnums schema,
-      enumName e `elem` usedEnumNames,
-      Just imp <- [enumImport e]
+      enumName e `elem` usedEnumNames
   ]
   where
     usedEnumNames =
@@ -110,6 +111,91 @@ enumImports schema model =
         | f <- modelFields model,
           TyEnum name <- [fieldType f]
       ]
+
+schemaEnumPrefix :: Text -> Text
+schemaEnumPrefix moduleName =
+  case T.breakOnEnd "." moduleName of
+    (prefix, _) | not (T.null prefix) -> prefix
+    _ -> ""
+
+enumImportLine :: Text -> EnumSpec -> Text
+enumImportLine prefix e =
+  "import " <> enumImportModule prefix e <> " (" <> enumName e <> ")"
+
+enumImportModule :: Text -> EnumSpec -> Text
+enumImportModule prefix e =
+  case enumImport e of
+    Just imp -> imp
+    Nothing -> prefix <> enumName e
+
+enumToStringName :: EnumSpec -> Text
+enumToStringName e = lowerFirst (enumName e) <> "ToString"
+
+emitEnumModule :: Text -> EnumSpec -> Text
+emitEnumModule moduleName e =
+  T.unlines
+    [ "{-# LANGUAGE OverloadedStrings #-}",
+      "",
+      "module " <> moduleName,
+      "  ( " <> enumName e <> " (..),",
+      "    " <> enumToStringName e,
+      "  )",
+      "where",
+      "",
+      "import Data.Maybe (isNothing)",
+      "import Data.Text (Text)",
+      "import Database.PostgreSQL.Simple.FromField",
+      "  ( FromField (..),",
+      "    ResultError (ConversionFailed, UnexpectedNull),",
+      "    returnError,",
+      "  )",
+      "import Database.PostgreSQL.Simple.ToField (ToField (..), toField)",
+      "",
+      emitEnumData e,
+      "",
+      emitEnumFromField e,
+      "",
+      emitEnumToField e,
+      "",
+      emitEnumToString e
+    ]
+
+emitEnumData :: EnumSpec -> Text
+emitEnumData e =
+  T.unlines
+    [ "data " <> enumName e <> " = " <> T.intercalate " | " (map variantName (enumVariants e)),
+      "  deriving (Show, Eq)"
+    ]
+
+emitEnumFromField :: EnumSpec -> Text
+emitEnumFromField e =
+  T.unlines $
+    [ "instance FromField " <> enumName e <> " where",
+      "  fromField f bs",
+      "    | isNothing bs = returnError UnexpectedNull f \"\""
+    ]
+      ++ [ "    | bs == Just \"" <> variantDbStr v <> "\" = pure " <> variantName v
+           | v <- enumVariants e
+         ]
+      ++ ["    | otherwise = returnError ConversionFailed f \"\""]
+
+emitEnumToField :: EnumSpec -> Text
+emitEnumToField e =
+  T.unlines
+    [ "instance ToField " <> enumName e <> " where",
+      "  toField = toField . " <> enumToStringName e
+    ]
+
+emitEnumToString :: EnumSpec -> Text
+emitEnumToString e =
+  T.unlines $
+    (enumToStringName e <> " :: " <> enumName e <> " -> Text")
+      : [ enumToStringName e <> " " <> variantName v <> " = \"" <> variantDbStr v <> "\""
+          | v <- enumVariants e
+        ]
+
+variantDbStr :: EnumVariant -> Text
+variantDbStr v = fromMaybe (lowerFirst (variantName v)) (variantDbValue v)
 
 relationModelImports :: Text -> Schema -> Model -> [Text]
 relationModelImports moduleName schema model =

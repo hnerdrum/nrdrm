@@ -39,7 +39,7 @@ import ORM.Schema.Ingredient (IngredientRow (..))
 import qualified ORM.Schema.Recipe as Recipe
 import qualified ORM.Schema.RecipeIngredient as RecipeIngredient
 import qualified ORM.Schema.Ingredient as Ingredient
-import Database.Ingredient (Unit)
+import ORM.Schema.Unit (Unit)
 
 newtype RecipeIngredientInclude = RecipeIngredientInclude
   { ingredient :: Bool

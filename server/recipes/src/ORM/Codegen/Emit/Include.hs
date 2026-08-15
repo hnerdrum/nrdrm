@@ -34,6 +34,7 @@ import ORM.Codegen.Emit.FlatRow
     shallowJoin,
     shallowJoinRowName,
   )
+import ORM.Codegen.Emit.Schema (enumImportLine)
 import ORM.Codegen.IR
 import ORM.Codegen.JoinAlias (IncludeAliases (..), assignIncludeAliases)
 
@@ -734,7 +735,7 @@ emitIncludeImports moduleName schema incl =
         "import qualified " <> childMod <> " as " <> modelName sjChild,
         grandQualified
       ]
-      ++ enumImports schema incl
+      ++ enumImports (schemaModulePrefix moduleName) schema incl
   where
     ShallowJoin {sjRoot, sjChild, sjRel, sjRootFields, sjChildFields} =
       shallowJoin schema incl
@@ -810,12 +811,11 @@ schemaModulePrefix moduleName =
     (prefix, _) | not (T.null prefix) -> prefix
     _ -> ""
 
-enumImports :: Schema -> ModelInclude -> [Text]
-enumImports schema incl =
-  [ "import " <> imp <> " (" <> enumName e <> ")"
+enumImports :: Text -> Schema -> ModelInclude -> [Text]
+enumImports prefix schema incl =
+  [ enumImportLine prefix e
     | e <- schemaEnums schema,
-      enumName e `elem` usedEnumNames schema incl,
-      Just imp <- [enumImport e]
+      enumName e `elem` usedEnumNames schema incl
   ]
 
 usedEnumNames :: Schema -> ModelInclude -> [Text]

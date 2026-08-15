@@ -398,13 +398,7 @@ emitRecipeUpdate root incl child deleteField =
     ]
 
 emitRecipeDelete :: Model -> Text
-emitRecipeDelete model =
-  T.unlines
-    [ "delete :: Pool Connection -> UUID -> IO ()",
-      "delete pool recipeId = do",
-      "  _ <- Ops.delete @" <> tableTypeName model <> " pool recipeId",
-      "  pure ()"
-    ]
+emitRecipeDelete = emitDeleteFn
 
 emitToRecipeCreate :: Model -> Text
 emitToRecipeCreate model =

@@ -63,7 +63,9 @@ updateRecipe pool recipeId input =
     <$> Recipe.update pool Recipe.withIngredients recipeId input
 
 deleteRecipe :: Pool Connection -> UUID -> IO ()
-deleteRecipe = Recipe.delete
+deleteRecipe pool recipeId = do
+  _ <- Recipe.delete pool recipeId
+  pure ()
 
 fromRecipeError :: ORMError -> AppError
 fromRecipeError err =
