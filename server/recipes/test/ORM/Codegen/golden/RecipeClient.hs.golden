@@ -115,10 +115,8 @@ update pool include recipeId input = do
         Include.findUniqueOrErrorConn @RecipeTable conn include recipeId
 
 
-delete :: Pool Connection -> UUID -> IO ()
-delete pool recipeId = do
-  _ <- Ops.delete @RecipeTable pool recipeId
-  pure ()
+delete :: Pool Connection -> UUID -> IO Int
+delete = Ops.delete @RecipeTable
 
 
 toRecipeCreate :: UUID -> CreateRecipeInput -> RecipeCreate

@@ -24,7 +24,7 @@ import ORM.Core
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 import ORM.Relation (BelongsTo (..), JoinType (..))
-import Database.Ingredient (Unit)
+import ORM.Schema.Unit (Unit)
 import ORM.Schema.Ingredient (IngredientTable)
 import qualified ORM.Schema.Ingredient as Ingredient
 

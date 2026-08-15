@@ -49,7 +49,7 @@ emitSpec = do
       actual
         `shouldSatisfy` T.isInfixOf "import ORM.Schema.Ingredient (IngredientTable)"
       actual `shouldSatisfy` T.isInfixOf "    riIngredient"
-      actual `shouldSatisfy` T.isInfixOf "import Database.Ingredient (Unit)"
+      actual `shouldSatisfy` T.isInfixOf "import ORM.Schema.Unit (Unit)"
       T.strip (emitBelongsTo recipeSchema riIngredientRel)
         `shouldSatisfy` (`T.isInfixOf` T.strip actual)
 

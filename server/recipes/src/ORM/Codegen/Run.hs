@@ -10,6 +10,7 @@ module ORM.Codegen.Run
 where
 
 import Data.List (find)
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -18,11 +19,15 @@ import ORM.Codegen.Emit.Client
     emitSimpleClientModule,
   )
 import ORM.Codegen.Emit.Include (emitIncludeModule)
-import ORM.Codegen.Emit.Schema (emitModelModule)
+import ORM.Codegen.Emit.Schema (emitEnumModule, emitModelModule)
 import ORM.Codegen.IR
-  ( Model (..),
+  ( EnumSpec (..),
+    Model (..),
     Schema (..),
+    enumImport,
+    enumName,
     modelName,
+    schemaEnums,
     schemaIncludes,
     schemaModels,
   )
@@ -99,33 +104,46 @@ shelfTestOutputs =
 
 recipeProdOutputs :: [GenOutput]
 recipeProdOutputs =
-  [ gen "src/ORM/Schema/Ingredient.hs" $
-      emitModelModule "ORM.Schema.Ingredient" recipeSchema ingredientModel,
-    genGolden "Ingredient.hs" $
-      emitModelModule "ORM.Schema.Ingredient" recipeSchema ingredientModel,
-    gen "src/ORM/Schema/Recipe.hs" $
-      emitModelModule "ORM.Schema.Recipe" recipeSchema recipeModel,
-    genGolden "Recipe.hs" $
-      emitModelModule "ORM.Schema.Recipe" recipeSchema recipeModel,
-    gen "src/ORM/Schema/RecipeIngredient.hs" $
-      emitModelModule "ORM.Schema.RecipeIngredient" recipeSchema recipeIngredientModel,
-    genGolden "RecipeIngredient.hs" $
-      emitModelModule "ORM.Schema.RecipeIngredient" recipeSchema recipeIngredientModel,
-    gen "src/ORM/Schema/RecipeInclude.hs" $
-      emitIncludeModule "ORM.Schema.RecipeInclude" recipeSchema recipeInclude,
-    genGolden "RecipeInclude.hs" $
-      emitIncludeModule "ORM.Schema.RecipeInclude" recipeSchema recipeInclude,
-    gen "src/ORM/Client/Ingredient.hs" $
-      emitSimpleClientModule "ORM.Client.Ingredient" ingredientModel,
-    genGolden "IngredientClient.hs" $
-      emitSimpleClientModule "ORM.Client.Ingredient" ingredientModel,
-    gen "src/ORM/Client/Recipe.hs" $
-      emitRecipeClientModule "ORM.Client.Recipe" recipeSchema recipeInclude,
-    genGolden "RecipeClient.hs" $
-      emitRecipeClientModule "ORM.Client.Recipe" recipeSchema recipeInclude
-  ]
+  recipeInlineEnumOutputs
+    ++ [ gen "src/ORM/Schema/Ingredient.hs" $
+           emitModelModule "ORM.Schema.Ingredient" recipeSchema ingredientModel,
+         genGolden "Ingredient.hs" $
+           emitModelModule "ORM.Schema.Ingredient" recipeSchema ingredientModel,
+         gen "src/ORM/Schema/Recipe.hs" $
+           emitModelModule "ORM.Schema.Recipe" recipeSchema recipeModel,
+         genGolden "Recipe.hs" $
+           emitModelModule "ORM.Schema.Recipe" recipeSchema recipeModel,
+         gen "src/ORM/Schema/RecipeIngredient.hs" $
+           emitModelModule "ORM.Schema.RecipeIngredient" recipeSchema recipeIngredientModel,
+         genGolden "RecipeIngredient.hs" $
+           emitModelModule "ORM.Schema.RecipeIngredient" recipeSchema recipeIngredientModel,
+         gen "src/ORM/Schema/RecipeInclude.hs" $
+           emitIncludeModule "ORM.Schema.RecipeInclude" recipeSchema recipeInclude,
+         genGolden "RecipeInclude.hs" $
+           emitIncludeModule "ORM.Schema.RecipeInclude" recipeSchema recipeInclude,
+         gen "src/ORM/Client/Ingredient.hs" $
+           emitSimpleClientModule "ORM.Client.Ingredient" ingredientModel,
+         genGolden "IngredientClient.hs" $
+           emitSimpleClientModule "ORM.Client.Ingredient" ingredientModel,
+         gen "src/ORM/Client/Recipe.hs" $
+           emitRecipeClientModule "ORM.Client.Recipe" recipeSchema recipeInclude,
+         genGolden "RecipeClient.hs" $
+           emitRecipeClientModule "ORM.Client.Recipe" recipeSchema recipeInclude
+       ]
   where
     recipeInclude = head (schemaIncludes recipeSchema)
+
+recipeInlineEnumOutputs :: [GenOutput]
+recipeInlineEnumOutputs =
+  concat
+    [ [ gen ("src/ORM/Schema/" <> T.unpack (enumName e) <> ".hs") $
+          emitEnumModule ("ORM.Schema." <> enumName e) e,
+        genGolden (T.unpack (enumName e) <> ".hs") $
+          emitEnumModule ("ORM.Schema." <> enumName e) e
+      ]
+      | e <- schemaEnums recipeSchema,
+        isNothing (enumImport e)
+    ]
 
 gen :: FilePath -> Text -> GenOutput
 gen path text = GenOutput {outputPath = path, outputText = text}
