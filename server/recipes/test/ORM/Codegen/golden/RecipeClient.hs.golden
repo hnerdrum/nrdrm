@@ -35,7 +35,7 @@ import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
 import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
 import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..))
-import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
+import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientId)
 import ORM.Transaction (transaction)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder)
@@ -108,7 +108,7 @@ update pool include recipeId input = do
           Just ingredients -> do
             _ <-
               Delete.deleteConn conn $
-                Delete.whereDelete (fieldColumn recipeIngredientRecipeId <> " = ?") [toField recipeId] (Delete.emptyDelete @RecipeIngredientTable)
+                Delete.whereDelete (fieldColumn recipeIngredientId <> " = ?") [toField recipeId] (Delete.emptyDelete @RecipeIngredientTable)
             forM_ (mapMaybe (toRecipeIngredientUpdate recipeId) ingredients) $ \ri ->
               Insert.executeInsertConn conn $
                 Insert.toInsertBuilder @RecipeIngredientTable ri
@@ -145,7 +145,8 @@ toRecipeUpdate now input =
 toRecipeIngredientCreate :: UUID -> CreateRecipeIngredientInput -> RecipeIngredientCreate
 toRecipeIngredientCreate recipeId input =
   RecipeIngredientCreate
-    { recipeId,
+    { id = Nothing,
+      recipeId,
       ingredientId = input.id,
       amount = input.amount,
       unit = input.unit
@@ -158,7 +159,8 @@ toRecipeIngredientUpdate recipeId input = do
   unit <- input.unit
   pure
     RecipeIngredientCreate
-      { recipeId,
+      { id = Nothing,
+        recipeId,
         ingredientId = input.id,
         amount,
         unit
