@@ -2,11 +2,11 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE NoFieldSelectors #-}
 
 module Schema.ShelfInclude
   ( ShelfInclude (..),
@@ -14,7 +14,7 @@ module Schema.ShelfInclude
     BookWithChapters (..),
     ShelfWithBooks (..),
     ShelfBookJoinRow (..),
-    ShelfBookChapterJoinRow (..),
+    ShelfBookChapterJoinRow (..)
   )
 where
 
@@ -32,12 +32,12 @@ import ORM.Include
   )
 import qualified ORM.JoinChain as JoinChain
 import ORM.Operations (findMany)
+import Schema.Shelf (ShelfTable, ShelfRow (..), shelfBooks)
 import Schema.Book (BookRow (..), bookChapters)
-import qualified Schema.Book as Book
 import Schema.Chapter (ChapterRow (..))
-import qualified Schema.Chapter as Chapter
-import Schema.Shelf (ShelfRow (..), ShelfTable, shelfBooks)
 import qualified Schema.Shelf as Shelf
+import qualified Schema.Book as Book
+import qualified Schema.Chapter as Chapter
 
 newtype BookInclude = BookInclude
   { chapters :: Bool
@@ -210,3 +210,4 @@ instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfInclude ShelfWithBoo
         let chain = applyRootFilter buildShelfBookChapterJoin modifier
         flatRows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow chain
         pure $ nestShelfBookChapterRows flatRows
+

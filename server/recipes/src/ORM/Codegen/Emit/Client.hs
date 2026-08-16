@@ -17,17 +17,20 @@ import ORM.Codegen.IR
 emitSimpleClientModule :: Text -> Model -> Text
 emitSimpleClientModule moduleName model =
   T.unlines
-    [ "{-# LANGUAGE TypeApplications #-}",
+    [ "{-# LANGUAGE RecordWildCards #-}",
+      "{-# LANGUAGE TypeApplications #-}",
       "",
       "module " <> moduleName,
-      emitSimpleExports,
+      emitSimpleExports model,
       "where",
       "",
       "import Data.UUID (UUID)",
       "import ORM.Db (Db)",
       "import ORM.Errors (ORMError)",
+      "import qualified ORM.Delete as Delete",
       "import qualified ORM.Insert as Insert",
       "import qualified ORM.Operations as Ops",
+      "import ORM.Query (QueryBuilder, applyQueryModifiers)",
       "import "
         <> schemaModule moduleName model
         <> " ("
@@ -45,19 +48,28 @@ emitSimpleClientModule moduleName model =
       "",
       emitUpdateFn model,
       "",
-      emitFindAllFn model,
+      emitQueryType model,
+      "",
+      emitEmptyQueryFn model,
+      "",
+      emitFindManyFn model,
       "",
       emitFindUniqueFn model,
       "",
-      emitFindUniqueOrErrorFn model,
+      emitFindUniqueOrFailFn model,
       "",
-      emitDeleteFn model
+      emitDeleteFn model,
+      "",
+      emitDeleteManyFn model
     ]
 
 emitIncludeReadClientModule :: Text -> Schema -> ModelInclude -> Text
 emitIncludeReadClientModule moduleName schema incl =
   T.unlines
-    ( [ "{-# LANGUAGE TypeApplications #-}",
+    ( [ "{-# LANGUAGE FlexibleContexts #-}",
+        "{-# LANGUAGE MultiParamTypeClasses #-}",
+        "{-# LANGUAGE RecordWildCards #-}",
+        "{-# LANGUAGE TypeApplications #-}",
         "",
         "module " <> moduleName
       ]
@@ -72,7 +84,10 @@ emitWriteClientModule :: Text -> Schema -> ModelInclude -> Text
 emitWriteClientModule moduleName schema incl =
   T.unlines
     ( [ "{-# LANGUAGE DuplicateRecordFields #-}",
+        "{-# LANGUAGE FlexibleContexts #-}",
+        "{-# LANGUAGE MultiParamTypeClasses #-}",
         "{-# LANGUAGE OverloadedRecordDot #-}",
+        "{-# LANGUAGE RecordWildCards #-}",
         "{-# LANGUAGE TypeApplications #-}",
         "",
         "module " <> moduleName
@@ -81,12 +96,14 @@ emitWriteClientModule moduleName schema incl =
           ( includeReadFunctionExportItems
               ++ [ "create,",
                    "update,",
-                   "deleteById,",
+                   "delete,",
+                   "deleteMany,",
                    writeCreateTypeName root <> " (..),",
                    writeUpdateTypeName root <> " (..),",
                    nestedCreateTypeName child <> " (..),"
                  ]
               ++ includeReadPresetExportItems schema incl
+              ++ [queryTypeName root <> " (..),"]
           )
         ++ ["where", ""]
         ++ [ "import Control.Monad (forM_)",
@@ -121,7 +138,7 @@ emitWriteClientModule moduleName schema incl =
                <> wipeField
                <> ")",
              "import qualified ORM.Operations as Ops",
-             "import ORM.Query (QueryBuilder)",
+             "import ORM.Query (QueryBuilder, applyQueryModifiers)",
              "import qualified ORM.Update as Update"
            ]
         ++ nestedEnumImports schema child
@@ -135,7 +152,8 @@ emitWriteClientModule moduleName schema incl =
           ++ emitIncludeReadDefinitions schema incl
           ++ [ emitWriteCreate root incl child rel,
                emitWriteUpdate root incl child rel wipeField,
-               emitDeleteFn root
+               emitDeleteFn root,
+               emitDeleteManyFn root
              ]
       )
   where
@@ -214,7 +232,7 @@ emitWriteCreate root incl child rel =
           "      forM_ input." <> childrenField <> " $ \\nested ->",
           "        Insert.executeInsert $",
           "          Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
-          "      Include.findUniqueOrErrorWith @" <> tableTypeName root <> " include rootId"
+          "      Include.findUniqueOrFail @" <> tableTypeName root <> " include rootId"
         ]
    in T.unlines $
         [ "create ::",
@@ -245,7 +263,7 @@ emitWriteUpdate root incl child rel wipeField =
           "          forM_ nestedItems $ \\nested ->",
           "            Insert.executeInsert $",
           "              Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
-          "      Include.findUniqueOrErrorWith @" <> tableTypeName root <> " include rootId"
+          "      Include.findUniqueOrFail @" <> tableTypeName root <> " include rootId"
         ]
    in T.unlines $
         [ "update ::",
@@ -332,15 +350,18 @@ nestedEnumImports schema child =
         go imp acc | imp `elem` acc = acc
         go imp acc = imp : acc
 
-emitSimpleExports :: Text
-emitSimpleExports =
+emitSimpleExports :: Model -> Text
+emitSimpleExports model =
   T.unlines
     [ "  ( create,",
       "    update,",
-      "    findAll,",
+      "    findMany,",
       "    findUnique,",
-      "    findUniqueOrError,",
-      "    deleteById",
+      "    findUniqueOrFail,",
+      "    delete,",
+      "    deleteMany,",
+      "    " <> queryTypeName model <> " (..),",
+      "    emptyQuery",
       "  )"
     ]
 
@@ -353,20 +374,21 @@ exportLinesFromItems items =
 
 includeReadExportItems :: Schema -> ModelInclude -> [Text]
 includeReadExportItems schema incl =
-  includeReadFunctionExportItems ++ includeReadPresetExportItems schema incl
+  includeReadFunctionExportItems
+    ++ includeReadPresetExportItems schema incl
+    ++ [queryTypeName (lookupModel schema (includeRootModel incl)) <> " (..),"]
 
 includeReadFunctionExportItems :: [Text]
 includeReadFunctionExportItems =
-  [ "findAllWith,",
-    "findManyWith,",
-    "findUniqueWith,",
-    "findUniqueOrErrorWith,"
+  [ "findMany,",
+    "findUnique,",
+    "findUniqueOrFail,"
   ]
 
 includeReadPresetExportItems :: Schema -> ModelInclude -> [Text]
 includeReadPresetExportItems schema incl =
   [ fullPresetName schema incl <> ",",
-    "noInclude"
+    "noInclude,"
   ]
 
 includeReadImportLines :: Text -> Schema -> ModelInclude -> [Text]
@@ -375,7 +397,7 @@ includeReadImportLines moduleName schema incl =
     "import ORM.Db (Db)",
     "import ORM.Errors (ORMError)",
     "import qualified ORM.Include as Include",
-    "import ORM.Query (QueryBuilder)",
+    "import ORM.Query (QueryBuilder, applyQueryModifiers)",
     "import "
       <> schemaModule moduleName root
       <> " ("
@@ -415,10 +437,11 @@ emitIncludeReadDefinitions schema incl =
   let root = lookupModel schema (includeRootModel incl)
    in [ emitFullIncludePreset schema incl,
         emitNoIncludePreset schema incl,
-        emitIncludeFindAll root incl,
-        emitIncludeFindMany root incl,
+        emitIncludeQueryType root incl,
+        emitIncludeFindManyClass root incl,
+        emitIncludeFindManyInstances root incl,
         emitIncludeFindUnique root incl,
-        emitIncludeFindUniqueOrError root incl
+        emitIncludeFindUniqueOrFail root incl
       ]
 
 intercalateSections :: [Text] -> Text
@@ -439,11 +462,35 @@ emitUpdateFn model =
       "update = Update.update @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
-emitFindAllFn :: Model -> Text
-emitFindAllFn model =
+emitFindManyFn :: Model -> Text
+emitFindManyFn model =
   T.unlines
-    [ "findAll :: Db [" <> rowTypeName model <> "]",
-      "findAll = Ops.findAll @" <> tableTypeName model <> " @" <> rowTypeName model
+    [ "findMany :: " <> queryTypeName model <> " -> Db [" <> rowTypeName model <> "]",
+      "findMany q =",
+      "  Ops.findMany @" <> tableTypeName model <> " @" <> rowTypeName model <> " (applyQuery q)",
+      "",
+      "applyQuery :: " <> queryTypeName model <> " -> QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model,
+      "applyQuery " <> queryTypeName model <> " {..} =",
+      "  applyQueryModifiers where_ orderBy_ limit_ offset_"
+    ]
+
+emitEmptyQueryFn :: Model -> Text
+emitEmptyQueryFn model =
+  T.unlines
+    [ "emptyQuery :: " <> queryTypeName model,
+      "emptyQuery =",
+      "  " <> queryTypeName model <> " {where_ = Nothing, orderBy_ = Nothing, limit_ = Nothing, offset_ = Nothing}"
+    ]
+
+emitQueryType :: Model -> Text
+emitQueryType model =
+  T.unlines
+    [ "data " <> queryTypeName model <> " = " <> queryTypeName model,
+      "  { where_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
+      "  , orderBy_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
+      "  , limit_ :: Maybe Int",
+      "  , offset_ :: Maybe Int",
+      "  }"
     ]
 
 emitFindUniqueFn :: Model -> Text
@@ -453,18 +500,25 @@ emitFindUniqueFn model =
       "findUnique = Ops.findUnique @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
-emitFindUniqueOrErrorFn :: Model -> Text
-emitFindUniqueOrErrorFn model =
+emitFindUniqueOrFailFn :: Model -> Text
+emitFindUniqueOrFailFn model =
   T.unlines
-    [ "findUniqueOrError :: UUID -> Db (Either ORMError " <> rowTypeName model <> ")",
-      "findUniqueOrError = Ops.findUniqueOrError @" <> tableTypeName model <> " @" <> rowTypeName model
+    [ "findUniqueOrFail :: UUID -> Db (Either ORMError " <> rowTypeName model <> ")",
+      "findUniqueOrFail = Ops.findUniqueOrError @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
 emitDeleteFn :: Model -> Text
 emitDeleteFn model =
   T.unlines
-    [ "deleteById :: UUID -> Db Int",
-      "deleteById = Ops.deleteById @" <> tableTypeName model
+    [ "delete :: UUID -> Db Int",
+      "delete = Ops.deleteById @" <> tableTypeName model
+    ]
+
+emitDeleteManyFn :: Model -> Text
+emitDeleteManyFn model =
+  T.unlines
+    [ "deleteMany :: (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ") -> Db Int",
+      "deleteMany = Delete.deleteMany @" <> tableTypeName model
     ]
 
 emitFullIncludePreset :: Schema -> ModelInclude -> Text
@@ -482,42 +536,64 @@ emitNoIncludePreset schema incl =
       "noInclude = " <> noIncludeValue schema incl
     ]
 
-emitIncludeFindAll :: Model -> ModelInclude -> Text
-emitIncludeFindAll model incl =
+emitIncludeQueryType :: Model -> ModelInclude -> Text
+emitIncludeQueryType model incl =
   T.unlines
-    [ "findAllWith :: " <> includeName incl <> " -> Db [" <> includeResultName model incl <> "]",
-      "findAllWith = Include.findAllWith @" <> tableTypeName model
+    [ "data " <> queryTypeName model <> " = " <> queryTypeName model,
+      "  { include :: " <> includeName incl,
+      "  , where_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
+      "  , orderBy_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
+      "  , limit_ :: Maybe Int",
+      "  , offset_ :: Maybe Int",
+      "  }"
     ]
 
-emitIncludeFindMany :: Model -> ModelInclude -> Text
-emitIncludeFindMany model incl =
+emitIncludeFindManyClass :: Model -> ModelInclude -> Text
+emitIncludeFindManyClass model incl =
   T.unlines
-    [ "findManyWith ::",
-      "  " <> includeName incl <> " ->",
-      "  (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ") ->",
-      "  Db [" <> resultName <> "]",
-      "findManyWith = Include.findManyWith @" <> tableTypeName model
+    [ "class FindMany" <> modelName model <> " a where",
+      "  findMany :: a -> Db [" <> includeResultName model incl <> "]"
     ]
-  where
-    resultName = includeResultName model incl
+
+emitIncludeFindManyInstances :: Model -> ModelInclude -> Text
+emitIncludeFindManyInstances model incl =
+  T.unlines
+    [ "instance FindMany" <> modelName model <> " " <> includeName incl <> " where",
+      "  findMany include =",
+      "    findMany",
+      "      " <> queryTypeName model,
+      "        { include = include,",
+      "          where_ = Nothing,",
+      "          orderBy_ = Nothing,",
+      "          limit_ = Nothing,",
+      "          offset_ = Nothing",
+      "        }",
+      "",
+      "instance FindMany" <> modelName model <> " " <> queryTypeName model <> " where",
+      "  findMany " <> queryTypeName model <> " {..} =",
+      "    Include.findMany @" <> tableTypeName model <> " include (applyQueryModifiers where_ orderBy_ limit_ offset_)"
+    ]
 
 emitIncludeFindUnique :: Model -> ModelInclude -> Text
 emitIncludeFindUnique model incl =
   T.unlines
-    [ "findUniqueWith :: " <> includeName incl <> " -> UUID -> Db (Maybe " <> resultName <> ")",
-      "findUniqueWith = Include.findUniqueWith @" <> tableTypeName model
+    [ "findUnique :: " <> includeName incl <> " -> UUID -> Db (Maybe " <> resultName <> ")",
+      "findUnique = Include.findUnique @" <> tableTypeName model
     ]
   where
     resultName = includeResultName model incl
 
-emitIncludeFindUniqueOrError :: Model -> ModelInclude -> Text
-emitIncludeFindUniqueOrError model incl =
+emitIncludeFindUniqueOrFail :: Model -> ModelInclude -> Text
+emitIncludeFindUniqueOrFail model incl =
   T.unlines
-    [ "findUniqueOrErrorWith :: " <> includeName incl <> " -> UUID -> Db (Either ORMError " <> resultName <> ")",
-      "findUniqueOrErrorWith = Include.findUniqueOrErrorWith @" <> tableTypeName model
+    [ "findUniqueOrFail :: " <> includeName incl <> " -> UUID -> Db (Either ORMError " <> resultName <> ")",
+      "findUniqueOrFail = Include.findUniqueOrFail @" <> tableTypeName model
     ]
   where
     resultName = includeResultName model incl
+
+queryTypeName :: Model -> Text
+queryTypeName model = modelName model <> "Query"
 
 includeResultName :: Model -> ModelInclude -> Text
 includeResultName model incl =

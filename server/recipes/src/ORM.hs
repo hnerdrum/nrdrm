@@ -8,6 +8,7 @@ module ORM
     count,
     deleteById,
     deleteWhere,
+    deleteMany,
     offset,
     ORMError (..),
     selectAll,
@@ -16,6 +17,7 @@ module ORM
     whereEq,
     orderBy,
     limit,
+    applyQueryModifiers,
     OrderDirection (..),
     runQuery,
     runQueryOne,
@@ -90,7 +92,7 @@ import ORM.Db (Db (..), runDb, withTransaction)
 import ORM.Delete
 import ORM.Errors
 import ORM.Group
-import ORM.Include
+import ORM.Include hiding (findMany, findUnique)
 import ORM.Insert
 import ORM.JoinChain
 import ORM.Operations

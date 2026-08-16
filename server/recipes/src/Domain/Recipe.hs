@@ -126,12 +126,12 @@ $(deriveJSON defaultOptions ''Recipe)
 
 getAllRecipes :: Pool Connection -> IO [Recipe]
 getAllRecipes pool =
-  map fromRecipeWithIngredients <$> runDb pool (Recipe.findAllWith Recipe.withIngredients)
+  map fromRecipeWithIngredients <$> runDb pool (Recipe.findMany Recipe.withIngredients)
 
 getRecipe :: Pool Connection -> UUID -> IO (Either AppError Recipe)
 getRecipe pool recipeId =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> runDb pool (Recipe.findUniqueOrErrorWith Recipe.withIngredients recipeId)
+    <$> runDb pool (Recipe.findUniqueOrFail Recipe.withIngredients recipeId)
 
 createRecipe :: Pool Connection -> CreateRecipeInput -> IO (Either AppError Recipe)
 createRecipe pool input =
@@ -191,7 +191,7 @@ toRecipeIngredientNestedUpdate input = do
 
 deleteRecipe :: Pool Connection -> UUID -> IO ()
 deleteRecipe pool recipeId =
-  void (runDb pool (Recipe.deleteById recipeId))
+  void (runDb pool (Recipe.delete recipeId))
 
 fromRecipeError :: ORMError -> AppError
 fromRecipeError err =
