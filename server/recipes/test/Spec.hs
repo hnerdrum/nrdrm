@@ -12,6 +12,7 @@ import ORM.ErrorsSpec (errorsSpec)
 import ORM.IncludeSpec (includeSpec)
 import ORM.JoinSpec (joinSpec)
 import ORM.OperationsSpec (operationsSpec)
+import ORM.RawSpec (rawSpec)
 import Support.TestDb (withTestDb)
 import Test.Hspec
 
@@ -27,4 +28,4 @@ main = hspec $ do
   emitClientSpec
   targetSpec
   errorsSpec
-  withTestDb $ operationsSpec >> joinSpec >> includeSpec
+  withTestDb $ operationsSpec >> joinSpec >> includeSpec >> rawSpec

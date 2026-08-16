@@ -81,6 +81,10 @@ module ORM
     runDb,
     withTransaction,
     Db (..),
+    queryRaw,
+    executeRaw,
+    param,
+    catchDb,
     Unit (..),
   )
 where
@@ -99,4 +103,5 @@ import ORM.Operations
 import ORM.Query
 import ORM.Relation
 import ORM.Schema.Unit (Unit (..))
+import ORM.Sql (catchDb, executeRaw, param, queryRaw)
 import ORM.Update
