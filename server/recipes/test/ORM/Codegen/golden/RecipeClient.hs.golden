@@ -1,9 +1,11 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module ORM.Client.Recipe
   ( findMany,
@@ -18,7 +20,10 @@ module ORM.Client.Recipe
     RecipeIngredientNestedCreate (..),
     withIngredients,
     noInclude,
-    RecipeQuery (..),
+    WithIngredients (..),
+    NoInclude (..),
+    ResolveInclude,
+    RecipeQuery (..)
   )
 where
 
@@ -33,7 +38,7 @@ import ORM.Errors (ORMError)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
 import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
-import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..))
+import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients)
 import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers)
@@ -67,47 +72,68 @@ toRecipeIngredientCreate parentId nested =
       recipeId = parentId
     }
 
-withIngredients :: RecipeInclude
+withIngredients :: WithIngredients
 withIngredients =
-  RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = True})}
+  WithIngredients RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = True})}
 
-noInclude :: RecipeInclude
-noInclude = RecipeInclude {ingredients = Nothing}
+noInclude :: NoInclude
+noInclude = NoInclude RecipeInclude {ingredients = Nothing}
 
-data RecipeQuery = RecipeQuery
-  { include :: RecipeInclude
-  , where_ :: Maybe (QueryBuilder RecipeTable -> QueryBuilder RecipeTable)
+data RecipeQuery preset = RecipeQuery
+  { where_ :: Maybe (QueryBuilder RecipeTable -> QueryBuilder RecipeTable)
   , orderBy_ :: Maybe (QueryBuilder RecipeTable -> QueryBuilder RecipeTable)
   , limit_ :: Maybe Int
   , offset_ :: Maybe Int
   }
 
-class FindManyRecipe a where
-  findMany :: a -> Db [RecipeWithIngredients]
+type instance ResolveInclude (RecipeQuery WithIngredients) = RecipeWithIngredients
+type instance ResolveInclude (RecipeQuery NoInclude) = RecipeRow
 
-instance FindManyRecipe RecipeInclude where
-  findMany include =
-    findMany
-      RecipeQuery
-        { include = include,
-          where_ = Nothing,
-          orderBy_ = Nothing,
-          limit_ = Nothing,
-          offset_ = Nothing
-        }
+class FindManyRecipe preset where
+  findMany :: preset -> Db [ResolveInclude preset]
 
-instance FindManyRecipe RecipeQuery where
+instance FindManyRecipe WithIngredients where
+  findMany preset =
+    Include.findMany @RecipeTable (unwrapWithIngredients preset) Prelude.id
+
+instance FindManyRecipe NoInclude where
+  findMany _ =
+    Ops.findMany @RecipeTable @RecipeRow Prelude.id
+
+instance FindManyRecipe (RecipeQuery WithIngredients) where
   findMany RecipeQuery {..} =
-    Include.findMany @RecipeTable include (applyQueryModifiers where_ orderBy_ limit_ offset_)
+    Include.findMany @RecipeTable (unwrapWithIngredients withIngredients) (applyQueryModifiers where_ orderBy_ limit_ offset_)
 
-findUnique :: RecipeInclude -> UUID -> Db (Maybe RecipeWithIngredients)
-findUnique = Include.findUnique @RecipeTable
+instance FindManyRecipe (RecipeQuery NoInclude) where
+  findMany RecipeQuery {..} =
+    Ops.findMany @RecipeTable @RecipeRow (applyQueryModifiers where_ orderBy_ limit_ offset_)
 
-findUniqueOrFail :: RecipeInclude -> UUID -> Db (Either ORMError RecipeWithIngredients)
-findUniqueOrFail = Include.findUniqueOrFail @RecipeTable
+class FindUniqueRecipe preset where
+  findUnique :: preset -> UUID -> Db (Maybe (ResolveInclude preset))
+
+
+instance FindUniqueRecipe WithIngredients where
+  findUnique preset =
+    Include.findUnique @RecipeTable (unwrapWithIngredients preset)
+
+instance FindUniqueRecipe NoInclude where
+  findUnique _ =
+    Ops.findUnique @RecipeTable @RecipeRow
+
+class FindUniqueOrFailRecipe preset where
+  findUniqueOrFail :: preset -> UUID -> Db (Either ORMError (ResolveInclude preset))
+
+
+instance FindUniqueOrFailRecipe WithIngredients where
+  findUniqueOrFail preset =
+    Include.findUniqueOrFail @RecipeTable (unwrapWithIngredients preset)
+
+instance FindUniqueOrFailRecipe NoInclude where
+  findUniqueOrFail _ =
+    Ops.findUniqueOrError @RecipeTable @RecipeRow
 
 create ::
-  RecipeInclude ->
+  WithIngredients ->
   RecipeWriteCreate ->
   Db (Either ORMError RecipeWithIngredients)
 create include input = do
@@ -122,10 +148,10 @@ create include input = do
       forM_ input.ingredients $ \nested ->
         Insert.executeInsert $
           Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate rootId nested)
-      Include.findUniqueOrFail @RecipeTable include rootId
+      Include.findUniqueOrFail @RecipeTable (unwrapWithIngredients include) rootId
 
 update ::
-  RecipeInclude ->
+  WithIngredients ->
   UUID ->
   RecipeWriteUpdate ->
   Db (Either ORMError RecipeWithIngredients)
@@ -144,7 +170,7 @@ update include rootId input = do
           forM_ nestedItems $ \nested ->
             Insert.executeInsert $
               Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate rootId nested)
-      Include.findUniqueOrFail @RecipeTable include rootId
+      Include.findUniqueOrFail @RecipeTable (unwrapWithIngredients include) rootId
 
 delete :: UUID -> Db Int
 delete = Ops.deleteById @RecipeTable

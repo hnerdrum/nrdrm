@@ -10,6 +10,11 @@
 
 module Schema.ShelfInclude
   ( ShelfInclude (..),
+    WithBooks (..),
+    NoInclude (..),
+    ResolveInclude,
+    unwrapWithBooks,
+    unwrapNoInclude,
     BookInclude (..),
     BookWithChapters (..),
     ShelfWithBooks (..),
@@ -18,6 +23,7 @@ module Schema.ShelfInclude
   )
 where
 
+import Data.Kind (Type)
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Text (Text)
 import Data.UUID (UUID)
@@ -60,6 +66,22 @@ data ShelfWithBooks = ShelfWithBooks
     books :: [BookWithChapters]
   }
   deriving (Show, Eq)
+
+type family ResolveInclude preset :: Type
+type instance ResolveInclude WithBooks = ShelfWithBooks
+type instance ResolveInclude NoInclude = ShelfRow
+
+newtype WithBooks = WithBooks ShelfInclude
+  deriving (Show, Eq)
+
+newtype NoInclude = NoInclude ShelfInclude
+  deriving (Show, Eq)
+
+unwrapWithBooks :: WithBooks -> ShelfInclude
+unwrapWithBooks (WithBooks include) = include
+
+unwrapNoInclude :: NoInclude -> ShelfInclude
+unwrapNoInclude (NoInclude include) = include
 
 instance IncludesJoin ShelfInclude where
   includesJoin ShelfInclude {books} = isJust books

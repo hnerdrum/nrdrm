@@ -7,6 +7,7 @@ module ORM.Codegen.Emit.Include
     emitBuildJoinChain,
     emitExecuteInclude,
     emitNestInclude,
+    emitIncludePresetTypes,
     emitIncludeModule,
   )
 where
@@ -173,6 +174,47 @@ executeIncludeArm schema incl path =
     "        pure $ " <> nestRowsFnName path <> " flatRows"
   ]
 
+emitIncludePresetTypes :: Schema -> ModelInclude -> Text
+emitIncludePresetTypes schema incl =
+  let root = lookupModel schema (includeRootModel incl)
+      withPreset = presetTypeName schema incl
+      inclName = includeName incl
+      nestedResult = resultTypeName schema root (includeTree incl)
+      rootRow = modelName root <> "Row"
+   in T.unlines
+        [ "type family ResolveInclude preset :: Type",
+          "type instance ResolveInclude " <> withPreset <> " = " <> nestedResult,
+          "type instance ResolveInclude NoInclude = " <> rootRow,
+          "",
+          "newtype " <> withPreset <> " = " <> withPreset <> " " <> inclName,
+          "  deriving (Show, Eq)",
+          "",
+          "newtype NoInclude = NoInclude " <> inclName,
+          "  deriving (Show, Eq)",
+          "",
+          "unwrap" <> withPreset <> " :: " <> withPreset <> " -> " <> inclName,
+          "unwrap" <> withPreset <> " (" <> withPreset <> " include) = include",
+          "",
+          "unwrapNoInclude :: NoInclude -> " <> inclName,
+          "unwrapNoInclude (NoInclude include) = include"
+        ]
+
+presetTypeName :: Schema -> ModelInclude -> Text
+presetTypeName schema incl =
+  case T.stripPrefix "with" (fullPresetName schema incl) of
+    Just rest -> "With" <> rest
+    Nothing -> "With" <> upperFirst (fullPresetName schema incl)
+
+fullPresetName :: Schema -> ModelInclude -> Text
+fullPresetName schema incl =
+  "with"
+    <> T.concat
+      [ upperFirst (includeFieldName root rel)
+        | let root = lookupModel schema (includeRootModel incl),
+          edge <- includeTree incl,
+          let rel = lookupRelation root (includeRelation edge)
+      ]
+
 emitIncludeModule :: Text -> Schema -> ModelInclude -> Text
 emitIncludeModule moduleName schema incl =
   T.unlines $
@@ -187,6 +229,7 @@ emitIncludeModule moduleName schema incl =
         ],
         [ emitIncludeADTs schema incl,
           emitResultADTs schema incl,
+          emitIncludePresetTypes schema incl,
           emitIncludesJoin schema incl
         ],
         pathPieces schema incl,
@@ -248,16 +291,27 @@ emitIncludeExports schema incl =
       ]
     items =
       [includeName incl <> " (..)"]
+        ++ presetExportItems schema incl
         ++ nestedExport
         ++ resultExports
         ++ flatExports
+
+presetExportItems :: Schema -> ModelInclude -> [Text]
+presetExportItems schema incl =
+  [ presetTypeName schema incl <> " (..)",
+    "NoInclude (..)",
+    "ResolveInclude",
+    "unwrap" <> presetTypeName schema incl,
+    "unwrapNoInclude"
+  ]
 
 emitIncludeImports :: Text -> Schema -> ModelInclude -> Text
 emitIncludeImports moduleName schema incl =
   T.intercalate "\n" $
     filter
       (not . T.null)
-      [ "import Data.Maybe (fromMaybe, isJust, mapMaybe)",
+      [ "import Data.Kind (Type)",
+        "import Data.Maybe (fromMaybe, isJust, mapMaybe)",
         if needsText then "import Data.Text (Text)" else "",
         if needsUuid then "import Data.UUID (UUID)" else "",
         if needsTime then "import Data.Time (UTCTime)" else "",
