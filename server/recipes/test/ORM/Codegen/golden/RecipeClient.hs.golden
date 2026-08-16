@@ -23,7 +23,6 @@ module ORM.Client.Recipe
     withIngredients,
     noInclude
   )
-
 where
 
 import Control.Monad (forM_)
@@ -58,14 +57,11 @@ data RecipeIngredientNestedCreate = RecipeIngredientNestedCreate
   }
   deriving (Show, Eq)
 
-
-
 data RecipeWriteUpdate = RecipeWriteUpdate
   { root :: RecipeUpdate
   , ingredients :: Maybe [RecipeIngredientNestedCreate]
   }
   deriving (Show, Eq)
-
 
 toRecipeIngredientCreate :: UUID -> RecipeIngredientNestedCreate -> RecipeIngredientCreate
 toRecipeIngredientCreate parentId nested =
@@ -77,27 +73,21 @@ toRecipeIngredientCreate parentId nested =
       recipeId = parentId
     }
 
-
 applyUpdatedAt :: UTCTime -> RecipeUpdate -> RecipeUpdate
 applyUpdatedAt now input = input { updatedAt = Just now }
-
 
 withIngredients :: RecipeInclude
 withIngredients =
   RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = True})}
 
-
 noInclude :: RecipeInclude
 noInclude = RecipeInclude {ingredients = Nothing}
-
 
 findAllWith :: Pool Connection -> RecipeInclude -> IO [RecipeWithIngredients]
 findAllWith = Include.findAllWith @RecipeTable
 
-
 findAllWithConn :: Connection -> RecipeInclude -> IO [RecipeWithIngredients]
 findAllWithConn = Include.findAllWithConn @RecipeTable
-
 
 findManyWith ::
   Pool Connection ->
@@ -106,7 +96,6 @@ findManyWith ::
   IO [RecipeWithIngredients]
 findManyWith = Include.findManyWith @RecipeTable
 
-
 findManyWithConn ::
   Connection ->
   RecipeInclude ->
@@ -114,22 +103,17 @@ findManyWithConn ::
   IO [RecipeWithIngredients]
 findManyWithConn = Include.findManyWithConn @RecipeTable
 
-
 findUniqueWith :: Pool Connection -> RecipeInclude -> UUID -> IO (Maybe RecipeWithIngredients)
 findUniqueWith = Include.findUniqueWith @RecipeTable
-
 
 findUniqueWithConn :: Connection -> RecipeInclude -> UUID -> IO (Maybe RecipeWithIngredients)
 findUniqueWithConn = Include.findUniqueWithConn @RecipeTable
 
-
 findUniqueOrErrorWith :: Pool Connection -> RecipeInclude -> UUID -> IO (Either ORMError RecipeWithIngredients)
 findUniqueOrErrorWith = Include.findUniqueOrErrorWith @RecipeTable
 
-
 findUniqueOrErrorWithConn :: Connection -> RecipeInclude -> UUID -> IO (Either ORMError RecipeWithIngredients)
 findUniqueOrErrorWithConn = Include.findUniqueOrErrorWithConn @RecipeTable
-
 
 createConn ::
   Connection ->
@@ -157,7 +141,6 @@ create ::
   IO (Either ORMError RecipeWithIngredients)
 create pool include input =
   transaction pool $ \conn -> createConn conn include input
-
 
 updateConn ::
   Connection ->
@@ -192,11 +175,8 @@ update ::
 update pool include rootId input =
   transaction pool $ \conn -> updateConn conn include rootId input
 
-
 deleteById :: Pool Connection -> UUID -> IO Int
 deleteById = Ops.deleteById @RecipeTable
 
-
 deleteByIdConn :: Connection -> UUID -> IO Int
 deleteByIdConn = Ops.deleteByIdConn @RecipeTable
-
