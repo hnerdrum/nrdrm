@@ -8,6 +8,7 @@ module ORM.Query
     QueryBuilder,
     queryWhereConditions,
     queryWhereParams,
+    queryLimit,
     select,
     selectAll,
     where_,
@@ -15,6 +16,7 @@ module ORM.Query
     orderBy,
     limit,
     offset,
+    applyQueryModifiers,
     OrderDirection (..),
     runQuery,
     runQueryOne,
@@ -23,6 +25,7 @@ module ORM.Query
 where
 
 import Data.Int (Int64)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -87,6 +90,22 @@ queryWhereConditions = qbWhere
 
 queryWhereParams :: QueryBuilder table -> [Action]
 queryWhereParams = qbParams
+
+queryLimit :: QueryBuilder table -> Maybe Int
+queryLimit = qbLimit
+
+applyQueryModifiers ::
+  Maybe (QueryBuilder table -> QueryBuilder table) ->
+  Maybe (QueryBuilder table -> QueryBuilder table) ->
+  Maybe Int ->
+  Maybe Int ->
+  QueryBuilder table ->
+  QueryBuilder table
+applyQueryModifiers mWhere mOrder mLimit mOffset =
+  fromMaybe id mWhere
+    . fromMaybe id mOrder
+    . maybe id limit mLimit
+    . maybe id offset mOffset
 
 buildQuery :: QueryBuilder table -> (Query, [Action])
 buildQuery qb =

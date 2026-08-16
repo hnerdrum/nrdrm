@@ -1,20 +1,24 @@
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
 
 module ORM.Client.Recipe
-  ( findAllWith,
-    findManyWith,
-    findUniqueWith,
-    findUniqueOrErrorWith,
+  ( findMany,
+    findUnique,
+    findUniqueOrFail,
     create,
     update,
-    deleteById,
+    delete,
+    deleteMany,
     RecipeWriteCreate (..),
     RecipeWriteUpdate (..),
     RecipeIngredientNestedCreate (..),
     withIngredients,
     noInclude,
+    RecipeQuery (..),
   )
 where
 
@@ -29,7 +33,7 @@ import ORM.Errors (ORMError)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
-import ORM.Query (QueryBuilder)
+import ORM.Query (QueryBuilder, applyQueryModifiers)
 import ORM.Schema.Recipe (RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
 import ORM.Schema.RecipeInclude (RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..))
 import ORM.Schema.RecipeIngredient (RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
@@ -72,20 +76,37 @@ withIngredients =
 noInclude :: RecipeInclude
 noInclude = RecipeInclude {ingredients = Nothing}
 
-findAllWith :: RecipeInclude -> Db [RecipeWithIngredients]
-findAllWith = Include.findAllWith @RecipeTable
+data RecipeQuery = RecipeQuery
+  { include :: RecipeInclude,
+    where_ :: Maybe (QueryBuilder RecipeTable -> QueryBuilder RecipeTable),
+    orderBy_ :: Maybe (QueryBuilder RecipeTable -> QueryBuilder RecipeTable),
+    limit_ :: Maybe Int,
+    offset_ :: Maybe Int
+  }
 
-findManyWith ::
-  RecipeInclude ->
-  (QueryBuilder RecipeTable -> QueryBuilder RecipeTable) ->
-  Db [RecipeWithIngredients]
-findManyWith = Include.findManyWith @RecipeTable
+class FindManyRecipe a where
+  findMany :: a -> Db [RecipeWithIngredients]
 
-findUniqueWith :: RecipeInclude -> UUID -> Db (Maybe RecipeWithIngredients)
-findUniqueWith = Include.findUniqueWith @RecipeTable
+instance FindManyRecipe RecipeInclude where
+  findMany include =
+    findMany
+      RecipeQuery
+        { include = include,
+          where_ = Nothing,
+          orderBy_ = Nothing,
+          limit_ = Nothing,
+          offset_ = Nothing
+        }
 
-findUniqueOrErrorWith :: RecipeInclude -> UUID -> Db (Either ORMError RecipeWithIngredients)
-findUniqueOrErrorWith = Include.findUniqueOrErrorWith @RecipeTable
+instance FindManyRecipe RecipeQuery where
+  findMany RecipeQuery {..} =
+    Include.findMany @RecipeTable include (applyQueryModifiers where_ orderBy_ limit_ offset_)
+
+findUnique :: RecipeInclude -> UUID -> Db (Maybe RecipeWithIngredients)
+findUnique = Include.findUnique @RecipeTable
+
+findUniqueOrFail :: RecipeInclude -> UUID -> Db (Either ORMError RecipeWithIngredients)
+findUniqueOrFail = Include.findUniqueOrFail @RecipeTable
 
 create ::
   RecipeInclude ->
@@ -103,7 +124,7 @@ create include input = do
       forM_ input.ingredients $ \nested ->
         Insert.executeInsert $
           Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate rootId nested)
-      Include.findUniqueOrErrorWith @RecipeTable include rootId
+      Include.findUniqueOrFail @RecipeTable include rootId
 
 update ::
   RecipeInclude ->
@@ -125,7 +146,10 @@ update include rootId input = do
           forM_ nestedItems $ \nested ->
             Insert.executeInsert $
               Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate rootId nested)
-      Include.findUniqueOrErrorWith @RecipeTable include rootId
+      Include.findUniqueOrFail @RecipeTable include rootId
 
-deleteById :: UUID -> Db Int
-deleteById = Ops.deleteById @RecipeTable
+delete :: UUID -> Db Int
+delete = Ops.deleteById @RecipeTable
+
+deleteMany :: (QueryBuilder RecipeTable -> QueryBuilder RecipeTable) -> Db Int
+deleteMany = Delete.deleteMany @RecipeTable

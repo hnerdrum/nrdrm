@@ -68,12 +68,12 @@ $(deriveJSON defaultOptions ''Ingredient)
 
 getAllIngredients :: Pool Connection -> IO [Ingredient]
 getAllIngredients pool =
-  map fromIngredientRow <$> runDb pool Ingredient.findAll
+  map fromIngredientRow <$> runDb pool (Ingredient.findMany Ingredient.emptyQuery)
 
 getIngredient :: Pool Connection -> UUID -> IO (Either AppError Ingredient)
 getIngredient pool ingredientId =
   bimap fromIngredientError fromIngredientRow
-    <$> runDb pool (Ingredient.findUniqueOrError ingredientId)
+    <$> runDb pool (Ingredient.findUniqueOrFail ingredientId)
 
 createIngredient :: Pool Connection -> CreateIngredientInput -> IO (Either AppError Ingredient)
 createIngredient pool input =
@@ -87,7 +87,7 @@ updateIngredient pool ingredientId input =
 
 deleteIngredient :: Pool Connection -> UUID -> IO ()
 deleteIngredient pool ingredientId =
-  void (runDb pool (Ingredient.deleteById ingredientId))
+  void (runDb pool (Ingredient.delete ingredientId))
 
 fromIngredientRow :: IngredientRow -> Ingredient
 fromIngredientRow row =

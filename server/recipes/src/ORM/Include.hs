@@ -11,10 +11,9 @@ module ORM.Include
     BuildJoinChain (..),
     NestInclude (..),
     ExecuteInclude (..),
-    findManyWith,
-    findAllWith,
-    findUniqueWith,
-    findUniqueOrErrorWith,
+    findMany,
+    findUnique,
+    findUniqueOrFail,
     applyRootFilter,
   )
 where
@@ -30,7 +29,7 @@ import ORM.Errors (ORMError (..))
 import ORM.JoinChain (JoinChain, rootAlias, whereJoin)
 import qualified ORM.JoinChain as JoinChain
 import qualified ORM.Operations as Ops
-import ORM.Query (QueryBuilder, queryWhereConditions, queryWhereParams, selectAll, whereEq)
+import ORM.Query (QueryBuilder, queryLimit, queryWhereConditions, queryWhereParams, selectAll, whereEq)
 
 class IncludesJoin include where
   includesJoin :: include -> Bool
@@ -68,21 +67,14 @@ instance
         roots <- Ops.findMany @root @(RootRow include) modifier
         pure $ map (wrapRoot include) roots
 
-findManyWith ::
+findMany ::
   (ExecuteInclude root include result) =>
   include ->
   (QueryBuilder root -> QueryBuilder root) ->
   Db [result]
-findManyWith = executeInclude
+findMany = executeInclude
 
-findAllWith ::
-  forall root include result.
-  (ExecuteInclude root include result) =>
-  include ->
-  Db [result]
-findAllWith include = findManyWith @root include Prelude.id
-
-findUniqueWith ::
+findUnique ::
   forall root include result.
   ( Entity root,
     ToField (PrimaryKeyType root),
@@ -94,7 +86,7 @@ findUniqueWith ::
   include ->
   PrimaryKeyType root ->
   Db (Maybe result)
-findUniqueWith include pk
+findUnique include pk
   | includesJoin include = do
       let chain =
             JoinChain.limitJoin 1 $
@@ -107,7 +99,7 @@ findUniqueWith include pk
       mRoot <- Ops.findUnique @root @(RootRow include) pk
       pure $ fmap (wrapRoot include) mRoot
 
-findUniqueOrErrorWith ::
+findUniqueOrFail ::
   forall root include result.
   ( Entity root,
     ToField (PrimaryKeyType root),
@@ -120,8 +112,8 @@ findUniqueOrErrorWith ::
   include ->
   PrimaryKeyType root ->
   Db (Either ORMError result)
-findUniqueOrErrorWith include pk = do
-  result <- findUniqueWith @root include pk
+findUniqueOrFail include pk = do
+  result <- findUnique @root include pk
   case result of
     Nothing ->
       pure $
@@ -140,7 +132,8 @@ applyRootFilter chain modifier =
   let qb = modifier (selectAll @root)
       alias = rootAlias chain
       prefixedWhere = map (prefixWhereCondition alias) (queryWhereConditions qb)
-   in foldl applyWhere chain (zip prefixedWhere (queryWhereParams qb))
+      filtered = foldl applyWhere chain (zip prefixedWhere (queryWhereParams qb))
+   in maybe id JoinChain.limitJoin (queryLimit qb) filtered
   where
     applyWhere c (condition, param) = whereJoin condition [param] c
 

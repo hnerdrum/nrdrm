@@ -7,6 +7,7 @@
 module ORM.Delete
   ( DeleteBuilder,
     deleteWhere,
+    deleteMany,
     deleteReturning,
     whereDelete,
     emptyDelete,
@@ -23,6 +24,7 @@ import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..))
 import ORM.Db (Db (..))
+import ORM.Query (QueryBuilder, queryWhereConditions, queryWhereParams, selectAll)
 
 data DeleteBuilder table = DeleteBuilder
   { dbTable :: Text,
@@ -51,6 +53,22 @@ deleteWhere ::
   DeleteBuilder table ->
   Db Int
 deleteWhere builder = Db (`runDeleteWhere` builder)
+
+deleteMany ::
+  forall table.
+  (Entity table) =>
+  (QueryBuilder table -> QueryBuilder table) ->
+  Db Int
+deleteMany modifier =
+  let qb = modifier (selectAll @table)
+   in deleteWhere (fromQueryWhere @table qb)
+
+fromQueryWhere :: forall table. (Entity table) => QueryBuilder table -> DeleteBuilder table
+fromQueryWhere qb =
+  foldl
+    (\builder (condition, param) -> whereDelete condition [param] builder)
+    (emptyDelete @table)
+    (zip (queryWhereConditions qb) (queryWhereParams qb))
 
 deleteReturning ::
   forall table result.

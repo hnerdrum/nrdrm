@@ -2,11 +2,11 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE NoFieldSelectors #-}
 
 module Schema.ShelfDeepInclude
   ( ShelfDeepInclude (..),
@@ -17,7 +17,7 @@ module Schema.ShelfDeepInclude
     ShelfWithBooks (..),
     ShelfBookJoinRow (..),
     ShelfBookChapterJoinRow (..),
-    ShelfBookChapterSectionJoinRow (..),
+    ShelfBookChapterSectionJoinRow (..)
   )
 where
 
@@ -35,14 +35,14 @@ import ORM.Include
   )
 import qualified ORM.JoinChain as JoinChain
 import ORM.Operations (findMany)
+import Schema.Shelf (ShelfTable, ShelfRow (..), shelfBooks)
 import Schema.Book (BookRow (..), bookChapters)
-import qualified Schema.Book as Book
 import Schema.Chapter (ChapterRow (..), chapterSections)
-import qualified Schema.Chapter as Chapter
 import Schema.Section (SectionRow (..))
-import qualified Schema.Section as Section
-import Schema.Shelf (ShelfRow (..), ShelfTable, shelfBooks)
 import qualified Schema.Shelf as Shelf
+import qualified Schema.Book as Book
+import qualified Schema.Chapter as Chapter
+import qualified Schema.Section as Section
 
 newtype ChapterInclude = ChapterInclude
   { sections :: Bool
@@ -324,3 +324,4 @@ instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfDeepInclude ShelfWit
         let chain = applyRootFilter buildShelfBookChapterSectionJoin modifier
         flatRows <- JoinChain.runJoinChain @ShelfBookChapterSectionJoinRow chain
         pure $ nestShelfBookChapterSectionRows flatRows
+
