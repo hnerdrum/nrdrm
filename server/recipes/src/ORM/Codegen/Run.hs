@@ -3,7 +3,7 @@ module ORM.Codegen.Run
     allOutputs,
     checkOutputs,
     writeOutputs,
-    codegenSchemas,
+    schemasForTargets,
   )
 where
 
@@ -11,25 +11,25 @@ import Data.Text (Text, strip)
 import qualified Data.Text.IO as TIO
 import ORM.Codegen.IR (Schema (..))
 import ORM.Codegen.Target
-  ( GenOutput (..),
-    allTargets,
+  ( CodegenTarget (..),
+    GenOutput (..),
     targetOutputs,
     targetSchemas,
   )
 import System.Directory (createDirectoryIfMissing, doesFileExist)
 import System.FilePath (takeDirectory, (</>))
 
-codegenSchemas :: [Schema]
-codegenSchemas = targetSchemas
+schemasForTargets :: [CodegenTarget] -> [Schema]
+schemasForTargets = targetSchemas
 
-allOutputs :: [GenOutput]
-allOutputs = concatMap targetOutputs allTargets
+allOutputs :: [CodegenTarget] -> [GenOutput]
+allOutputs = concatMap targetOutputs
 
-writeOutputs :: FilePath -> IO ()
-writeOutputs root = mapM_ (writeOutput root) allOutputs
+writeOutputs :: FilePath -> [CodegenTarget] -> IO ()
+writeOutputs root targets = mapM_ (writeOutput root) (allOutputs targets)
 
-checkOutputs :: FilePath -> IO [FilePath]
-checkOutputs root = filterMismatches root allOutputs
+checkOutputs :: FilePath -> [CodegenTarget] -> IO [FilePath]
+checkOutputs root targets = filterMismatches root (allOutputs targets)
 
 writeOutput :: FilePath -> GenOutput -> IO ()
 writeOutput root GenOutput {outputPath = path, outputText = text} = do

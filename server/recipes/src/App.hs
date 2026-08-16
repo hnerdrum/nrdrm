@@ -5,14 +5,13 @@ module App
 where
 
 import Control.Monad.Reader (ReaderT)
-import Data.Pool (Pool)
 import Data.Text (Text)
-import Database.PostgreSQL.Simple (Connection)
+import ORM.Db (DbPool)
 import Servant (Handler)
 
 data AppContext = AppContext
   { name :: Text,
-    dbPool :: Pool Connection,
+    dbPool :: DbPool,
     bootTime :: Text,
     apiVersion :: Text
   }

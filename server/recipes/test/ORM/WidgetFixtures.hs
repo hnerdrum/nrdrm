@@ -3,15 +3,14 @@ module ORM.WidgetFixtures
   )
 where
 
-import Data.Pool (Pool)
 import Data.Text (Text)
-import Database.PostgreSQL.Simple (Connection)
 import ORM (NullableValue (Omit), runDb)
+import ORM.Db (DbPool)
 import qualified ORM.Insert as Insert
 import Schema.Widget
 import Support.Assert (assertRight)
 
-insertWidget :: Pool Connection -> Text -> IO WidgetRow
+insertWidget :: DbPool -> Text -> IO WidgetRow
 insertWidget pool name =
   runDb
     pool

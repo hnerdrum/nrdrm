@@ -315,7 +315,7 @@ emitIncludeImports moduleName schema incl =
         if needsText then "import Data.Text (Text)" else "",
         if needsUuid then "import Data.UUID (UUID)" else "",
         if needsTime then "import Data.Time (UTCTime)" else "",
-        "import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)",
+        "import ORM.PG (FromRow (..), field)",
         "import ORM.Group (groupByKey)",
         "import ORM.Include",
         "  ( BuildJoinChain (..),",

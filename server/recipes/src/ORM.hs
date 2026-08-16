@@ -81,18 +81,19 @@ module ORM
     runDb,
     withTransaction,
     Db (..),
+    DbPool (..),
+    connect,
     queryRaw,
     executeRaw,
     param,
     catchDb,
-    Unit (..),
   )
 where
 
 import Database.PostgreSQL.Simple.ToField (toField)
 import ORM.Column
 import ORM.Core
-import ORM.Db (Db (..), runDb, withTransaction)
+import ORM.Db (Db (..), DbPool (..), connect, runDb, withTransaction)
 import ORM.Delete
 import ORM.Errors
 import ORM.Group
@@ -102,6 +103,5 @@ import ORM.JoinChain
 import ORM.Operations
 import ORM.Query
 import ORM.Relation
-import ORM.Schema.Unit (Unit (..))
 import ORM.Sql (catchDb, executeRaw, param, queryRaw)
 import ORM.Update

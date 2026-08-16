@@ -7,24 +7,28 @@ where
 
 import Data.List (nub, sort)
 import qualified Data.Text as T
-import ORM.Codegen.Run (allOutputs)
+import ORM.Codegen.RecipeTarget (prodTarget)
+import ORM.Codegen.Run (allOutputs, schemasForTargets)
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import ORM.Codegen.Spec.ShelfDeep (shelfDeepSchema)
 import ORM.Codegen.Spec.Widget (widgetSchema)
 import ORM.Codegen.Target
-  ( GenOutput (..),
-    allTargets,
+  ( CodegenTarget,
+    GenOutput (..),
     targetOutputs,
-    targetSchemas,
+    testTarget,
   )
 import Test.Hspec
+
+allTargets :: [CodegenTarget]
+allTargets = [testTarget, prodTarget]
 
 targetSpec :: Spec
 targetSpec =
   describe "ORM.Codegen.Target" $ do
     it "validates every schema referenced by a target" $ do
-      targetSchemas
+      schemasForTargets allTargets
         `shouldMatchList` [ widgetSchema,
                             shelfSchema,
                             shelfDeepSchema,
@@ -33,10 +37,10 @@ targetSpec =
 
     it "derives 27 outputs across all targets" $ do
       length (concatMap targetOutputs allTargets) `shouldBe` 27
-      length allOutputs `shouldBe` 27
+      length (allOutputs allTargets) `shouldBe` 27
 
     it "derives expected output paths" $ do
-      let paths = sort (nub (map outputPath allOutputs))
+      let paths = sort (nub (map outputPath (allOutputs allTargets)))
       paths
         `shouldBe` sort
           [ ".orm-gen/ORM/Client/Ingredient.hs",
@@ -72,7 +76,7 @@ targetSpec =
       mapM_ assertGoldenStable goldenOutputPaths
   where
     goldenOutputPaths =
-      map outputPath (filter isGoldenOutput allOutputs)
+      map outputPath (filter isGoldenOutput (allOutputs allTargets))
 
     isGoldenOutput output =
       "test/ORM/Codegen/golden/" `T.isPrefixOf` T.pack (outputPath output)
@@ -82,7 +86,7 @@ targetSpec =
       let output =
             head
               [ out
-                | out <- allOutputs,
+                | out <- allOutputs allTargets,
                   outputPath out == path
               ]
           actual = T.unpack (outputText output)
