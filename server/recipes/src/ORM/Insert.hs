@@ -30,7 +30,7 @@ import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..), NullableValue (..))
 import ORM.Db (Db (..))
-import ORM.Errors (ORMError (..))
+import ORM.Errors (ORMError (..), parseSingleton)
 import ORM.Sql (catchSql)
 
 class (Entity table) => Insertable table where
@@ -57,15 +57,14 @@ insertBuilder ::
   Db (Either ORMError result)
 insertBuilder builder = Db $ \conn -> do
   result <- catchSql (runInsertReturning conn builder)
-  case result of
-    Left err -> pure $ Left err
-    Right [] ->
-      pure $
-        Left $
-          RecordNotFound $
-            "INSERT into " <> ibTable builder <> " returned no rows"
-    Right [row] -> pure $ Right row
-    Right _ -> pure $ Left $ MultipleRecordsFound "Insert returned multiple rows"
+  pure $
+    case result of
+      Left err -> Left err
+      Right rows ->
+        parseSingleton
+          rows
+          (RecordNotFound $ "INSERT into " <> ibTable builder <> " returned no rows")
+          (MultipleRecordsFound "Insert returned multiple rows")
 
 insertReturning ::
   forall table result.
@@ -134,27 +133,23 @@ runInsertReturning ::
   Connection ->
   InsertBuilder table ->
   IO [result]
-runInsertReturning conn builder = do
-  let allColumns = ibColumns builder
-      allValues = ibValues builder
-      placeholders = Text.intercalate ", " $ replicate (length allValues) "?"
-      columnsText = Text.intercalate ", " allColumns
-      queryText =
-        "INSERT INTO "
-          <> ibTable builder
-          <> " ("
-          <> columnsText
-          <> ") VALUES ("
-          <> placeholders
-          <> ") RETURNING *"
+runInsertReturning conn builder =
+  let (queryText, allValues) = insertQueryParts builder " RETURNING *"
       query = Query (TE.encodeUtf8 queryText)
-  PGSimple.queryWith fromRow conn query allValues
+   in PGSimple.queryWith fromRow conn query allValues
 
 runExecuteInsert ::
   Connection ->
   InsertBuilder table ->
   IO ()
 runExecuteInsert conn builder = do
+  let (queryText, allValues) = insertQueryParts builder ""
+      query = Query (TE.encodeUtf8 queryText)
+  _ <- PGSimple.execute conn query allValues
+  pure ()
+
+insertQueryParts :: InsertBuilder table -> Text -> (Text, [Action])
+insertQueryParts builder suffix =
   let allColumns = ibColumns builder
       allValues = ibValues builder
       placeholders = Text.intercalate ", " $ replicate (length allValues) "?"
@@ -167,6 +162,5 @@ runExecuteInsert conn builder = do
           <> ") VALUES ("
           <> placeholders
           <> ")"
-      query = Query (TE.encodeUtf8 queryText)
-  _ <- PGSimple.execute conn query allValues
-  pure ()
+          <> suffix
+   in (queryText, allValues)

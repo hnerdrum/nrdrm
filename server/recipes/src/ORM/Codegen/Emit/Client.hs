@@ -7,12 +7,22 @@ module ORM.Codegen.Emit.Client
   )
 where
 
-import Data.Char (toLower, toUpper)
-import Data.List (find)
 import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
+import ORM.Codegen.EmitCommon
+  ( createTypeName,
+    fieldBinder,
+    hsType,
+    includeFieldName,
+    resultTypeName,
+    rowTypeName,
+    tableTypeName,
+    updateTypeName,
+  )
 import ORM.Codegen.IR
+import ORM.Codegen.Lookup (lookupField, lookupModel, lookupRelation)
+import ORM.Codegen.TextUtil (upperFirst)
 
 emitSimpleClientModule :: Text -> Model -> Text
 emitSimpleClientModule moduleName model =
@@ -317,24 +327,6 @@ replaceChildRelation schema root incl =
           <> T.unpack (includeName incl)
           <> " has no replaceChildren relation"
 
-lookupField :: Model -> Text -> FieldSpec
-lookupField model name =
-  case find ((== name) . fieldName) (modelFields model) of
-    Just f -> f
-    Nothing ->
-      error $
-        "emit Client: unknown field "
-          <> T.unpack name
-          <> " on "
-          <> T.unpack (modelName model)
-
-hsType :: FieldType -> Text
-hsType TyText = "Text"
-hsType TyUuid = "UUID"
-hsType TyInt = "Int"
-hsType TyTimestamptz = "UTCTime"
-hsType (TyEnum name) = name
-
 createRootInputExpr :: Model -> Text
 createRootInputExpr model =
   let cn = createTypeName model
@@ -616,14 +608,14 @@ emitFindUniqueOrFailFn :: Model -> Text
 emitFindUniqueOrFailFn model =
   T.unlines
     [ "findUniqueOrFail :: UUID -> Db (Either ORMError " <> rowTypeName model <> ")",
-      "findUniqueOrFail = Ops.findUniqueOrError @" <> tableTypeName model <> " @" <> rowTypeName model
+      "findUniqueOrFail = Ops.findUniqueOrFail @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
 emitDeleteFn :: Model -> Text
 emitDeleteFn model =
   T.unlines
     [ "delete :: UUID -> Db Int",
-      "delete = Ops.deleteById @" <> tableTypeName model
+      "delete = Ops.delete @" <> tableTypeName model
     ]
 
 emitDeleteManyFn :: Model -> Text
@@ -738,7 +730,7 @@ emitIncludeFindUniqueOrFailInstances schema model incl =
           "",
           "instance FindUniqueOrFail" <> modelNm <> " NoInclude where",
           "  findUniqueOrFail _ =",
-          "    Ops.findUniqueOrError @" <> table <> " @" <> row
+          "    Ops.findUniqueOrFail @" <> table <> " @" <> row
         ]
 
 emitIncludeFindUnique :: Schema -> Model -> ModelInclude -> Text
@@ -828,21 +820,6 @@ fullPresetName schema incl =
           let rel = lookupRelation root (includeRelation edge)
       ]
 
-includeFieldName :: Model -> RelationSpec -> Text
-includeFieldName parent rel =
-  case T.stripPrefix (lowerFirst (modelName parent)) (relName rel) of
-    Just rest | not (T.null rest) -> lowerFirst rest
-    _ -> lowerFirst (relToModel rel)
-
-resultTypeName :: Schema -> Model -> [IncludeTree] -> Text
-resultTypeName _schema model edges =
-  modelName model
-    <> "With"
-    <> T.concat (map (upperFirst . fieldOf) edges)
-  where
-    fieldOf edge =
-      includeFieldName model (lookupRelation model (includeRelation edge))
-
 schemaModule :: Text -> Model -> Text
 schemaModule clientModule model =
   clientSchemaPrefix clientModule <> modelName model
@@ -856,46 +833,3 @@ clientSchemaPrefix clientModule =
   case T.stripPrefix "ORM.Client." clientModule of
     Just _ -> "ORM.Schema."
     _ -> "Schema."
-
-tableTypeName :: Model -> Text
-tableTypeName model = modelName model <> "Table"
-
-rowTypeName :: Model -> Text
-rowTypeName model = modelName model <> "Row"
-
-createTypeName :: Model -> Text
-createTypeName model = modelName model <> "Create"
-
-updateTypeName :: Model -> Text
-updateTypeName model = modelName model <> "Update"
-
-fieldBinder :: Model -> FieldSpec -> Text
-fieldBinder model f =
-  lowerFirst (modelName model) <> upperFirst (fieldName f)
-
-lookupModel :: Schema -> Text -> Model
-lookupModel schema name =
-  case find ((== name) . modelName) (schemaModels schema) of
-    Just m -> m
-    Nothing -> error $ "emit Client: unknown model " <> T.unpack name
-
-lookupRelation :: Model -> Text -> RelationSpec
-lookupRelation model name =
-  case find ((== name) . relName) (modelRelations model) of
-    Just r -> r
-    Nothing ->
-      error $
-        "emit Client: unknown relation "
-          <> T.unpack name
-          <> " on "
-          <> T.unpack (modelName model)
-
-lowerFirst :: Text -> Text
-lowerFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toLower c) rest
-
-upperFirst :: Text -> Text
-upperFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toUpper c) rest

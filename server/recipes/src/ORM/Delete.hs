@@ -15,7 +15,6 @@ module ORM.Delete
 where
 
 import Data.Text (Text)
-import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
 import Database.PostgreSQL.Simple (Connection)
 import qualified Database.PostgreSQL.Simple as PGSimple
@@ -24,7 +23,7 @@ import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..))
 import ORM.Db (Db (..))
-import ORM.Query (QueryBuilder, queryWhereConditions, queryWhereParams, selectAll)
+import ORM.Query (QueryBuilder, buildWhereClause, queryWhereConditions, queryWhereParams, selectAll)
 
 data DeleteBuilder table = DeleteBuilder
   { dbTable :: Text,
@@ -82,14 +81,10 @@ runDeleteWhere ::
   DeleteBuilder table ->
   IO Int
 runDeleteWhere conn builder = do
-  let whereClause =
-        if null (dbWhere builder)
-          then ""
-          else " WHERE " <> Text.intercalate " AND " (dbWhere builder)
-      queryText =
+  let queryText =
         "DELETE FROM "
           <> dbTable builder
-          <> whereClause
+          <> buildWhereClause (dbWhere builder)
       query = Query (TE.encodeUtf8 queryText)
   fromIntegral <$> PGSimple.execute conn query (dbWhereParams builder)
 
@@ -100,14 +95,10 @@ runDeleteReturning ::
   DeleteBuilder table ->
   IO [result]
 runDeleteReturning conn builder = do
-  let whereClause =
-        if null (dbWhere builder)
-          then ""
-          else " WHERE " <> Text.intercalate " AND " (dbWhere builder)
-      queryText =
+  let queryText =
         "DELETE FROM "
           <> dbTable builder
-          <> whereClause
+          <> buildWhereClause (dbWhere builder)
           <> " RETURNING *"
       query = Query (TE.encodeUtf8 queryText)
   PGSimple.queryWith fromRow conn query (dbWhereParams builder)

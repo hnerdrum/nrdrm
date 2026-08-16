@@ -9,12 +9,21 @@ module ORM.Codegen.Emit.Schema
   )
 where
 
-import Data.Char (toLower, toUpper)
-import Data.List (find)
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import ORM.Codegen.EmitCommon
+  ( createTypeName,
+    fieldBinder,
+    hsType,
+    primaryKeyField,
+    rowTypeName,
+    tableTypeName,
+    updateTypeName,
+  )
 import ORM.Codegen.IR
+import ORM.Codegen.Lookup (lookupField, lookupModel)
+import ORM.Codegen.TextUtil (lowerFirst)
 
 emitModelModule :: Text -> Schema -> Model -> Text
 emitModelModule moduleName schema model =
@@ -290,37 +299,8 @@ belongsToRelations :: Model -> [RelationSpec]
 belongsToRelations =
   filter ((== RelBelongsTo) . relKind) . modelRelations
 
-tableTypeName :: Model -> Text
-tableTypeName model = modelName model <> "Table"
-
-rowTypeName :: Model -> Text
-rowTypeName model = modelName model <> "Row"
-
-createTypeName :: Model -> Text
-createTypeName model = modelName model <> "Create"
-
-updateTypeName :: Model -> Text
-updateTypeName model = modelName model <> "Update"
-
-fieldBinder :: Model -> FieldSpec -> Text
-fieldBinder model f =
-  lowerFirst (modelName model) <> upperFirst (fieldName f)
-
-primaryKeyField :: Model -> FieldSpec
-primaryKeyField model =
-  case filter fieldIsPrimaryKey (modelFields model) of
-    [f] -> f
-    _ -> error "emitModelModule: model must have exactly one primary key"
-
 pkHsType :: Model -> Text
 pkHsType model = hsType (fieldType (primaryKeyField model))
-
-hsType :: FieldType -> Text
-hsType TyText = "Text"
-hsType TyUuid = "UUID"
-hsType TyInt = "Int"
-hsType TyTimestamptz = "UTCTime"
-hsType (TyEnum name) = name
 
 rowHsType :: FieldSpec -> Text
 rowHsType f
@@ -509,30 +489,3 @@ emitJoinType :: JoinKind -> Text
 emitJoinType JoinLeft = "LeftJoin"
 emitJoinType JoinInner = "InnerJoin"
 emitJoinType JoinRight = "RightJoin"
-
-lookupModel :: Schema -> Text -> Model
-lookupModel schema name =
-  case find ((== name) . modelName) (schemaModels schema) of
-    Just m -> m
-    Nothing -> error $ "emit: unknown model " <> T.unpack name
-
-lookupField :: Model -> Text -> FieldSpec
-lookupField model name =
-  case find ((== name) . fieldName) (modelFields model) of
-    Just f -> f
-    Nothing ->
-      error $
-        "emit: unknown field "
-          <> T.unpack name
-          <> " on "
-          <> T.unpack (modelName model)
-
-lowerFirst :: Text -> Text
-lowerFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toLower c) rest
-
-upperFirst :: Text -> Text
-upperFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toUpper c) rest

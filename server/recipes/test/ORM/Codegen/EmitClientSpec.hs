@@ -139,5 +139,5 @@ expectedShelfReadClient =
       "",
       "instance FindUniqueOrFailShelf NoInclude where",
       "  findUniqueOrFail _ =",
-      "    Ops.findUniqueOrError @ShelfTable @ShelfRow"
+      "    Ops.findUniqueOrFail @ShelfTable @ShelfRow"
     ]

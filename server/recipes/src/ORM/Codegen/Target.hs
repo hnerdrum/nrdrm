@@ -15,7 +15,7 @@ module ORM.Codegen.Target
   )
 where
 
-import Data.List (find, nub)
+import Data.List (nub)
 import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -47,6 +47,7 @@ import ORM.Codegen.IR
     schemaIncludes,
     schemaModels,
   )
+import ORM.Codegen.Lookup (lookupModel, lookupRelation)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import ORM.Codegen.Spec.ShelfDeep (shelfDeepSchema)
 import ORM.Codegen.Spec.Widget (widgetSchema)
@@ -235,23 +236,3 @@ genGolden file text =
     { outputPath = "test/ORM/Codegen/golden/" <> file <> ".golden",
       outputText = text
     }
-
-lookupModel :: Schema -> Text -> Model
-lookupModel schema name =
-  case find ((== name) . modelName) (schemaModels schema) of
-    Just model -> model
-    Nothing ->
-      error $
-        "ORM.Codegen.Target: missing model "
-          <> T.unpack name
-
-lookupRelation :: Model -> Text -> RelationSpec
-lookupRelation model relationName =
-  case find ((== relationName) . relName) (modelRelations model) of
-    Just rel -> rel
-    Nothing ->
-      error $
-        "ORM.Codegen.Target: missing relation "
-          <> T.unpack relationName
-          <> " on "
-          <> T.unpack (modelName model)

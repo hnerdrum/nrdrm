@@ -18,6 +18,7 @@ module ORM.Query
     offset,
     applyQueryModifiers,
     OrderDirection (..),
+    buildWhereClause,
     runQuery,
     runQueryOne,
     runCountQuery,

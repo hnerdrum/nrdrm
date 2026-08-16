@@ -8,11 +8,11 @@ module ORM.Codegen.Emit.Nest
   )
 where
 
-import Data.Char (toLower, toUpper)
 import Data.List (find)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import ORM.Codegen.EmitCommon (fieldBinder, includeFieldName, primaryKeyField, resultTypeName)
 import ORM.Codegen.IR
 import ORM.Codegen.IncludePath
   ( JoinPath (..),
@@ -21,6 +21,8 @@ import ORM.Codegen.IncludePath
     joinPathModels,
     joinRowName,
   )
+import ORM.Codegen.Lookup (lookupModel, lookupRelation)
+import ORM.Codegen.TextUtil (lowerFirst, upperFirst)
 
 emitNestHelpersForPath :: Schema -> ModelInclude -> JoinPath -> Text
 emitNestHelpersForPath schema incl path =
@@ -526,21 +528,6 @@ emptyNestedField _schema parent edge =
       RelHasMany -> "[]"
       RelBelongsTo -> "Nothing"
 
-resultTypeName :: Schema -> Model -> [IncludeTree] -> Text
-resultTypeName _schema model edges =
-  modelName model
-    <> "With"
-    <> T.concat (map (upperFirst . fieldOf) edges)
-  where
-    fieldOf edge =
-      includeFieldName model (lookupRelation model (includeRelation edge))
-
-includeFieldName :: Model -> RelationSpec -> Text
-includeFieldName parent rel =
-  case T.stripPrefix (lowerFirst (modelName parent)) (relName rel) of
-    Just rest | not (T.null rest) -> lowerFirst rest
-    _ -> lowerFirst (relToModel rel)
-
 groupKeyFieldForJoinSide :: Model -> RelationSpec -> FieldSpec
 groupKeyFieldForJoinSide model rel =
   let pkField = primaryKeyField model
@@ -558,40 +545,3 @@ patVar model f
 
 toRowFn :: Model -> Text
 toRowFn model = "to" <> modelName model <> "Row"
-
-fieldBinder :: Model -> FieldSpec -> Text
-fieldBinder model f =
-  lowerFirst (modelName model) <> upperFirst (fieldName f)
-
-primaryKeyField :: Model -> FieldSpec
-primaryKeyField model =
-  case filter fieldIsPrimaryKey (modelFields model) of
-    [f] -> f
-    _ -> error "emit Nest: model must have exactly one primary key"
-
-lookupModel :: Schema -> Text -> Model
-lookupModel schema name =
-  case find ((== name) . modelName) (schemaModels schema) of
-    Just m -> m
-    Nothing -> error $ "emit Nest: unknown model " <> T.unpack name
-
-lookupRelation :: Model -> Text -> RelationSpec
-lookupRelation model name =
-  case find ((== name) . relName) (modelRelations model) of
-    Just r -> r
-    Nothing ->
-      error $
-        "emit Nest: unknown relation "
-          <> T.unpack name
-          <> " on "
-          <> T.unpack (modelName model)
-
-lowerFirst :: Text -> Text
-lowerFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toLower c) rest
-
-upperFirst :: Text -> Text
-upperFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toUpper c) rest

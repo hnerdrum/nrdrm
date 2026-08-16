@@ -12,8 +12,6 @@ module ORM.Codegen.Emit.Include
   )
 where
 
-import Data.Char (toLower, toUpper)
-import Data.List (find)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.Emit.FlatRow
@@ -28,6 +26,7 @@ import ORM.Codegen.Emit.Nest
     nestedIncludePatternForPath,
   )
 import ORM.Codegen.Emit.Schema (enumImportLine)
+import ORM.Codegen.EmitCommon (includeFieldName, resultTypeName)
 import ORM.Codegen.IR
 import ORM.Codegen.IncludePath
   ( JoinPath (..),
@@ -39,6 +38,8 @@ import ORM.Codegen.IncludePath
     joinPathTake,
     joinRowName,
   )
+import ORM.Codegen.Lookup (lookupModel, lookupRelation)
+import ORM.Codegen.TextUtil (lowerFirst, upperFirst)
 
 data IncludeTypeDecl = IncludeTypeDecl
   { itdName :: Text,
@@ -499,15 +500,6 @@ collectResultTypes schema incl =
         | d <- collectNested schema root (includeTree incl)
       ]
 
-resultTypeName :: Schema -> Model -> [IncludeTree] -> Text
-resultTypeName _schema model edges =
-  modelName model
-    <> "With"
-    <> T.concat (map (upperFirst . fieldOf) edges)
-  where
-    fieldOf edge =
-      includeFieldName model (lookupRelation model (includeRelation edge))
-
 emitResultTypeDecl :: Schema -> IncludeTypeDecl -> Text
 emitResultTypeDecl schema IncludeTypeDecl {itdName, itdParent, itdEdges} =
   T.unlines
@@ -536,36 +528,3 @@ emitResultField schema parent edge =
           "[" <> modelName child <> "Row]"
       | otherwise =
           "Maybe " <> modelName child <> "Row"
-
-includeFieldName :: Model -> RelationSpec -> Text
-includeFieldName parent rel =
-  case T.stripPrefix (lowerFirst (modelName parent)) (relName rel) of
-    Just rest | not (T.null rest) -> lowerFirst rest
-    _ -> lowerFirst (relToModel rel)
-
-lookupModel :: Schema -> Text -> Model
-lookupModel schema name =
-  case find ((== name) . modelName) (schemaModels schema) of
-    Just m -> m
-    Nothing -> error $ "emit Include: unknown model " <> T.unpack name
-
-lookupRelation :: Model -> Text -> RelationSpec
-lookupRelation model name =
-  case find ((== name) . relName) (modelRelations model) of
-    Just r -> r
-    Nothing ->
-      error $
-        "emit Include: unknown relation "
-          <> T.unpack name
-          <> " on "
-          <> T.unpack (modelName model)
-
-lowerFirst :: Text -> Text
-lowerFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toLower c) rest
-
-upperFirst :: Text -> Text
-upperFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toUpper c) rest

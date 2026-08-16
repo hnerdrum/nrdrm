@@ -8,9 +8,9 @@ module ORM.Codegen.Emit.FlatRow
 where
 
 import Data.Bifunctor (first)
-import Data.Char (toLower, toUpper)
 import Data.Text (Text)
 import qualified Data.Text as T
+import ORM.Codegen.EmitCommon (fieldBinder, hsType)
 import ORM.Codegen.IR
 import ORM.Codegen.IncludePath
   ( JoinPath (..),
@@ -174,24 +174,3 @@ isRelationFk rel f = fieldName f == relForeignField rel
 fromRowBody :: Int -> Text
 fromRowBody n =
   T.intercalate " <*> " (replicate n "field")
-
-fieldBinder :: Model -> FieldSpec -> Text
-fieldBinder model f =
-  lowerFirst (modelName model) <> upperFirst (fieldName f)
-
-hsType :: FieldType -> Text
-hsType TyText = "Text"
-hsType TyUuid = "UUID"
-hsType TyInt = "Int"
-hsType TyTimestamptz = "UTCTime"
-hsType (TyEnum name) = name
-
-lowerFirst :: Text -> Text
-lowerFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toLower c) rest
-
-upperFirst :: Text -> Text
-upperFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toUpper c) rest
