@@ -23,7 +23,15 @@ module ORM.Client.Recipe
     WithIngredients (..),
     NoInclude (..),
     ResolveInclude,
-    RecipeQuery (..)
+    RecipeQuery (..),
+    RecipeCreate (..),
+    RecipeRow (..),
+    RecipeUpdate (..),
+    RecipeWithIngredients (..),
+    RecipeIngredientWithIngredient (..),
+    RecipeIngredientRow (..),
+    IngredientRow (..),
+    Unit (..),
   )
 where
 
@@ -37,13 +45,14 @@ import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
-import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
-import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients)
-import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
+import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow (..), RecipeTable, RecipeUpdate (..))
+import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients)
+import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientRow (..), RecipeIngredientTable, recipeIngredientRecipeId)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers)
 import qualified ORM.Update as Update
-import ORM.Schema.Unit (Unit)
+import ORM.Schema.Ingredient (IngredientRow (..))
+import ORM.Schema.Unit (Unit (..))
 
 data RecipeWriteCreate = RecipeWriteCreate
   { root :: RecipeCreate

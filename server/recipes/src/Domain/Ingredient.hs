@@ -25,8 +25,8 @@ import Database.PostgreSQL.Simple (Connection)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Unit (Unit (..))
 import ORM (ORMError (..), runDb)
+import ORM.Client.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
 import qualified ORM.Client.Ingredient as Ingredient
-import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
 
 newtype CreateIngredientInput = CreateIngredientInput
   { name :: Text

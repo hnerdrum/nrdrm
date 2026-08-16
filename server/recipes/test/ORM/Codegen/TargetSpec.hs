@@ -39,13 +39,13 @@ targetSpec =
       let paths = sort (nub (map outputPath allOutputs))
       paths
         `shouldBe` sort
-          [ "src/ORM/Client/Ingredient.hs",
-            "src/ORM/Client/Recipe.hs",
-            "src/ORM/Schema/Ingredient.hs",
-            "src/ORM/Schema/Recipe.hs",
-            "src/ORM/Schema/RecipeInclude.hs",
-            "src/ORM/Schema/RecipeIngredient.hs",
-            "src/ORM/Schema/Unit.hs",
+          [ ".orm-gen/ORM/Client/Ingredient.hs",
+            ".orm-gen/ORM/Client/Recipe.hs",
+            ".orm-gen/ORM/Schema/Ingredient.hs",
+            ".orm-gen/ORM/Schema/Recipe.hs",
+            ".orm-gen/ORM/Schema/RecipeInclude.hs",
+            ".orm-gen/ORM/Schema/RecipeIngredient.hs",
+            ".orm-gen/ORM/Schema/Unit.hs",
             "test/ORM/Codegen/golden/Book.hs.golden",
             "test/ORM/Codegen/golden/Chapter.hs.golden",
             "test/ORM/Codegen/golden/Ingredient.hs.golden",

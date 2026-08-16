@@ -104,12 +104,12 @@ prodTarget :: CodegenTarget
 prodTarget =
   CodegenTarget
     { ctSchemas = [TargetSchema recipeSchema True EmitAll],
-      ctLayout = SchemaLayout "ORM.Schema." "src/ORM/Schema/",
+      ctLayout = SchemaLayout "ORM.Schema." ".orm-gen/ORM/Schema/",
       ctClients =
         DeriveClients
           ClientLayout
             { clModulePrefix = "ORM.Client.",
-              clOutputDir = "src/ORM/Client/",
+              clOutputDir = ".orm-gen/ORM/Client/",
               clGolden = True
             }
     }

@@ -35,13 +35,13 @@ emitSimpleClientModule moduleName model =
         <> schemaModule moduleName model
         <> " ("
         <> createTypeName model
-        <> ", "
+        <> " (..), "
         <> rowTypeName model
-        <> ", "
+        <> " (..), "
         <> tableTypeName model
         <> ", "
         <> updateTypeName model
-        <> ")",
+        <> " (..))",
       "import qualified ORM.Update as Update",
       "",
       emitCreateFn model,
@@ -110,8 +110,9 @@ emitWriteClientModule moduleName schema incl =
               ++ [ presetTypeName schema incl <> " (..),",
                    "NoInclude (..),",
                    "ResolveInclude,",
-                   queryTypeName root <> " (..)"
+                   queryTypeName root <> " (..),"
                  ]
+              ++ writeClientTypeReexportItems schema root incl
           )
         ++ ["where", ""]
         ++ [ "import Control.Monad (forM_)",
@@ -130,7 +131,7 @@ emitWriteClientModule moduleName schema incl =
                <> createTypeName root
                <> " (..), "
                <> rowTypeName root
-               <> ", "
+               <> " (..), "
                <> tableTypeName root
                <> ", "
                <> updateTypeName root
@@ -141,6 +142,8 @@ emitWriteClientModule moduleName schema incl =
                <> " ( "
                <> createTypeName child
                <> " (..), "
+               <> rowTypeName child
+               <> " (..), "
                <> tableTypeName child
                <> ", "
                <> wipeField
@@ -149,6 +152,7 @@ emitWriteClientModule moduleName schema incl =
              "import ORM.Query (QueryBuilder, applyQueryModifiers)",
              "import qualified ORM.Update as Update"
            ]
+        ++ writeClientRelatedRowImportLines moduleName schema root child incl
         ++ nestedEnumImports schema child
     )
     <> "\n"
@@ -349,7 +353,7 @@ createRootFieldLine f
 nestedEnumImports :: Schema -> Model -> [Text]
 nestedEnumImports schema child =
   nubImports
-    [ "import ORM.Schema." <> enumName e <> " (" <> enumName e <> ")"
+    [ "import ORM.Schema." <> enumName e <> " (" <> enumName e <> " (..))"
       | f <- modelFields child,
         TyEnum wanted <- [fieldType f],
         e <- schemaEnums schema,
@@ -372,6 +376,10 @@ emitSimpleExports model =
       "    findUniqueOrFail,",
       "    delete,",
       "    deleteMany,",
+      "    " <> createTypeName model <> " (..),",
+      "    " <> rowTypeName model <> " (..),",
+      "    " <> updateTypeName model <> " (..),",
+      "    " <> tableTypeName model <> ",",
       "    " <> queryTypeName model <> " (..),",
       "    emptyQuery",
       "  )"
@@ -407,6 +415,40 @@ includeReadPresetExportItems schema incl =
     "noInclude,"
   ]
 
+writeClientTypeReexportItems :: Schema -> Model -> ModelInclude -> [Text]
+writeClientTypeReexportItems schema root incl =
+  nubExportItems $
+    [ createTypeName root <> " (..),",
+      rowTypeName root <> " (..),",
+      updateTypeName root <> " (..),",
+      includeResultName root incl <> " (..),"
+    ]
+      ++ concatMap (includeNestedTypeReexports schema root) (includeTree incl)
+      ++ inlineEnumReexportItems schema
+
+includeNestedTypeReexports :: Schema -> Model -> IncludeTree -> [Text]
+includeNestedTypeReexports schema parent edge =
+  let rel = lookupRelation parent (includeRelation edge)
+      child = lookupModel schema (relToModel rel)
+      kids = includeChildren edge
+      nestedWith
+        | not (null kids) =
+            [resultTypeName schema child kids <> " (..),"]
+        | otherwise = []
+   in nestedWith
+        ++ [rowTypeName child <> " (..),"]
+        ++ concatMap (includeNestedTypeReexports schema child) kids
+
+inlineEnumReexportItems :: Schema -> [Text]
+inlineEnumReexportItems schema =
+  [enumName enum <> " (..)," | enum <- schemaEnums schema, isNothing (enumImport enum)]
+
+nubExportItems :: [Text] -> [Text]
+nubExportItems = foldr go []
+  where
+    go item acc | item `elem` acc = acc
+    go item acc = item : acc
+
 includeReadImportLines :: Text -> Schema -> ModelInclude -> [Text]
 includeReadImportLines moduleName schema incl =
   [ "import Data.UUID (UUID)",
@@ -432,22 +474,53 @@ includeModuleImportLine moduleName schema incl =
   let root = lookupModel schema (includeRootModel incl)
       typeExports = nestedIncludeTypeExports schema incl
       withPreset = presetTypeName schema incl
+      nestedWithImports = nestedWithTypeImportNames schema root (includeTree incl)
+      includeTypes =
+        [includeName incl <> " (..)"]
+          ++ typeExports
+          ++ [resultTypeName schema root (includeTree incl) <> " (..)"]
+          ++ nestedWithImports
+          ++ [withPreset <> " (..)", "NoInclude (..)", "ResolveInclude", "unwrap" <> withPreset]
    in "import "
         <> includeModule moduleName incl
         <> " ( "
-        <> includeName incl
-        <> " (..), "
-        <> T.intercalate ", " typeExports
-        <> ", "
-        <> resultTypeName schema root (includeTree incl)
-        <> " (..), "
-        <> withPreset
-        <> " (..), "
-        <> "NoInclude (..), "
-        <> "ResolveInclude, "
-        <> "unwrap"
-        <> withPreset
+        <> T.intercalate ", " includeTypes
         <> ")"
+
+nestedWithTypeImportNames :: Schema -> Model -> [IncludeTree] -> [Text]
+nestedWithTypeImportNames schema parent =
+  concatMap (nestedWithTypeImportNamesForEdge schema parent)
+
+nestedWithTypeImportNamesForEdge :: Schema -> Model -> IncludeTree -> [Text]
+nestedWithTypeImportNamesForEdge schema parent edge =
+  let rel = lookupRelation parent (includeRelation edge)
+      child = lookupModel schema (relToModel rel)
+      kids = includeChildren edge
+      withType
+        | not (null kids) = [resultTypeName schema child kids <> " (..)"]
+        | otherwise = []
+   in withType ++ nestedWithTypeImportNames schema child kids
+
+writeClientRelatedRowImportLines :: Text -> Schema -> Model -> Model -> ModelInclude -> [Text]
+writeClientRelatedRowImportLines moduleName schema root child incl =
+  [ "import "
+      <> schemaModule moduleName model
+      <> " ("
+      <> rowTypeName model
+      <> " (..))"
+    | model <- includeTreeModels schema root (includeTree incl),
+      modelName model `notElem` [modelName root, modelName child]
+  ]
+
+includeTreeModels :: Schema -> Model -> [IncludeTree] -> [Model]
+includeTreeModels schema parent =
+  concatMap (includeEdgeModels schema parent)
+
+includeEdgeModels :: Schema -> Model -> IncludeTree -> [Model]
+includeEdgeModels schema parent edge =
+  let rel = lookupRelation parent (includeRelation edge)
+      child = lookupModel schema (relToModel rel)
+   in child : includeTreeModels schema child (includeChildren edge)
 
 nestedIncludeTypeExports :: Schema -> ModelInclude -> [Text]
 nestedIncludeTypeExports schema incl =

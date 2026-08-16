@@ -28,15 +28,17 @@ import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..))
 import Domain.Unit (Unit (..))
 import ORM (ORMError (..), runDb, withTransaction)
-import qualified ORM.Client.Recipe as Recipe
-import ORM.Core (NullableValue (..))
-import ORM.Schema.Ingredient (IngredientRow (..))
-import ORM.Schema.Recipe (RecipeCreate (..), RecipeRow (..), RecipeUpdate (..))
-import ORM.Schema.RecipeInclude
-  ( RecipeIngredientWithIngredient (..),
+import ORM.Client.Recipe
+  ( IngredientRow (..),
+    RecipeCreate (..),
+    RecipeIngredientRow (..),
+    RecipeIngredientWithIngredient (..),
+    RecipeRow (..),
+    RecipeUpdate (..),
     RecipeWithIngredients (..),
   )
-import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..))
+import qualified ORM.Client.Recipe as Recipe
+import ORM.Core (NullableValue (..))
 
 data CreateRecipeInput = CreateRecipeInput
   { name :: Text,
