@@ -11,9 +11,8 @@ import API.Errors (withErrorHandling)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID (UUID)
-import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
 import Domain.Errors (AppError)
-import Domain.Recipe (Recipe (..), createRecipe, deleteRecipe, getAllRecipes, getRecipe, updateRecipe)
+import Domain.Recipe (CreateRecipeInput (..), Recipe (..), UpdateRecipeInput (..), createRecipe, deleteRecipe, getAllRecipes, getRecipe, updateRecipe)
 import Servant (NoContent (..))
 
 getAllRecipesRoute :: AppM [Recipe]

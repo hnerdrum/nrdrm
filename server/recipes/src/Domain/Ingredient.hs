@@ -4,6 +4,8 @@
 module Domain.Ingredient
   ( Ingredient (..),
     RecipeIngredient (..),
+    CreateIngredientInput (..),
+    UpdateIngredientInput (..),
     getAllIngredients,
     getIngredient,
     createIngredient,
@@ -18,12 +20,34 @@ import Data.Bifunctor (bimap)
 import Data.Pool (Pool)
 import Data.Text (Text)
 import Data.UUID (UUID)
-import Database.Ingredient (CreateIngredientInput (..), Unit (..), UpdateIngredientInput (..))
 import Database.PostgreSQL.Simple (Connection)
 import Domain.Errors (AppError (..), DomainError (..))
 import ORM (ORMError (..))
 import qualified ORM.Client.Ingredient as Ingredient
 import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
+import ORM.Schema.Unit (Unit (..))
+
+$(deriveJSON defaultOptions ''Unit)
+
+newtype CreateIngredientInput = CreateIngredientInput
+  { name :: Text
+  }
+  deriving (Show)
+
+instance FromJSON CreateIngredientInput where
+  parseJSON = withObject "CreateIngredientInput" $ \obj -> do
+    nameValue <- obj .: "name"
+    return $ CreateIngredientInput {name = nameValue}
+
+newtype UpdateIngredientInput = UpdateIngredientInput
+  { name :: Text
+  }
+  deriving (Show)
+
+instance FromJSON UpdateIngredientInput where
+  parseJSON = withObject "UpdateIngredientInput" $ \obj -> do
+    nameValue <- obj .: "name"
+    return $ UpdateIngredientInput {name = nameValue}
 
 data RecipeIngredient = RecipeIngredient
   { id :: UUID,
