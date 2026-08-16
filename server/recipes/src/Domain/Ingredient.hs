@@ -22,10 +22,10 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Unit (Unit (..))
-import ORM (ORMError (..), runDb)
+import ORM (ORMError (..))
 import ORM.Client.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
 import qualified ORM.Client.Ingredient as Ingredient
-import ORM.Db (DbPool)
+import ORM.Db (Db)
 
 newtype CreateIngredientInput = CreateIngredientInput
   { name :: Text
@@ -65,28 +65,27 @@ data Ingredient = Ingredient
 
 $(deriveJSON defaultOptions ''Ingredient)
 
-getAllIngredients :: DbPool -> IO [Ingredient]
-getAllIngredients pool =
-  map fromIngredientRow <$> runDb pool (Ingredient.findMany Ingredient.emptyQuery)
+getAllIngredients :: Db [Ingredient]
+getAllIngredients =
+  map fromIngredientRow <$> Ingredient.findMany Ingredient.emptyQuery
 
-getIngredient :: DbPool -> UUID -> IO (Either AppError Ingredient)
-getIngredient pool ingredientId =
+getIngredient :: UUID -> Db (Either AppError Ingredient)
+getIngredient ingredientId =
   bimap fromIngredientError fromIngredientRow
-    <$> runDb pool (Ingredient.findUniqueOrFail ingredientId)
+    <$> Ingredient.findUniqueOrFail ingredientId
 
-createIngredient :: DbPool -> CreateIngredientInput -> IO (Either AppError Ingredient)
-createIngredient pool input =
+createIngredient :: CreateIngredientInput -> Db (Either AppError Ingredient)
+createIngredient input =
   bimap fromIngredientError fromIngredientRow
-    <$> runDb pool (Ingredient.create (toIngredientCreate input))
+    <$> Ingredient.create (toIngredientCreate input)
 
-updateIngredient :: DbPool -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
-updateIngredient pool ingredientId input =
+updateIngredient :: UUID -> UpdateIngredientInput -> Db (Either AppError Ingredient)
+updateIngredient ingredientId input =
   bimap fromIngredientError fromIngredientRow
-    <$> runDb pool (Ingredient.update ingredientId (toIngredientUpdate input))
+    <$> Ingredient.update ingredientId (toIngredientUpdate input)
 
-deleteIngredient :: DbPool -> UUID -> IO ()
-deleteIngredient pool ingredientId =
-  void (runDb pool (Ingredient.delete ingredientId))
+deleteIngredient :: UUID -> Db ()
+deleteIngredient ingredientId = void (Ingredient.delete ingredientId)
 
 fromIngredientRow :: IngredientRow -> Ingredient
 fromIngredientRow row =

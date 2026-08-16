@@ -25,7 +25,7 @@ import Data.UUID (UUID)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..))
 import Domain.Unit (Unit (..), fromDbUnit, toDbUnit)
-import ORM (ORMError (..), runDb, withTransaction)
+import ORM (ORMError (..))
 import ORM.Client.Recipe
   ( IngredientRow (..),
     RecipeCreate (..),
@@ -37,7 +37,7 @@ import ORM.Client.Recipe
   )
 import qualified ORM.Client.Recipe as Recipe
 import ORM.Core (NullableValue (..))
-import ORM.Db (DbPool)
+import ORM.Db (Db)
 
 data CreateRecipeInput = CreateRecipeInput
   { name :: Text,
@@ -125,24 +125,24 @@ data Recipe = Recipe
 
 $(deriveJSON defaultOptions ''Recipe)
 
-getAllRecipes :: DbPool -> IO [Recipe]
-getAllRecipes pool =
-  map fromRecipeWithIngredients <$> runDb pool (Recipe.findMany Recipe.withIngredients)
+getAllRecipes :: Db [Recipe]
+getAllRecipes =
+  map fromRecipeWithIngredients <$> Recipe.findMany Recipe.withIngredients
 
-getRecipe :: DbPool -> UUID -> IO (Either AppError Recipe)
-getRecipe pool recipeId =
+getRecipe :: UUID -> Db (Either AppError Recipe)
+getRecipe recipeId =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> runDb pool (Recipe.findUniqueOrFail Recipe.withIngredients recipeId)
+    <$> Recipe.findUniqueOrFail Recipe.withIngredients recipeId
 
-createRecipe :: DbPool -> CreateRecipeInput -> IO (Either AppError Recipe)
-createRecipe pool input =
+createRecipe :: CreateRecipeInput -> Db (Either AppError Recipe)
+createRecipe input =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> withTransaction pool (Recipe.create Recipe.withIngredients (toRecipeWriteCreate input))
+    <$> Recipe.create Recipe.withIngredients (toRecipeWriteCreate input)
 
-updateRecipe :: DbPool -> UUID -> UpdateRecipeInput -> IO (Either AppError Recipe)
-updateRecipe pool recipeId input =
+updateRecipe :: UUID -> UpdateRecipeInput -> Db (Either AppError Recipe)
+updateRecipe recipeId input =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> withTransaction pool (Recipe.update Recipe.withIngredients recipeId (toRecipeWriteUpdate input))
+    <$> Recipe.update Recipe.withIngredients recipeId (toRecipeWriteUpdate input)
 
 toRecipeWriteCreate :: CreateRecipeInput -> Recipe.RecipeWriteCreate
 toRecipeWriteCreate input =
@@ -190,9 +190,8 @@ toRecipeIngredientNestedUpdate input = do
         unit = toDbUnit unit
       }
 
-deleteRecipe :: DbPool -> UUID -> IO ()
-deleteRecipe pool recipeId =
-  void (runDb pool (Recipe.delete recipeId))
+deleteRecipe :: UUID -> Db ()
+deleteRecipe recipeId = void (Recipe.delete recipeId)
 
 fromRecipeError :: ORMError -> AppError
 fromRecipeError err =

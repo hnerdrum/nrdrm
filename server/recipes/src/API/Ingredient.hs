@@ -8,44 +8,34 @@ module API.Ingredient
 where
 
 import API.Errors (withErrorHandling)
-import App (AppContext (..), AppM)
-import Control.Monad.Reader (asks, liftIO)
+import App (AppM, runDbAction)
 import Data.UUID (UUID)
 import Domain.Errors (AppError)
 import Domain.Ingredient (CreateIngredientInput (..), Ingredient (..), UpdateIngredientInput (..), createIngredient, deleteIngredient, getAllIngredients, getIngredient, updateIngredient)
 import Servant (NoContent (..))
 
 getAllIngredientsRoute :: AppM [Ingredient]
-getAllIngredientsRoute = do
-  pool <- asks dbPool
-  liftIO $ getAllIngredients pool
+getAllIngredientsRoute = runDbAction getAllIngredients
 
 getIngredientRoute :: UUID -> AppM Ingredient
 getIngredientRoute = withErrorHandling . getIngredientHandler
 
 getIngredientHandler :: UUID -> AppM (Either AppError Ingredient)
-getIngredientHandler ingredientId = do
-  pool <- asks dbPool
-  liftIO $ getIngredient pool ingredientId
+getIngredientHandler ingredientId = runDbAction (getIngredient ingredientId)
 
 createIngredientRoute :: CreateIngredientInput -> AppM Ingredient
 createIngredientRoute = withErrorHandling . createIngredientHandler
 
 createIngredientHandler :: CreateIngredientInput -> AppM (Either AppError Ingredient)
-createIngredientHandler createIngredientInput = do
-  pool <- asks dbPool
-  liftIO $ createIngredient pool createIngredientInput
+createIngredientHandler input = runDbAction (createIngredient input)
 
 updateIngredientRoute :: UUID -> UpdateIngredientInput -> AppM Ingredient
 updateIngredientRoute ingredientId input = withErrorHandling (updateIngredientHandler ingredientId input)
 
 updateIngredientHandler :: UUID -> UpdateIngredientInput -> AppM (Either AppError Ingredient)
-updateIngredientHandler ingredientId updateIngredientInput = do
-  pool <- asks dbPool
-  liftIO $ updateIngredient pool ingredientId updateIngredientInput
+updateIngredientHandler ingredientId input = runDbAction (updateIngredient ingredientId input)
 
 deleteIngredientRoute :: UUID -> AppM NoContent
 deleteIngredientRoute ingredientId = do
-  pool <- asks dbPool
-  _ <- liftIO $ deleteIngredient pool ingredientId
+  runDbAction (deleteIngredient ingredientId)
   return NoContent
