@@ -67,9 +67,11 @@ emitIncludeReadClientModule :: Text -> Schema -> ModelInclude -> Text
 emitIncludeReadClientModule moduleName schema incl =
   T.unlines
     ( [ "{-# LANGUAGE FlexibleContexts #-}",
+        "{-# LANGUAGE FlexibleInstances #-}",
         "{-# LANGUAGE MultiParamTypeClasses #-}",
         "{-# LANGUAGE RecordWildCards #-}",
         "{-# LANGUAGE TypeApplications #-}",
+        "{-# LANGUAGE TypeFamilies #-}",
         "",
         "module " <> moduleName
       ]
@@ -85,10 +87,12 @@ emitWriteClientModule moduleName schema incl =
   T.unlines
     ( [ "{-# LANGUAGE DuplicateRecordFields #-}",
         "{-# LANGUAGE FlexibleContexts #-}",
+        "{-# LANGUAGE FlexibleInstances #-}",
         "{-# LANGUAGE MultiParamTypeClasses #-}",
         "{-# LANGUAGE OverloadedRecordDot #-}",
         "{-# LANGUAGE RecordWildCards #-}",
         "{-# LANGUAGE TypeApplications #-}",
+        "{-# LANGUAGE TypeFamilies #-}",
         "",
         "module " <> moduleName
       ]
@@ -103,7 +107,11 @@ emitWriteClientModule moduleName schema incl =
                    nestedCreateTypeName child <> " (..),"
                  ]
               ++ includeReadPresetExportItems schema incl
-              ++ [queryTypeName root <> " (..),"]
+              ++ [ presetTypeName schema incl <> " (..),",
+                   "NoInclude (..),",
+                   "ResolveInclude,",
+                   queryTypeName root <> " (..)"
+                 ]
           )
         ++ ["where", ""]
         ++ [ "import Control.Monad (forM_)",
@@ -150,8 +158,8 @@ emitWriteClientModule moduleName schema incl =
           emitNestedToChildCreate child rel
         ]
           ++ emitIncludeReadDefinitions schema incl
-          ++ [ emitWriteCreate root incl child rel,
-               emitWriteUpdate root incl child rel wipeField,
+          ++ [ emitWriteCreate schema root incl child rel,
+               emitWriteUpdate schema root incl child rel wipeField,
                emitDeleteFn root,
                emitDeleteManyFn root
              ]
@@ -215,11 +223,13 @@ emitNestedToChildCreate child rel =
          ]
       ++ ["      " <> relForeignField rel <> " = parentId", "    }"]
 
-emitWriteCreate :: Model -> ModelInclude -> Model -> RelationSpec -> Text
-emitWriteCreate root incl child rel =
+emitWriteCreate :: Schema -> Model -> ModelInclude -> Model -> RelationSpec -> Text
+emitWriteCreate schema root incl child rel =
   let childrenField = childrenFieldName root rel
       toChild = "to" <> createTypeName child
       resultName = includeResultName root incl
+      withPreset = presetTypeName schema incl
+      unwrapFn = "unwrap" <> withPreset
       createBody =
         [ "  rootId <- liftIO $ maybe V4.nextRandom pure input.root.id",
           "  let rootInput =",
@@ -232,22 +242,24 @@ emitWriteCreate root incl child rel =
           "      forM_ input." <> childrenField <> " $ \\nested ->",
           "        Insert.executeInsert $",
           "          Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
-          "      Include.findUniqueOrFail @" <> tableTypeName root <> " include rootId"
+          "      Include.findUniqueOrFail @" <> tableTypeName root <> " (" <> unwrapFn <> " include) rootId"
         ]
    in T.unlines $
         [ "create ::",
-          "  " <> includeName incl <> " ->",
+          "  " <> withPreset <> " ->",
           "  " <> writeCreateTypeName root <> " ->",
           "  Db (Either ORMError " <> resultName <> ")",
           "create include input = do"
         ]
           ++ createBody
 
-emitWriteUpdate :: Model -> ModelInclude -> Model -> RelationSpec -> Text -> Text
-emitWriteUpdate root incl child rel wipeField =
+emitWriteUpdate :: Schema -> Model -> ModelInclude -> Model -> RelationSpec -> Text -> Text
+emitWriteUpdate schema root incl child rel wipeField =
   let childrenField = childrenFieldName root rel
       toChild = "to" <> createTypeName child
       resultName = includeResultName root incl
+      withPreset = presetTypeName schema incl
+      unwrapFn = "unwrap" <> withPreset
       updateBody =
         [ "  updateResult <-",
           "    Update.update @" <> tableTypeName root <> " @" <> rowTypeName root <> " rootId input.root",
@@ -263,11 +275,11 @@ emitWriteUpdate root incl child rel wipeField =
           "          forM_ nestedItems $ \\nested ->",
           "            Insert.executeInsert $",
           "              Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
-          "      Include.findUniqueOrFail @" <> tableTypeName root <> " include rootId"
+          "      Include.findUniqueOrFail @" <> tableTypeName root <> " (" <> unwrapFn <> " include) rootId"
         ]
    in T.unlines $
         [ "update ::",
-          "  " <> includeName incl <> " ->",
+          "  " <> withPreset <> " ->",
           "  UUID ->",
           "  " <> writeUpdateTypeName root <> " ->",
           "  Db (Either ORMError " <> resultName <> ")",
@@ -376,7 +388,11 @@ includeReadExportItems :: Schema -> ModelInclude -> [Text]
 includeReadExportItems schema incl =
   includeReadFunctionExportItems
     ++ includeReadPresetExportItems schema incl
-    ++ [queryTypeName (lookupModel schema (includeRootModel incl)) <> " (..),"]
+    ++ [ presetTypeName schema incl <> " (..),",
+         "NoInclude (..),",
+         "ResolveInclude,",
+         queryTypeName (lookupModel schema (includeRootModel incl)) <> " (..)"
+       ]
 
 includeReadFunctionExportItems :: [Text]
 includeReadFunctionExportItems =
@@ -397,11 +413,14 @@ includeReadImportLines moduleName schema incl =
     "import ORM.Db (Db)",
     "import ORM.Errors (ORMError)",
     "import qualified ORM.Include as Include",
+    "import qualified ORM.Operations as Ops",
     "import ORM.Query (QueryBuilder, applyQueryModifiers)",
     "import "
       <> schemaModule moduleName root
       <> " ("
       <> tableTypeName root
+      <> ", "
+      <> rowTypeName root
       <> ")",
     includeModuleImportLine moduleName schema incl
   ]
@@ -412,6 +431,7 @@ includeModuleImportLine :: Text -> Schema -> ModelInclude -> Text
 includeModuleImportLine moduleName schema incl =
   let root = lookupModel schema (includeRootModel incl)
       typeExports = nestedIncludeTypeExports schema incl
+      withPreset = presetTypeName schema incl
    in "import "
         <> includeModule moduleName incl
         <> " ( "
@@ -420,7 +440,14 @@ includeModuleImportLine moduleName schema incl =
         <> T.intercalate ", " typeExports
         <> ", "
         <> resultTypeName schema root (includeTree incl)
-        <> " (..))"
+        <> " (..), "
+        <> withPreset
+        <> " (..), "
+        <> "NoInclude (..), "
+        <> "ResolveInclude, "
+        <> "unwrap"
+        <> withPreset
+        <> ")"
 
 nestedIncludeTypeExports :: Schema -> ModelInclude -> [Text]
 nestedIncludeTypeExports schema incl =
@@ -438,11 +465,23 @@ emitIncludeReadDefinitions schema incl =
    in [ emitFullIncludePreset schema incl,
         emitNoIncludePreset schema incl,
         emitIncludeQueryType root incl,
+        emitIncludeQueryResolveInstances schema root incl,
         emitIncludeFindManyClass root incl,
-        emitIncludeFindManyInstances root incl,
-        emitIncludeFindUnique root incl,
-        emitIncludeFindUniqueOrFail root incl
+        emitIncludeFindManyInstances schema root incl,
+        emitIncludeFindUnique schema root incl,
+        emitIncludeFindUniqueOrFail schema root incl
       ]
+
+emitIncludeQueryResolveInstances :: Schema -> Model -> ModelInclude -> Text
+emitIncludeQueryResolveInstances schema model incl =
+  let withPreset = presetTypeName schema incl
+      nested = includeResultName model incl
+      row = rowTypeName model
+      query = queryTypeName model
+   in T.unlines
+        [ "type instance ResolveInclude (" <> query <> " " <> withPreset <> ") = " <> nested,
+          "type instance ResolveInclude (" <> query <> " NoInclude) = " <> row
+        ]
 
 intercalateSections :: [Text] -> Text
 intercalateSections sections =
@@ -523,25 +562,25 @@ emitDeleteManyFn model =
 
 emitFullIncludePreset :: Schema -> ModelInclude -> Text
 emitFullIncludePreset schema incl =
-  T.unlines
-    [ fullPresetName schema incl <> " :: " <> includeName incl,
-      fullPresetName schema incl <> " =",
-      "  " <> fullIncludeValue schema incl
-    ]
+  let withPreset = presetTypeName schema incl
+   in T.unlines
+        [ fullPresetName schema incl <> " :: " <> withPreset,
+          fullPresetName schema incl <> " =",
+          "  " <> withPreset <> " " <> fullIncludeValue schema incl
+        ]
 
 emitNoIncludePreset :: Schema -> ModelInclude -> Text
 emitNoIncludePreset schema incl =
   T.unlines
-    [ "noInclude :: " <> includeName incl,
-      "noInclude = " <> noIncludeValue schema incl
+    [ "noInclude :: NoInclude",
+      "noInclude = NoInclude " <> noIncludeValue schema incl
     ]
 
 emitIncludeQueryType :: Model -> ModelInclude -> Text
-emitIncludeQueryType model incl =
+emitIncludeQueryType model _incl =
   T.unlines
-    [ "data " <> queryTypeName model <> " = " <> queryTypeName model,
-      "  { include :: " <> includeName incl,
-      "  , where_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
+    [ "data " <> queryTypeName model <> " preset = " <> queryTypeName model,
+      "  { where_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
       "  , orderBy_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
       "  , limit_ :: Maybe Int",
       "  , offset_ :: Maybe Int",
@@ -549,48 +588,103 @@ emitIncludeQueryType model incl =
     ]
 
 emitIncludeFindManyClass :: Model -> ModelInclude -> Text
-emitIncludeFindManyClass model incl =
+emitIncludeFindManyClass model _incl =
   T.unlines
-    [ "class FindMany" <> modelName model <> " a where",
-      "  findMany :: a -> Db [" <> includeResultName model incl <> "]"
+    [ "class FindMany" <> modelName model <> " preset where",
+      "  findMany :: preset -> Db [ResolveInclude preset]"
     ]
 
-emitIncludeFindManyInstances :: Model -> ModelInclude -> Text
-emitIncludeFindManyInstances model incl =
+emitIncludeFindManyInstances :: Schema -> Model -> ModelInclude -> Text
+emitIncludeFindManyInstances schema model incl =
+  let table = tableTypeName model
+      row = rowTypeName model
+      withPreset = presetTypeName schema incl
+      unwrapFn = "unwrap" <> withPreset
+      presetVal = fullPresetName schema incl
+      query = queryTypeName model
+   in T.unlines
+        [ "instance FindMany" <> modelName model <> " " <> withPreset <> " where",
+          "  findMany preset =",
+          "    Include.findMany @" <> table <> " (" <> unwrapFn <> " preset) Prelude.id",
+          "",
+          "instance FindMany" <> modelName model <> " NoInclude where",
+          "  findMany _ =",
+          "    Ops.findMany @" <> table <> " @" <> row <> " Prelude.id",
+          "",
+          "instance FindMany" <> modelName model <> " (" <> query <> " " <> withPreset <> ") where",
+          "  findMany " <> query <> " {..} =",
+          "    Include.findMany @" <> table <> " (" <> unwrapFn <> " " <> presetVal <> ") (applyQueryModifiers where_ orderBy_ limit_ offset_)",
+          "",
+          "instance FindMany" <> modelName model <> " (" <> query <> " NoInclude) where",
+          "  findMany " <> query <> " {..} =",
+          "    Ops.findMany @" <> table <> " @" <> row <> " (applyQueryModifiers where_ orderBy_ limit_ offset_)"
+        ]
+
+emitIncludeFindUniqueClass :: Model -> Text
+emitIncludeFindUniqueClass model =
   T.unlines
-    [ "instance FindMany" <> modelName model <> " " <> includeName incl <> " where",
-      "  findMany include =",
-      "    findMany",
-      "      " <> queryTypeName model,
-      "        { include = include,",
-      "          where_ = Nothing,",
-      "          orderBy_ = Nothing,",
-      "          limit_ = Nothing,",
-      "          offset_ = Nothing",
-      "        }",
-      "",
-      "instance FindMany" <> modelName model <> " " <> queryTypeName model <> " where",
-      "  findMany " <> queryTypeName model <> " {..} =",
-      "    Include.findMany @" <> tableTypeName model <> " include (applyQueryModifiers where_ orderBy_ limit_ offset_)"
+    [ "class FindUnique" <> modelName model <> " preset where",
+      "  findUnique :: preset -> UUID -> Db (Maybe (ResolveInclude preset))"
     ]
 
-emitIncludeFindUnique :: Model -> ModelInclude -> Text
-emitIncludeFindUnique model incl =
+emitIncludeFindUniqueOrFailClass :: Model -> Text
+emitIncludeFindUniqueOrFailClass model =
   T.unlines
-    [ "findUnique :: " <> includeName incl <> " -> UUID -> Db (Maybe " <> resultName <> ")",
-      "findUnique = Include.findUnique @" <> tableTypeName model
+    [ "class FindUniqueOrFail" <> modelName model <> " preset where",
+      "  findUniqueOrFail :: preset -> UUID -> Db (Either ORMError (ResolveInclude preset))"
     ]
-  where
-    resultName = includeResultName model incl
 
-emitIncludeFindUniqueOrFail :: Model -> ModelInclude -> Text
-emitIncludeFindUniqueOrFail model incl =
-  T.unlines
-    [ "findUniqueOrFail :: " <> includeName incl <> " -> UUID -> Db (Either ORMError " <> resultName <> ")",
-      "findUniqueOrFail = Include.findUniqueOrFail @" <> tableTypeName model
-    ]
-  where
-    resultName = includeResultName model incl
+emitIncludeFindUniqueInstances :: Schema -> Model -> ModelInclude -> Text
+emitIncludeFindUniqueInstances schema model incl =
+  let table = tableTypeName model
+      row = rowTypeName model
+      withPreset = presetTypeName schema incl
+      unwrapFn = "unwrap" <> withPreset
+      modelNm = modelName model
+   in T.unlines
+        [ "instance FindUnique" <> modelNm <> " " <> withPreset <> " where",
+          "  findUnique preset =",
+          "    Include.findUnique @" <> table <> " (" <> unwrapFn <> " preset)",
+          "",
+          "instance FindUnique" <> modelNm <> " NoInclude where",
+          "  findUnique _ =",
+          "    Ops.findUnique @" <> table <> " @" <> row
+        ]
+
+emitIncludeFindUniqueOrFailInstances :: Schema -> Model -> ModelInclude -> Text
+emitIncludeFindUniqueOrFailInstances schema model incl =
+  let table = tableTypeName model
+      row = rowTypeName model
+      withPreset = presetTypeName schema incl
+      unwrapFn = "unwrap" <> withPreset
+      modelNm = modelName model
+   in T.unlines
+        [ "instance FindUniqueOrFail" <> modelNm <> " " <> withPreset <> " where",
+          "  findUniqueOrFail preset =",
+          "    Include.findUniqueOrFail @" <> table <> " (" <> unwrapFn <> " preset)",
+          "",
+          "instance FindUniqueOrFail" <> modelNm <> " NoInclude where",
+          "  findUniqueOrFail _ =",
+          "    Ops.findUniqueOrError @" <> table <> " @" <> row
+        ]
+
+emitIncludeFindUnique :: Schema -> Model -> ModelInclude -> Text
+emitIncludeFindUnique schema model incl =
+  emitIncludeFindUniqueClass model
+    <> "\n\n"
+    <> emitIncludeFindUniqueInstances schema model incl
+
+emitIncludeFindUniqueOrFail :: Schema -> Model -> ModelInclude -> Text
+emitIncludeFindUniqueOrFail schema model incl =
+  emitIncludeFindUniqueOrFailClass model
+    <> "\n\n"
+    <> emitIncludeFindUniqueOrFailInstances schema model incl
+
+presetTypeName :: Schema -> ModelInclude -> Text
+presetTypeName schema incl =
+  case T.stripPrefix "with" (fullPresetName schema incl) of
+    Just rest -> "With" <> rest
+    Nothing -> "With" <> upperFirst (fullPresetName schema incl)
 
 queryTypeName :: Model -> Text
 queryTypeName model = modelName model <> "Query"

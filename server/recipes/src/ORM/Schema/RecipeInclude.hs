@@ -10,6 +10,11 @@
 
 module ORM.Schema.RecipeInclude
   ( RecipeInclude (..),
+    WithIngredients (..),
+    NoInclude (..),
+    ResolveInclude,
+    unwrapWithIngredients,
+    unwrapNoInclude,
     RecipeIngredientInclude (..),
     RecipeIngredientWithIngredient (..),
     RecipeWithIngredients (..),
@@ -18,6 +23,7 @@ module ORM.Schema.RecipeInclude
   )
 where
 
+import Data.Kind (Type)
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Text (Text)
 import Data.UUID (UUID)
@@ -62,6 +68,22 @@ data RecipeWithIngredients = RecipeWithIngredients
     ingredients :: [RecipeIngredientWithIngredient]
   }
   deriving (Show, Eq)
+
+type family ResolveInclude preset :: Type
+type instance ResolveInclude WithIngredients = RecipeWithIngredients
+type instance ResolveInclude NoInclude = RecipeRow
+
+newtype WithIngredients = WithIngredients RecipeInclude
+  deriving (Show, Eq)
+
+newtype NoInclude = NoInclude RecipeInclude
+  deriving (Show, Eq)
+
+unwrapWithIngredients :: WithIngredients -> RecipeInclude
+unwrapWithIngredients (WithIngredients include) = include
+
+unwrapNoInclude :: NoInclude -> RecipeInclude
+unwrapNoInclude (NoInclude include) = include
 
 instance IncludesJoin RecipeInclude where
   includesJoin RecipeInclude {ingredients} = isJust ingredients

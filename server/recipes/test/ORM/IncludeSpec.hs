@@ -10,6 +10,7 @@ import Data.Text (Text)
 import Data.UUID (UUID, nil)
 import ORM (runDb)
 import ORM.Include (findMany, findUnique)
+import qualified ORM.Operations as Ops
 import ORM.Query (whereEq)
 import qualified ORM.ShelfFixtures as ShelfFixtures
 import Schema.Book (BookRow (..))
@@ -69,9 +70,9 @@ includeSpec =
     it "findMany without include uses single-table read" $ \TestEnv {envPool = pool} -> do
       _ <- ShelfFixtures.insertShelf pool "alpha"
       _ <- ShelfFixtures.insertShelf pool "beta"
-      results <- runDb pool (findMany @Shelf.ShelfTable (ShelfInclude {books = Nothing}) id)
+      results <- runDb pool (Ops.findMany @Shelf.ShelfTable @Shelf.ShelfRow id)
       length results `shouldBe` 2
-      map (.books) results `shouldBe` [[], []]
+      sort (map (.name) results) `shouldBe` ["alpha", "beta"]
 
     it "findMany applies root filter before nesting" $ \TestEnv {envPool = pool} -> do
       fiction <- ShelfFixtures.insertShelf pool "fiction"
