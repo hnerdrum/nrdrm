@@ -1,12 +1,11 @@
 module ORM
-  ( findAll,
-    findMany,
+  ( findMany,
     findUnique,
-    findUniqueOrError,
+    findUniqueOrFail,
     findFirst,
-    findFirstOrError,
+    findFirstOrFail,
     count,
-    deleteById,
+    delete,
     deleteWhere,
     deleteMany,
     offset,
@@ -78,6 +77,7 @@ module ORM
     ExecuteInclude (..),
     applyRootFilter,
     groupByKey,
+    requireFound,
     runDb,
     withTransaction,
     Db (..),
@@ -97,7 +97,7 @@ import ORM.Db (Db (..), DbPool (..), connect, runDb, withTransaction)
 import ORM.Delete
 import ORM.Errors
 import ORM.Group
-import ORM.Include hiding (findMany, findUnique)
+import ORM.Include hiding (findMany, findUnique, findUniqueOrFail)
 import ORM.Insert
 import ORM.JoinChain
 import ORM.Operations

@@ -64,11 +64,11 @@ findUnique = Ops.findUnique @IngredientTable @IngredientRow
 
 
 findUniqueOrFail :: UUID -> Db (Either ORMError IngredientRow)
-findUniqueOrFail = Ops.findUniqueOrError @IngredientTable @IngredientRow
+findUniqueOrFail = Ops.findUniqueOrFail @IngredientTable @IngredientRow
 
 
 delete :: UUID -> Db Int
-delete = Ops.deleteById @IngredientTable
+delete = Ops.delete @IngredientTable
 
 
 deleteMany :: (QueryBuilder IngredientTable -> QueryBuilder IngredientTable) -> Db Int

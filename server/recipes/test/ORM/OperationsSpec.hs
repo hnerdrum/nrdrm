@@ -21,15 +21,15 @@ import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
 operationsSpec :: SpecWith TestEnv
 operationsSpec =
   describe "ORM.Operations" $ do
-    it "findAll returns an empty list on a clean test_widget table" $ \TestEnv {envPool = pool} -> do
-      rows <- runDb pool (Ops.findAll @WidgetTable @WidgetRow)
+    it "findMany returns an empty list on a clean test_widget table" $ \TestEnv {envPool = pool} -> do
+      rows <- runDb pool (Ops.findMany @WidgetTable @WidgetRow id)
       rows `shouldBe` []
 
-    it "findAll return all rows in table" $ \TestEnv {envPool = pool} -> do
+    it "findMany returns all rows in table" $ \TestEnv {envPool = pool} -> do
       alpha <- WidgetFixtures.insertWidget pool "alpha"
       beta <- WidgetFixtures.insertWidget pool "beta"
       gamma <- WidgetFixtures.insertWidget pool "gamma"
-      results <- runDb pool (Ops.findAll @WidgetTable @WidgetRow)
+      results <- runDb pool (Ops.findMany @WidgetTable @WidgetRow id)
       sort (map (.id) results) `shouldBe` sort [alpha.id, beta.id, gamma.id]
 
     it "findUnique returns an element by id" $ \TestEnv {envPool = pool} -> do
@@ -44,13 +44,13 @@ operationsSpec =
       results <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ whereEq widgetName "alpha")
       sort (map (.id) results) `shouldBe` sort [alpha1.id, alpha2.id]
 
-    it "findUniqueOrError returns an element by id" $ \TestEnv {envPool = pool} -> do
+    it "findUniqueOrFail returns an element by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "test"
-      result <- runDb pool (Ops.findUniqueOrError @WidgetTable @WidgetRow widget.id)
+      result <- runDb pool (Ops.findUniqueOrFail @WidgetTable @WidgetRow widget.id)
       result `shouldBe` Right widget
 
-    it "findUniqueOrError returns an error if no element is found" $ \TestEnv {envPool = pool} -> do
-      result <- runDb pool (Ops.findUniqueOrError @WidgetTable @WidgetRow (nil :: UUID))
+    it "findUniqueOrFail returns an error if no element is found" $ \TestEnv {envPool = pool} -> do
+      result <- runDb pool (Ops.findUniqueOrFail @WidgetTable @WidgetRow (nil :: UUID))
       result
         `shouldSatisfy` ( \case
                             Left (RecordNotFound _) -> True
@@ -189,13 +189,13 @@ operationsSpec =
       length allAlpha `shouldBe` 3
       length paged `shouldBe` 1
 
-    it "deleteById removes a widget by id" $ \TestEnv {envPool = pool} -> do
+    it "delete removes a widget by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "doomed"
-      deleted <- runDb pool (Ops.deleteById @WidgetTable widget.id)
+      deleted <- runDb pool (Ops.delete @WidgetTable widget.id)
       deleted `shouldBe` 1
       found <- runDb pool (Ops.findUnique @WidgetTable @WidgetRow widget.id)
       found `shouldBe` Nothing
 
-    it "deleteById returns 0 when no row matches" $ \TestEnv {envPool = pool} -> do
-      deleted <- runDb pool (Ops.deleteById @WidgetTable (nil :: UUID))
+    it "delete returns 0 when no row matches" $ \TestEnv {envPool = pool} -> do
+      deleted <- runDb pool (Ops.delete @WidgetTable (nil :: UUID))
       deleted `shouldBe` 0

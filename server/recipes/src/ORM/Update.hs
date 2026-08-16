@@ -32,8 +32,9 @@ import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..), NullableValue (..), PrimaryKeyType)
 import ORM.Db (Db (..))
-import ORM.Errors (ORMError (..))
+import ORM.Errors (ORMError (..), parseSingleton)
 import qualified ORM.Operations as Ops
+import ORM.Query (buildWhereClause)
 import ORM.Sql (catchSql)
 
 class (Entity table) => Updatable table where
@@ -113,7 +114,7 @@ update ::
 update pkValue input = do
   let builder = toUpdateBuilder @table input
   if null (ubSets builder)
-    then Ops.findUniqueOrError @table @result pkValue
+    then Ops.findUniqueOrFail @table @result pkValue
     else do
       now <- liftCurrentTime
       let pkField = primaryKey @table
@@ -132,11 +133,14 @@ updateBuilder ::
   Db (Either ORMError result)
 updateBuilder builder = Db $ \conn -> do
   result <- catchSql (runUpdateReturning conn builder)
-  case result of
-    Left err -> pure $ Left err
-    Right [] -> pure $ Left $ RecordNotFound "No record found to update"
-    Right [row] -> pure $ Right row
-    Right _ -> pure $ Left $ MultipleRecordsFound "Update affected multiple rows"
+  pure $
+    case result of
+      Left err -> Left err
+      Right rows ->
+        parseSingleton
+          rows
+          (RecordNotFound "No record found to update")
+          (MultipleRecordsFound "Update affected multiple rows")
 
 updateReturning ::
   forall table result.
@@ -150,10 +154,6 @@ liftCurrentTime = Db (const getCurrentTime)
 
 buildSetClause :: [(Text, Action)] -> Text
 buildSetClause sets = " SET " <> Text.intercalate ", " (map (\(col, _) -> col <> " = ?") sets)
-
-buildWhereClause :: [Text] -> Text
-buildWhereClause [] = ""
-buildWhereClause conditions = " WHERE " <> Text.intercalate " AND " conditions
 
 runUpdateReturning ::
   forall table result.

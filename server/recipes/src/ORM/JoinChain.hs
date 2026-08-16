@@ -32,6 +32,7 @@ import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..))
 import ORM.Db (Db (..))
+import ORM.Query (buildWhereClause)
 import ORM.Relation (BelongsTo (..), HasMany (..), JoinType (..))
 
 data JoinedTable = JoinedTable
@@ -188,10 +189,7 @@ buildJoinQuery jc =
           else Text.intercalate ", " (jcSelect jc)
       joinClauses = map buildJoinClause (jcJoins jc)
       fromClause = " FROM " <> rootRef <> " " <> Text.intercalate " " joinClauses
-      whereClause =
-        if null (jcWhere jc)
-          then ""
-          else " WHERE " <> Text.intercalate " AND " (jcWhere jc)
+      whereClause = buildWhereClause (jcWhere jc)
       limitClause =
         case jcLimit jc of
           Nothing -> ""

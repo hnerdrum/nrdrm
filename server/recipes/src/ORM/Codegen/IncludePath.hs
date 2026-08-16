@@ -20,12 +20,12 @@ module ORM.Codegen.IncludePath
 where
 
 import Data.Bifunctor (first)
-import Data.Char (toLower)
-import Data.List (find)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.IR
 import ORM.Codegen.JoinAlias (assignModelAliases)
+import ORM.Codegen.Lookup (lookupModel, lookupRelation)
+import ORM.Codegen.TextUtil (lowerFirst)
 
 defaultMaxIncludeDepth :: Int
 defaultMaxIncludeDepth = 5
@@ -123,25 +123,3 @@ lookupModelAlias aliases model =
       error $
         "lookupModelAlias: no alias for model "
           <> T.unpack (modelName model)
-
-lookupModel :: Schema -> Text -> Model
-lookupModel schema name =
-  case find ((== name) . modelName) (schemaModels schema) of
-    Just m -> m
-    Nothing -> error $ "IncludePath: unknown model " <> T.unpack name
-
-lookupRelation :: Model -> Text -> RelationSpec
-lookupRelation model name =
-  case find ((== name) . relName) (modelRelations model) of
-    Just r -> r
-    Nothing ->
-      error $
-        "IncludePath: unknown relation "
-          <> T.unpack name
-          <> " on "
-          <> T.unpack (modelName model)
-
-lowerFirst :: Text -> Text
-lowerFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toLower c) rest

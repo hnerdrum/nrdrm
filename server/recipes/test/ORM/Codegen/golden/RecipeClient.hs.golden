@@ -139,7 +139,7 @@ instance FindUniqueOrFailRecipe WithIngredients where
 
 instance FindUniqueOrFailRecipe NoInclude where
   findUniqueOrFail _ =
-    Ops.findUniqueOrError @RecipeTable @RecipeRow
+    Ops.findUniqueOrFail @RecipeTable @RecipeRow
 
 create ::
   WithIngredients ->
@@ -182,7 +182,7 @@ update include rootId input = do
       Include.findUniqueOrFail @RecipeTable (unwrapWithIngredients include) rootId
 
 delete :: UUID -> Db Int
-delete = Ops.deleteById @RecipeTable
+delete = Ops.delete @RecipeTable
 
 deleteMany :: (QueryBuilder RecipeTable -> QueryBuilder RecipeTable) -> Db Int
 deleteMany = Delete.deleteMany @RecipeTable

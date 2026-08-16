@@ -25,7 +25,7 @@ import Database.PostgreSQL.Simple.FromRow (FromRow)
 import Database.PostgreSQL.Simple.ToField (ToField)
 import ORM.Core (Entity (..), PrimaryKeyType)
 import ORM.Db (Db (..))
-import ORM.Errors (ORMError (..))
+import ORM.Errors (ORMError (..), requireFound)
 import ORM.JoinChain (JoinChain, rootAlias, whereJoin)
 import qualified ORM.JoinChain as JoinChain
 import qualified ORM.Operations as Ops
@@ -114,13 +114,10 @@ findUniqueOrFail ::
   Db (Either ORMError result)
 findUniqueOrFail include pk = do
   result <- findUnique @root include pk
-  case result of
-    Nothing ->
-      pure $
-        Left $
-          RecordNotFound $
-            "Record not found with primary key: " <> Text.pack (show pk)
-    Just row -> pure $ Right row
+  pure $
+    requireFound result $
+      RecordNotFound $
+        "Record not found with primary key: " <> Text.pack (show pk)
 
 applyRootFilter ::
   forall root.

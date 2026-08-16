@@ -106,8 +106,11 @@ library:
     - ORM.Query
     - ORM.Relation
     - ORM.Sql
-    - ORM.Transaction
     - ORM.Update
+  other-modules:
+    - ORM.Codegen.EmitCommon
+    - ORM.Codegen.Lookup
+    - ORM.Codegen.TextUtil
   default-extensions:
     - DataKinds
     - DuplicateRecordFields

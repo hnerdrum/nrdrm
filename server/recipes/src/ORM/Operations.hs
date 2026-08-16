@@ -4,14 +4,13 @@
 {-# LANGUAGE TypeApplications #-}
 
 module ORM.Operations
-  ( findAll,
-    findMany,
+  ( findMany,
     findUnique,
-    findUniqueOrError,
+    findUniqueOrFail,
     findFirst,
-    findFirstOrError,
+    findFirstOrFail,
     count,
-    deleteById,
+    delete,
     ORMError (..),
   )
 where
@@ -22,7 +21,7 @@ import Database.PostgreSQL.Simple.ToField (ToField, toField)
 import ORM.Core (Entity (..), Field (..), PrimaryKeyType)
 import ORM.Db (Db (..))
 import qualified ORM.Delete as Delete
-import ORM.Errors (ORMError (..))
+import ORM.Errors (ORMError (..), requireFound)
 import ORM.Query
   ( QueryBuilder,
     runCountQuery,
@@ -31,12 +30,6 @@ import ORM.Query
     selectAll,
     whereEq,
   )
-
-findAll ::
-  forall table result.
-  (Entity table, FromRow result) =>
-  Db [result]
-findAll = runQuery (selectAll @table)
 
 findMany ::
   forall table result.
@@ -54,19 +47,16 @@ findUnique pkValue =
   runQueryOne $
     whereEq (primaryKey @table) pkValue (selectAll @table)
 
-findUniqueOrError ::
+findUniqueOrFail ::
   forall table result.
   (Entity table, FromRow result, ToField (PrimaryKeyType table), Show (PrimaryKeyType table)) =>
   PrimaryKeyType table ->
   Db (Either ORMError result)
-findUniqueOrError pkValue = do
+findUniqueOrFail pkValue = do
   result <- findUnique @table @result pkValue
-  case result of
-    Nothing ->
-      pure $
-        Left $
-          RecordNotFound ("Record not found with primary key: " <> (Text.pack . show) pkValue)
-    Just record -> pure $ Right record
+  pure $
+    requireFound result $
+      RecordNotFound ("Record not found with primary key: " <> Text.pack (show pkValue))
 
 findFirst ::
   forall table result.
@@ -75,16 +65,16 @@ findFirst ::
   Db (Maybe result)
 findFirst modifier = runQueryOne (modifier (selectAll @table))
 
-findFirstOrError ::
+findFirstOrFail ::
   forall table result.
   (Entity table, FromRow result) =>
   (QueryBuilder table -> QueryBuilder table) ->
   Db (Either ORMError result)
-findFirstOrError modifier = do
+findFirstOrFail modifier = do
   result <- findFirst @table modifier
-  case result of
-    Nothing -> pure $ Left $ RecordNotFound "No record found matching criteria"
-    Just record -> pure $ Right record
+  pure $
+    requireFound result $
+      RecordNotFound "No record found matching criteria"
 
 count ::
   forall table.
@@ -93,12 +83,12 @@ count ::
   Db Int
 count modifier = runCountQuery (modifier (selectAll @table))
 
-deleteById ::
+delete ::
   forall table.
   (Entity table, ToField (PrimaryKeyType table)) =>
   PrimaryKeyType table ->
   Db Int
-deleteById pkValue =
+delete pkValue =
   let pkField = primaryKey @table
       builder = Delete.whereDelete (fieldColumn pkField <> " = ?") [toField pkValue] (Delete.emptyDelete @table)
    in Delete.deleteWhere builder

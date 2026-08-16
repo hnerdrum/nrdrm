@@ -11,10 +11,12 @@ module ORM.Codegen.JoinAlias
 where
 
 import Data.Char (isUpper, toLower)
-import Data.List (find, nub)
+import Data.List (nub)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.IR
+import ORM.Codegen.Lookup (lookupModel, lookupRelation)
+import ORM.Codegen.TextUtil (lowerFirst)
 
 data IncludeAliases = IncludeAliases
   { iaRoot :: Text,
@@ -100,25 +102,3 @@ abbrevCamelAlias name =
       case T.find isUpper rest of
         Just u -> T.cons (toLower c) (T.singleton (toLower u))
         Nothing -> T.singleton (toLower c)
-
-lookupModel :: Schema -> Text -> Model
-lookupModel schema name =
-  case find ((== name) . modelName) (schemaModels schema) of
-    Just m -> m
-    Nothing -> error $ "JoinAlias: unknown model " <> T.unpack name
-
-lookupRelation :: Model -> Text -> RelationSpec
-lookupRelation model name =
-  case find ((== name) . relName) (modelRelations model) of
-    Just r -> r
-    Nothing ->
-      error $
-        "JoinAlias: unknown relation "
-          <> T.unpack name
-          <> " on "
-          <> T.unpack (modelName model)
-
-lowerFirst :: Text -> Text
-lowerFirst t = case T.uncons t of
-  Nothing -> t
-  Just (c, rest) -> T.cons (toLower c) rest
