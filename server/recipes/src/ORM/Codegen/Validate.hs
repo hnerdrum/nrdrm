@@ -10,6 +10,7 @@ import Data.List (find, nub)
 import Data.Maybe (catMaybes, isNothing)
 import Data.Text (Text)
 import ORM.Codegen.IR
+import ORM.Codegen.IncludePath (defaultMaxIncludeDepth, includeMaxDepth)
 import ORM.Codegen.JoinAlias (allocateJoinAlias, includeModelsInOrder)
 
 data ValidationError
@@ -26,6 +27,7 @@ data ValidationError
   | UnknownIncludeRoot Text Text
   | UnknownIncludeRelation Text Text Text
   | JoinAliasExhausted Text Text
+  | MaxIncludeDepthExceeded Text Int Int
   | ReplaceChildrenNotHasMany Text
   deriving (Show, Eq)
 
@@ -116,8 +118,15 @@ validateInclude schema incl =
     Just root ->
       let treeErrs = validateIncludeTree schema (includeName incl) root (includeTree incl)
        in if null treeErrs
-            then treeErrs ++ validateIncludeJoinAliases schema incl
+            then treeErrs ++ validateIncludeJoinAliases schema incl ++ validateIncludeDepth schema incl
             else treeErrs
+
+validateIncludeDepth :: Schema -> ModelInclude -> [ValidationError]
+validateIncludeDepth schema incl =
+  let depth = includeMaxDepth schema incl
+   in [ MaxIncludeDepthExceeded (includeName incl) depth defaultMaxIncludeDepth
+        | depth > defaultMaxIncludeDepth
+      ]
 
 validateIncludeTree :: Schema -> Text -> Model -> [IncludeTree] -> [ValidationError]
 validateIncludeTree schema includeName current = concatMap go

@@ -7,20 +7,22 @@ where
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
+import ORM.Codegen.Emit.FlatRow (emitJoinBuilder)
 import ORM.Codegen.Emit.Include
   ( emitBuildJoinChain,
-    emitDeepJoinBuilder,
-    emitDeepNestHelpers,
     emitExecuteInclude,
     emitIncludeADTs,
     emitIncludeModule,
     emitIncludesJoin,
     emitNestInclude,
     emitResultADTs,
-    emitShallowJoinBuilder,
-    emitShallowNestHelpers,
   )
+import ORM.Codegen.Emit.Nest (emitNestHelpersForPath)
 import ORM.Codegen.IR (Schema (..))
+import ORM.Codegen.IncludePath
+  ( includeLongestJoinPath,
+    joinPathTake,
+  )
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import Test.Hspec
@@ -45,12 +47,14 @@ emitIncludeSpec =
 
     it "emits buildShelfBookJoin" $ do
       let incl = head (schemaIncludes shelfSchema)
-      T.strip (emitShallowJoinBuilder shelfSchema incl)
+          path = joinPathTake 1 (includeLongestJoinPath shelfSchema incl)
+      T.strip (emitJoinBuilder shelfSchema path)
         `shouldBe` T.strip expectedShelfBookJoin
 
     it "emits buildShelfBookChapterJoin" $ do
       let incl = head (schemaIncludes shelfSchema)
-      T.strip (emitDeepJoinBuilder shelfSchema incl)
+          path = includeLongestJoinPath shelfSchema incl
+      T.strip (emitJoinBuilder shelfSchema path)
         `shouldBe` T.strip expectedShelfBookChapterJoin
 
     it "emits BuildJoinChain for ShelfInclude" $ do
@@ -65,12 +69,14 @@ emitIncludeSpec =
 
     it "emits shallow nest helpers for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
-      T.strip (emitShallowNestHelpers shelfSchema incl)
+          path = joinPathTake 1 (includeLongestJoinPath shelfSchema incl)
+      T.strip (emitNestHelpersForPath shelfSchema incl path)
         `shouldBe` T.strip expectedShallowNestHelpers
 
     it "emits deep nest helpers for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
-      T.strip (emitDeepNestHelpers shelfSchema incl)
+          path = includeLongestJoinPath shelfSchema incl
+      T.strip (emitNestHelpersForPath shelfSchema incl path)
         `shouldBe` T.strip expectedDeepNestHelpers
 
     it "emits OVERLAPPING ExecuteInclude for ShelfInclude" $ do

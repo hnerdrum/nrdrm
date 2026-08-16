@@ -33,6 +33,7 @@ import ORM.Codegen.IR
   )
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
+import ORM.Codegen.Spec.ShelfDeep (shelfDeepSchema)
 import ORM.Codegen.Spec.Widget (widgetModel)
 import System.Directory (createDirectoryIfMissing, doesFileExist)
 import System.FilePath (takeDirectory, (</>))
@@ -46,7 +47,7 @@ data GenOutput = GenOutput
   }
 
 allOutputs :: [GenOutput]
-allOutputs = shelfTestOutputs ++ recipeProdOutputs
+allOutputs = shelfTestOutputs ++ shelfDeepTestOutputs ++ recipeProdOutputs
 
 writeOutputs :: FilePath -> IO ()
 writeOutputs root = mapM_ (writeOutput root) allOutputs
@@ -94,6 +95,10 @@ shelfTestOutputs =
       emitModelModule "Schema.Chapter" shelfSchema chapterModel,
     genGolden "Chapter.hs" $
       emitModelModule "Schema.Chapter" shelfSchema chapterModel,
+    gen "test/Schema/Section.hs" $
+      emitModelModule "Schema.Section" shelfSchema sectionModel,
+    genGolden "Section.hs" $
+      emitModelModule "Schema.Section" shelfSchema sectionModel,
     gen "test/Schema/ShelfInclude.hs" $
       emitIncludeModule "Schema.ShelfInclude" shelfSchema shelfInclude,
     genGolden "ShelfInclude.hs" $
@@ -101,6 +106,14 @@ shelfTestOutputs =
   ]
   where
     shelfInclude = head (schemaIncludes shelfSchema)
+
+shelfDeepTestOutputs :: [GenOutput]
+shelfDeepTestOutputs =
+  [ gen "test/Schema/ShelfDeepInclude.hs" $
+      emitIncludeModule "Schema.ShelfDeepInclude" shelfDeepSchema shelfDeepInclude
+  ]
+  where
+    shelfDeepInclude = head (schemaIncludes shelfDeepSchema)
 
 recipeProdOutputs :: [GenOutput]
 recipeProdOutputs =
@@ -171,6 +184,9 @@ bookModel = requireModel shelfSchema "Book"
 
 chapterModel :: Model
 chapterModel = requireModel shelfSchema "Chapter"
+
+sectionModel :: Model
+sectionModel = requireModel shelfSchema "Section"
 
 ingredientModel :: Model
 ingredientModel = requireModel recipeSchema "Ingredient"
