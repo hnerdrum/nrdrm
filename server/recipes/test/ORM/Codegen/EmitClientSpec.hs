@@ -79,7 +79,7 @@ expectedShelfReadClient =
       "import qualified ORM.Operations as Ops",
       "import ORM.Query (QueryBuilder, applyQueryModifiers)",
       "import Schema.Shelf (ShelfTable, ShelfRow)",
-      "import Schema.ShelfInclude ( ShelfInclude (..), BookInclude (..), ShelfWithBooks (..), WithBooks (..), NoInclude (..), ResolveInclude, unwrapWithBooks)",
+      "import Schema.ShelfInclude ( ShelfInclude (..), BookInclude (..), ShelfWithBooks (..), BookWithChapters (..), WithBooks (..), NoInclude (..), ResolveInclude, unwrapWithBooks)",
       "",
       "withBooks :: WithBooks",
       "withBooks =",

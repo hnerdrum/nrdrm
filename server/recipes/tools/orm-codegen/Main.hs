@@ -32,7 +32,7 @@ runCheck root = do
   case stale of
     [] -> exitSuccess
     paths -> do
-      TIO.putStrLn "Generated ORM files are out of date. Run `make orm-gen` and commit."
+      TIO.putStrLn "Generated ORM files are out of date. Run `make orm-gen`."
       mapM_ (TIO.putStrLn . ("  " <>)) (pack <$> paths)
       exitFailure
 

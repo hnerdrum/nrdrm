@@ -53,7 +53,60 @@ ghc-options:
   - -Wredundant-constraints
 
 library:
-  source-dirs: src
+  source-dirs:
+    - src
+    - .orm-gen
+  exposed-modules:
+    - API.Errors
+    - API.Health
+    - API.Ingredient
+    - API.Recipe
+    - API.Server
+    - API.Utils
+    - App
+    - Config
+    - Database.Connection
+    - Database.Migrations
+    - Domain.Errors
+    - Domain.Health
+    - Domain.Ingredient
+    - Domain.Recipe
+    - Domain.Unit
+    - Lib
+    - Logger
+    - ORM
+    - ORM.Client.Ingredient
+    - ORM.Client.Recipe
+    - ORM.Codegen.Emit.Client
+    - ORM.Codegen.Emit.FlatRow
+    - ORM.Codegen.Emit.Include
+    - ORM.Codegen.Emit.Nest
+    - ORM.Codegen.Emit.Schema
+    - ORM.Codegen.IncludePath
+    - ORM.Codegen.IR
+    - ORM.Codegen.JoinAlias
+    - ORM.Codegen.Run
+    - ORM.Codegen.Spec.Recipe
+    - ORM.Codegen.Spec.Shelf
+    - ORM.Codegen.Spec.ShelfDeep
+    - ORM.Codegen.Spec.Widget
+    - ORM.Codegen.Target
+    - ORM.Codegen.Validate
+    - ORM.Column
+    - ORM.Core
+    - ORM.Db
+    - ORM.Delete
+    - ORM.Errors
+    - ORM.Group
+    - ORM.Include
+    - ORM.Insert
+    - ORM.JoinChain
+    - ORM.Operations
+    - ORM.Query
+    - ORM.Relation
+    - ORM.Sql
+    - ORM.Transaction
+    - ORM.Update
   default-extensions:
     - DataKinds
     - DuplicateRecordFields

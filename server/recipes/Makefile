@@ -7,7 +7,7 @@ STACK := stack --arch=aarch64
 help: ## Show available commands
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*##"}; {printf "  %-16s %s\n", $$1, $$2}'
 
-build:
+build: orm-gen
 	$(STACK) build
 
 orm-gen: ## Regenerate ORM schema, include, and client modules from specs
@@ -30,5 +30,5 @@ test-db-logs:
 test: test-db-up
 	TEST_DATABASE_URL=$(TEST_DATABASE_URL) $(STACK) test --arch=aarch64
 
-test-fast:
+test-fast: orm-gen
 	TEST_DATABASE_URL=$(TEST_DATABASE_URL) $(STACK) test --arch=aarch64

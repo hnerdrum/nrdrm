@@ -9,6 +9,10 @@ module ORM.Client.Ingredient
     findUniqueOrFail,
     delete,
     deleteMany,
+    IngredientCreate (..),
+    IngredientRow (..),
+    IngredientUpdate (..),
+    IngredientTable,
     IngredientQuery (..),
     emptyQuery
   )
@@ -22,7 +26,7 @@ import qualified ORM.Delete as Delete
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers)
-import ORM.Schema.Ingredient (IngredientCreate, IngredientRow, IngredientTable, IngredientUpdate)
+import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientTable, IngredientUpdate (..))
 import qualified ORM.Update as Update
 
 create :: IngredientCreate -> Db (Either ORMError IngredientRow)

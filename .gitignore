@@ -1,3 +1,5 @@
+**/.orm-gen/*
+!**/.orm-gen/.gitkeep
 node_modules
 
 .stack-work
