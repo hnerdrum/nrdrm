@@ -24,7 +24,7 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..))
-import Domain.Unit (Unit (..))
+import Domain.Unit (Unit (..), fromDbUnit, toDbUnit)
 import ORM (ORMError (..), runDb, withTransaction)
 import ORM.Client.Recipe
   ( IngredientRow (..),
@@ -176,7 +176,7 @@ toRecipeIngredientNestedCreate input =
   Recipe.RecipeIngredientNestedCreate
     { ingredientId = input.id,
       amount = input.amount,
-      unit = input.unit
+      unit = toDbUnit input.unit
     }
 
 toRecipeIngredientNestedUpdate :: UpdateRecipeIngredientInput -> Maybe Recipe.RecipeIngredientNestedCreate
@@ -187,7 +187,7 @@ toRecipeIngredientNestedUpdate input = do
     Recipe.RecipeIngredientNestedCreate
       { ingredientId = input.id,
         amount,
-        unit
+        unit = toDbUnit unit
       }
 
 deleteRecipe :: DbPool -> UUID -> IO ()
@@ -222,6 +222,6 @@ fromDbRecipeIngredient
         { id = iid,
           name = iname,
           amount,
-          unit
+          unit = fromDbUnit unit
         }
 fromDbRecipeIngredient _ = Nothing

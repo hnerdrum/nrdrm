@@ -3,11 +3,16 @@
 
 module Domain.Unit
   ( Unit (..),
+    fromDbUnit,
+    toDbUnit,
   )
 where
 
 import Data.Aeson (FromJSON (..), ToJSON (..), Value (String), withText)
-import ORM.Client.Recipe (Unit (..))
+import qualified ORM.Client.Recipe as ORM
+
+data Unit = G | Ml | Tsp | Tbsp | Qty
+  deriving (Show, Eq)
 
 instance ToJSON Unit where
   toJSON G = String "g"
@@ -25,3 +30,17 @@ instance FromJSON Unit where
       "tbsp" -> pure Tbsp
       "qty" -> pure Qty
       _ -> fail "unknown Unit"
+
+toDbUnit :: Unit -> ORM.Unit
+toDbUnit G = ORM.G
+toDbUnit Ml = ORM.Ml
+toDbUnit Tsp = ORM.Tsp
+toDbUnit Tbsp = ORM.Tbsp
+toDbUnit Qty = ORM.Qty
+
+fromDbUnit :: ORM.Unit -> Unit
+fromDbUnit ORM.G = G
+fromDbUnit ORM.Ml = Ml
+fromDbUnit ORM.Tsp = Tsp
+fromDbUnit ORM.Tbsp = Tbsp
+fromDbUnit ORM.Qty = Qty
