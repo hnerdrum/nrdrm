@@ -109,6 +109,7 @@ tests:
       - Support.TestDb
       - Support.TestMigrations
       - ORM.OperationsSpec
+      - ORM.RawSpec
       - ORM.ErrorsSpec
       - ORM.JoinSpec
       - ORM.IncludeSpec
