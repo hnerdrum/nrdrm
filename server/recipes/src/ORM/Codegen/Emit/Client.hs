@@ -70,194 +70,99 @@ emitSimpleClientModule moduleName model =
 emitIncludeReadClientModule :: Text -> Schema -> ModelInclude -> Text
 emitIncludeReadClientModule moduleName schema incl =
   T.unlines
-    [ "{-# LANGUAGE TypeApplications #-}",
-      "",
-      "module " <> moduleName,
-      emitIncludeReadExports schema incl,
-      "where",
-      "",
-      "import Data.Pool (Pool)",
-      "import Data.UUID (UUID)",
-      "import Database.PostgreSQL.Simple (Connection)",
-      "import ORM.Errors (ORMError)",
-      "import qualified ORM.Include as Include",
-      "import ORM.Query (QueryBuilder)",
-      "import "
-        <> schemaModule moduleName root
-        <> " ("
-        <> tableTypeName root
-        <> ")",
-      "import "
-        <> includeModule moduleName incl
-        <> " ( "
-        <> includeName incl
-        <> " (..), "
-        <> T.intercalate ", " includeTypeExports
-        <> ", "
-        <> resultTypeName schema root (includeTree incl)
-        <> " (..))",
-      "",
-      emitFullIncludePreset schema incl,
-      "",
-      emitNoIncludePreset schema incl,
-      "",
-      emitIncludeFindAll root incl,
-      "",
-      emitIncludeFindAllWithConn root incl,
-      "",
-      emitIncludeFindMany root incl,
-      "",
-      emitIncludeFindManyWithConn root incl,
-      "",
-      emitIncludeFindUnique root incl,
-      "",
-      emitIncludeFindUniqueWithConn root incl,
-      "",
-      emitIncludeFindUniqueOrError root incl,
-      "",
-      emitIncludeFindUniqueOrErrorWithConn root incl
-    ]
-  where
-    root = lookupModel schema (includeRootModel incl)
-    includeTypeExports =
-      [ modelName child <> "Include (..)"
-        | edge <- includeTree incl,
-          let rel = lookupRelation root (includeRelation edge),
-          let child = lookupModel schema (relToModel rel),
-          not (null (includeChildren edge))
+    ( [ "{-# LANGUAGE TypeApplications #-}",
+        "",
+        "module " <> moduleName
       ]
+        ++ exportLinesFromItems (includeReadExportItems schema incl)
+        ++ ["where", ""]
+        ++ includeReadImportLines moduleName schema incl
+    )
+    <> "\n"
+    <> intercalateSections (emitIncludeReadDefinitions schema incl)
 
 emitWriteClientModule :: Text -> Schema -> ModelInclude -> Text
 emitWriteClientModule moduleName schema incl =
-  T.unlines $
-    [ "{-# LANGUAGE DuplicateRecordFields #-}",
-      "{-# LANGUAGE OverloadedRecordDot #-}",
-      "{-# LANGUAGE TypeApplications #-}",
-      "",
-      "module " <> moduleName,
-      emitWriteExports schema incl root child rel,
-      "where",
-      "",
-      "import Control.Monad (forM_)",
-      "import Data.Pool (Pool)",
-      "import Data.Time (UTCTime, getCurrentTime)",
-      "import Data.UUID (UUID)",
-      "import qualified Data.UUID.V4 as V4",
-      "import Database.PostgreSQL.Simple (Connection)",
-      "import Database.PostgreSQL.Simple.ToField (toField)",
-      "import ORM.Core (fieldColumn)",
-      "import qualified ORM.Delete as Delete",
-      "import ORM.Errors (ORMError)",
-      "import qualified ORM.Include as Include",
-      "import qualified ORM.Insert as Insert",
-      "import "
-        <> schemaModule moduleName root
-        <> " ( "
-        <> createTypeName root
-        <> " (..), "
-        <> rowTypeName root
-        <> ", "
-        <> tableTypeName root
-        <> ", "
-        <> updateTypeName root
-        <> " (..))",
-      "import "
-        <> includeModule moduleName incl
-        <> " ( "
-        <> includeName incl
-        <> " (..), "
-        <> T.intercalate ", " includeTypeExports
-        <> ", "
-        <> resultTypeName schema root (includeTree incl)
-        <> " (..))",
-      "import "
-        <> schemaModule moduleName child
-        <> " ( "
-        <> createTypeName child
-        <> " (..), "
-        <> tableTypeName child
-        <> ", "
-        <> wipeField
-        <> ")",
-      "import ORM.Transaction (transaction)",
-      "import qualified ORM.Operations as Ops",
-      "import ORM.Query (QueryBuilder)",
-      "import qualified ORM.Update as Update"
-    ]
-      ++ nestedEnumImports schema child
-      ++ [ "",
-           emitWriteCreateType root child rel,
-           "",
-           emitWriteUpdateType root child rel,
-           "",
-           emitNestedToChildCreate child rel,
-           "",
-           applyUpdatedAtHelper root,
-           "",
-           emitFullIncludePreset schema incl,
-           "",
-           emitNoIncludePreset schema incl,
-           "",
-           emitIncludeFindAll root incl,
-           "",
-           emitIncludeFindAllWithConn root incl,
-           "",
-           emitIncludeFindMany root incl,
-           "",
-           emitIncludeFindManyWithConn root incl,
-           "",
-           emitIncludeFindUnique root incl,
-           "",
-           emitIncludeFindUniqueWithConn root incl,
-           "",
-           emitIncludeFindUniqueOrError root incl,
-           "",
-           emitIncludeFindUniqueOrErrorWithConn root incl,
-           "",
-           emitWriteCreate root incl child rel,
-           "",
-           emitWriteUpdate root incl child rel wipeField,
-           "",
-           emitDeleteFn root,
-           "",
-           emitDeleteByIdConnFn root
-         ]
+  T.unlines
+    ( [ "{-# LANGUAGE DuplicateRecordFields #-}",
+        "{-# LANGUAGE OverloadedRecordDot #-}",
+        "{-# LANGUAGE TypeApplications #-}",
+        "",
+        "module " <> moduleName
+      ]
+        ++ exportLinesFromItems
+          ( includeReadFunctionExportItems
+              ++ [ "create,",
+                   "createConn,",
+                   "update,",
+                   "updateConn,",
+                   "deleteById,",
+                   "deleteByIdConn,",
+                   writeCreateTypeName root <> " (..),",
+                   writeUpdateTypeName root <> " (..),",
+                   nestedCreateTypeName child <> " (..),"
+                 ]
+              ++ includeReadPresetExportItems schema incl
+          )
+        ++ ["where", ""]
+        ++ [ "import Control.Monad (forM_)",
+             "import Data.Pool (Pool)",
+             "import Data.Time (UTCTime, getCurrentTime)",
+             "import Data.UUID (UUID)",
+             "import qualified Data.UUID.V4 as V4",
+             "import Database.PostgreSQL.Simple (Connection)",
+             "import Database.PostgreSQL.Simple.ToField (toField)",
+             "import ORM.Core (fieldColumn)",
+             "import qualified ORM.Delete as Delete",
+             "import ORM.Errors (ORMError)",
+             "import qualified ORM.Include as Include",
+             "import qualified ORM.Insert as Insert",
+             "import "
+               <> schemaModule moduleName root
+               <> " ( "
+               <> createTypeName root
+               <> " (..), "
+               <> rowTypeName root
+               <> ", "
+               <> tableTypeName root
+               <> ", "
+               <> updateTypeName root
+               <> " (..))",
+             includeModuleImportLine moduleName schema incl,
+             "import "
+               <> schemaModule moduleName child
+               <> " ( "
+               <> createTypeName child
+               <> " (..), "
+               <> tableTypeName child
+               <> ", "
+               <> wipeField
+               <> ")",
+             "import ORM.Transaction (transaction)",
+             "import qualified ORM.Operations as Ops",
+             "import ORM.Query (QueryBuilder)",
+             "import qualified ORM.Update as Update"
+           ]
+        ++ nestedEnumImports schema child
+    )
+    <> "\n"
+    <> intercalateSections
+      ( [ emitWriteCreateType root child rel,
+          emitWriteUpdateType root child rel,
+          emitNestedToChildCreate child rel,
+          applyUpdatedAtHelper root
+        ]
+          ++ emitIncludeReadDefinitions schema incl
+          ++ [ emitWriteCreate root incl child rel,
+               emitWriteUpdate root incl child rel wipeField,
+               emitDeleteFn root,
+               emitDeleteByIdConnFn root
+             ]
+      )
   where
     root = lookupModel schema (includeRootModel incl)
     (rel, child) = replaceChildRelation schema root incl
     wipeField = fieldBinder child (lookupField child (relForeignField rel))
-    includeTypeExports =
-      [ modelName nested <> "Include (..)"
-        | edge <- includeTree incl,
-          let childRel = lookupRelation root (includeRelation edge),
-          let nested = lookupModel schema (relToModel childRel),
-          not (null (includeChildren edge))
-      ]
-
-emitWriteExports :: Schema -> ModelInclude -> Model -> Model -> RelationSpec -> Text
-emitWriteExports schema incl root child _rel =
-  T.unlines
-    [ "  ( findAllWith,",
-      "    findManyWith,",
-      "    findUniqueWith,",
-      "    findUniqueOrErrorWith,",
-      "    findAllWithConn,",
-      "    findManyWithConn,",
-      "    findUniqueWithConn,",
-      "    findUniqueOrErrorWithConn,",
-      "    create,",
-      "    createConn,",
-      "    update,",
-      "    updateConn,",
-      "    deleteById,",
-      "    deleteByIdConn,",
-      "    " <> writeCreateTypeName root <> " (..),",
-      "    " <> writeUpdateTypeName root <> " (..),",
-      "    " <> nestedCreateTypeName child <> " (..),",
-      "    " <> fullPresetName schema incl <> ",",
-      "    noInclude",
-      "  )"
-    ]
 
 emitWriteCreateType :: Model -> Model -> RelationSpec -> Text
 emitWriteCreateType root child rel =
@@ -487,21 +392,95 @@ emitSimpleExports =
       "  )"
     ]
 
-emitIncludeReadExports :: Schema -> ModelInclude -> Text
-emitIncludeReadExports schema incl =
-  T.unlines
-    [ "  ( findAllWith,",
-      "    findManyWith,",
-      "    findUniqueWith,",
-      "    findUniqueOrErrorWith,",
-      "    findAllWithConn,",
-      "    findManyWithConn,",
-      "    findUniqueWithConn,",
-      "    findUniqueOrErrorWithConn,",
-      "    " <> fullPresetName schema incl <> ",",
-      "    noInclude",
-      "  )"
-    ]
+exportLinesFromItems :: [Text] -> [Text]
+exportLinesFromItems items =
+  case items of
+    [] -> ["  ()"]
+    (first : rest) ->
+      ("  ( " <> first) : map ("    " <>) rest ++ ["  )"]
+
+includeReadExportItems :: Schema -> ModelInclude -> [Text]
+includeReadExportItems schema incl =
+  includeReadFunctionExportItems ++ includeReadPresetExportItems schema incl
+
+includeReadFunctionExportItems :: [Text]
+includeReadFunctionExportItems =
+  [ "findAllWith,",
+    "findManyWith,",
+    "findUniqueWith,",
+    "findUniqueOrErrorWith,",
+    "findAllWithConn,",
+    "findManyWithConn,",
+    "findUniqueWithConn,",
+    "findUniqueOrErrorWithConn,"
+  ]
+
+includeReadPresetExportItems :: Schema -> ModelInclude -> [Text]
+includeReadPresetExportItems schema incl =
+  [ fullPresetName schema incl <> ",",
+    "noInclude"
+  ]
+
+includeReadImportLines :: Text -> Schema -> ModelInclude -> [Text]
+includeReadImportLines moduleName schema incl =
+  [ "import Data.Pool (Pool)",
+    "import Data.UUID (UUID)",
+    "import Database.PostgreSQL.Simple (Connection)",
+    "import ORM.Errors (ORMError)",
+    "import qualified ORM.Include as Include",
+    "import ORM.Query (QueryBuilder)",
+    "import "
+      <> schemaModule moduleName root
+      <> " ("
+      <> tableTypeName root
+      <> ")",
+    includeModuleImportLine moduleName schema incl
+  ]
+  where
+    root = lookupModel schema (includeRootModel incl)
+
+includeModuleImportLine :: Text -> Schema -> ModelInclude -> Text
+includeModuleImportLine moduleName schema incl =
+  let root = lookupModel schema (includeRootModel incl)
+      typeExports = nestedIncludeTypeExports schema incl
+   in "import "
+        <> includeModule moduleName incl
+        <> " ( "
+        <> includeName incl
+        <> " (..), "
+        <> T.intercalate ", " typeExports
+        <> ", "
+        <> resultTypeName schema root (includeTree incl)
+        <> " (..))"
+
+nestedIncludeTypeExports :: Schema -> ModelInclude -> [Text]
+nestedIncludeTypeExports schema incl =
+  let root = lookupModel schema (includeRootModel incl)
+   in [ modelName nested <> "Include (..)"
+        | edge <- includeTree incl,
+          let rel = lookupRelation root (includeRelation edge),
+          let nested = lookupModel schema (relToModel rel),
+          not (null (includeChildren edge))
+      ]
+
+emitIncludeReadDefinitions :: Schema -> ModelInclude -> [Text]
+emitIncludeReadDefinitions schema incl =
+  let root = lookupModel schema (includeRootModel incl)
+   in [ emitFullIncludePreset schema incl,
+        emitNoIncludePreset schema incl,
+        emitIncludeFindAll root incl,
+        emitIncludeFindAllWithConn root incl,
+        emitIncludeFindMany root incl,
+        emitIncludeFindManyWithConn root incl,
+        emitIncludeFindUnique root incl,
+        emitIncludeFindUniqueWithConn root incl,
+        emitIncludeFindUniqueOrError root incl,
+        emitIncludeFindUniqueOrErrorWithConn root incl
+      ]
+
+intercalateSections :: [Text] -> Text
+intercalateSections sections =
+  T.intercalate "\n\n" (map T.strip sections)
 
 emitCreateFn :: Model -> Text
 emitCreateFn model =
