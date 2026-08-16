@@ -11,7 +11,8 @@ module Schema.Chapter
     ChapterUpdate (..),
     chapterId,
     chapterBookRef,
-    chapterHeading
+    chapterHeading,
+    chapterSections
   )
 where
 
@@ -21,6 +22,8 @@ import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import ORM.Core
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
+import ORM.Relation (HasMany (..), JoinType (..))
+import Schema.Section (SectionTable, sectionChapterRef)
 
 data ChapterTable = ChapterTable
 
@@ -83,4 +86,12 @@ chapterBookRef = Field "bookRef" "book_id"
 
 chapterHeading :: Field ChapterTable Text
 chapterHeading = Field "heading" "heading"
+
+chapterSections :: HasMany ChapterTable SectionTable UUID
+chapterSections =
+  HasMany
+    { localKey = chapterId,
+      foreignKey = sectionChapterRef,
+      joinType = LeftJoin
+    }
 

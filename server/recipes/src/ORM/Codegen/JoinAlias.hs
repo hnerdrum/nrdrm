@@ -25,23 +25,16 @@ data IncludeAliases = IncludeAliases
 
 assignIncludeAliases :: Schema -> ModelInclude -> IncludeAliases
 assignIncludeAliases schema incl =
-  case assignModelAliases (includeModelsInOrder schema incl) of
-    [(_, rootAlias), (_, childAlias)] ->
-      IncludeAliases
-        { iaRoot = rootAlias,
-          iaChild = childAlias,
-          iaGrand = Nothing
+  let assigned = assignModelAliases (includeModelsInOrder schema incl)
+      aliasAt i = snd (assigned !! i)
+   in IncludeAliases
+        { iaRoot = aliasAt 0,
+          iaChild = aliasAt 1,
+          iaGrand =
+            if length assigned > 2
+              then Just (aliasAt 2)
+              else Nothing
         }
-    [(_, rootAlias), (_, childAlias), (_, grandAlias)] ->
-      IncludeAliases
-        { iaRoot = rootAlias,
-          iaChild = childAlias,
-          iaGrand = Just grandAlias
-        }
-    _ ->
-      error $
-        "assignIncludeAliases: expected 2 or 3 models for "
-          <> T.unpack (includeName incl)
 
 includeModelsInOrder :: Schema -> ModelInclude -> [Model]
 includeModelsInOrder schema incl =
@@ -51,16 +44,19 @@ includeModelsInOrder schema incl =
         "includeModelsInOrder: include "
           <> T.unpack (includeName incl)
           <> " has empty tree"
+    edges ->
+      modelsOnPath schema (lookupModel schema (includeRootModel incl)) edges
+
+modelsOnPath :: Schema -> Model -> [IncludeTree] -> [Model]
+modelsOnPath schema from edges =
+  case edges of
+    [] -> [from]
     (edge : _) ->
-      let root = lookupModel schema (includeRootModel incl)
-          childRel = lookupRelation root (includeRelation edge)
-          child = lookupModel schema (relToModel childRel)
-       in case includeChildren edge of
-            [] -> [root, child]
-            (childEdge : _) ->
-              let grandRel = lookupRelation child (includeRelation childEdge)
-                  grand = lookupModel schema (relToModel grandRel)
-               in [root, child, grand]
+      let rel = lookupRelation from (includeRelation edge)
+          child = lookupModel schema (relToModel rel)
+       in from : case includeChildren edge of
+            [] -> [child]
+            childEdges -> modelsOnPath schema child childEdges
 
 assignModelAliases :: [Model] -> [(Model, Text)]
 assignModelAliases models = go models []

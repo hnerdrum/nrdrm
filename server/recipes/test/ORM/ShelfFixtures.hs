@@ -2,6 +2,7 @@ module ORM.ShelfFixtures
   ( insertShelf,
     insertBook,
     insertChapter,
+    insertSection,
   )
 where
 
@@ -12,6 +13,7 @@ import Database.PostgreSQL.Simple
 import qualified ORM.Insert as Insert
 import Schema.Book (BookCreate (..), BookRow (..), BookTable)
 import Schema.Chapter (ChapterCreate (..), ChapterRow (..), ChapterTable)
+import Schema.Section (SectionCreate (..), SectionRow (..), SectionTable)
 import Schema.Shelf (ShelfCreate (..), ShelfRow (..), ShelfTable)
 import Support.Assert (assertRight)
 
@@ -34,4 +36,11 @@ insertChapter pool bookRef heading =
   Insert.insert @ChapterTable @ChapterRow
     pool
     ChapterCreate {id = Nothing, bookRef, heading}
+    >>= assertRight
+
+insertSection :: Pool Connection -> UUID -> Text -> IO SectionRow
+insertSection pool chapterRef label =
+  Insert.insert @SectionTable @SectionRow
+    pool
+    SectionCreate {id = Nothing, chapterRef, label}
     >>= assertRight

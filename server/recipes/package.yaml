@@ -112,6 +112,7 @@ tests:
       - ORM.IncludeSpec
       - ORM.Codegen.ValidateSpec
       - ORM.Codegen.JoinAliasSpec
+      - ORM.Codegen.IncludePathSpec
       - ORM.Codegen.EmitSpec
       - ORM.Codegen.EmitFlatRowSpec
       - ORM.Codegen.EmitIncludeSpec

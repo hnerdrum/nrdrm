@@ -7,12 +7,14 @@ where
 
 import qualified Data.Text as T
 import ORM.Codegen.Emit.FlatRow
-  ( emitDeepColumnList,
-    emitDeepFlatJoinRow,
-    emitShallowColumnList,
-    emitShallowFlatJoinRow,
+  ( emitColumnList,
+    emitFlatJoinRow,
   )
 import ORM.Codegen.IR (Schema (..))
+import ORM.Codegen.IncludePath
+  ( includeLongestJoinPath,
+    joinPathTake,
+  )
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import Test.Hspec
 
@@ -21,22 +23,26 @@ emitFlatRowSpec =
   describe "ORM.Codegen.Emit.FlatRow" $ do
     it "emits ShelfBookJoinRow for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
-      T.strip (emitShallowFlatJoinRow shelfSchema incl)
+          path = joinPathTake 1 (includeLongestJoinPath shelfSchema incl)
+      T.strip (emitFlatJoinRow shelfSchema path)
         `shouldBe` T.strip expectedShelfBookJoinRow
 
     it "emits shelfBookColumns for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
-      T.strip (emitShallowColumnList shelfSchema incl)
+          path = joinPathTake 1 (includeLongestJoinPath shelfSchema incl)
+      T.strip (emitColumnList shelfSchema path)
         `shouldBe` T.strip expectedShelfBookColumns
 
     it "emits ShelfBookChapterJoinRow for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
-      T.strip (emitDeepFlatJoinRow shelfSchema incl)
+          path = includeLongestJoinPath shelfSchema incl
+      T.strip (emitFlatJoinRow shelfSchema path)
         `shouldBe` T.strip expectedShelfBookChapterJoinRow
 
     it "emits shelfBookChapterColumns for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
-      T.strip (emitDeepColumnList shelfSchema incl)
+          path = includeLongestJoinPath shelfSchema incl
+      T.strip (emitColumnList shelfSchema path)
         `shouldBe` T.strip expectedShelfBookChapterColumns
 
 expectedShelfBookJoinRow :: T.Text

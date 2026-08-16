@@ -4,6 +4,7 @@ import ORM.Codegen.EmitClientSpec (emitClientSpec)
 import ORM.Codegen.EmitFlatRowSpec (emitFlatRowSpec)
 import ORM.Codegen.EmitIncludeSpec (emitIncludeSpec)
 import ORM.Codegen.EmitSpec (emitSpec)
+import ORM.Codegen.IncludePathSpec (fourLevelPathSpec, includePathSpec)
 import ORM.Codegen.JoinAliasSpec (joinAliasSpec)
 import ORM.Codegen.ValidateSpec (validateSpec)
 import ORM.ErrorsSpec (errorsSpec)
@@ -17,6 +18,8 @@ main :: IO ()
 main = hspec $ do
   validateSpec
   joinAliasSpec
+  includePathSpec
+  fourLevelPathSpec
   emitSpec
   emitFlatRowSpec
   emitIncludeSpec

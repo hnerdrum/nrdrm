@@ -11,7 +11,7 @@ shelfSchema :: Schema
 shelfSchema =
   Schema
     { schemaEnums = [],
-      schemaModels = [shelfModel, bookModel, chapterModel],
+      schemaModels = [shelfModel, bookModel, chapterModel, sectionModel],
       schemaIncludes = [shelfInclude]
     }
 
@@ -53,6 +53,21 @@ chapterModel =
         [ pk (withDefault DefaultUuidV4 (uuid "id")),
           column "book_id" (uuid "bookRef"),
           text "heading"
+        ],
+      modelRelations =
+        [ hasMany "chapterSections" "Chapter" "Section" "id" "chapterRef"
+        ]
+    }
+
+sectionModel :: Model
+sectionModel =
+  Model
+    { modelName = "Section",
+      modelTable = "test_section",
+      modelFields =
+        [ pk (withDefault DefaultUuidV4 (uuid "id")),
+          column "chapter_id" (uuid "chapterRef"),
+          text "label"
         ],
       modelRelations = []
     }
