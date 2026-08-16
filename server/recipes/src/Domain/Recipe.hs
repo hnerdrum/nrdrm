@@ -20,10 +20,8 @@ import Data.Aeson (FromJSON (parseJSON), object, withObject, (.:), (.:?))
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Data.Bifunctor (bimap)
 import Data.Maybe (mapMaybe)
-import Data.Pool (Pool)
 import Data.Text (Text)
 import Data.UUID (UUID)
-import Database.PostgreSQL.Simple (Connection)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..))
 import Domain.Unit (Unit (..))
@@ -39,6 +37,7 @@ import ORM.Client.Recipe
   )
 import qualified ORM.Client.Recipe as Recipe
 import ORM.Core (NullableValue (..))
+import ORM.Db (DbPool)
 
 data CreateRecipeInput = CreateRecipeInput
   { name :: Text,
@@ -126,21 +125,21 @@ data Recipe = Recipe
 
 $(deriveJSON defaultOptions ''Recipe)
 
-getAllRecipes :: Pool Connection -> IO [Recipe]
+getAllRecipes :: DbPool -> IO [Recipe]
 getAllRecipes pool =
   map fromRecipeWithIngredients <$> runDb pool (Recipe.findMany Recipe.withIngredients)
 
-getRecipe :: Pool Connection -> UUID -> IO (Either AppError Recipe)
+getRecipe :: DbPool -> UUID -> IO (Either AppError Recipe)
 getRecipe pool recipeId =
   bimap fromRecipeError fromRecipeWithIngredients
     <$> runDb pool (Recipe.findUniqueOrFail Recipe.withIngredients recipeId)
 
-createRecipe :: Pool Connection -> CreateRecipeInput -> IO (Either AppError Recipe)
+createRecipe :: DbPool -> CreateRecipeInput -> IO (Either AppError Recipe)
 createRecipe pool input =
   bimap fromRecipeError fromRecipeWithIngredients
     <$> withTransaction pool (Recipe.create Recipe.withIngredients (toRecipeWriteCreate input))
 
-updateRecipe :: Pool Connection -> UUID -> UpdateRecipeInput -> IO (Either AppError Recipe)
+updateRecipe :: DbPool -> UUID -> UpdateRecipeInput -> IO (Either AppError Recipe)
 updateRecipe pool recipeId input =
   bimap fromRecipeError fromRecipeWithIngredients
     <$> withTransaction pool (Recipe.update Recipe.withIngredients recipeId (toRecipeWriteUpdate input))
@@ -191,7 +190,7 @@ toRecipeIngredientNestedUpdate input = do
         unit
       }
 
-deleteRecipe :: Pool Connection -> UUID -> IO ()
+deleteRecipe :: DbPool -> UUID -> IO ()
 deleteRecipe pool recipeId =
   void (runDb pool (Recipe.delete recipeId))
 

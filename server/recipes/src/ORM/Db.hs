@@ -1,15 +1,22 @@
 module ORM.Db
   ( Db (..),
+    DbPool (..),
+    connect,
+    closePool,
     runDb,
     withTransaction,
+    withConn,
     liftIO,
   )
 where
 
 import Control.Monad.IO.Class (MonadIO (..), liftIO)
-import Data.Pool (Pool, withResource)
+import qualified Data.ByteString.Char8 as B8
+import Data.Pool (Pool, defaultPoolConfig, destroyAllResources, newPool, setNumStripes, withResource)
 import Database.PostgreSQL.Simple (Connection)
 import qualified Database.PostgreSQL.Simple as PG
+
+newtype DbPool = DbPool {unDbPool :: Pool Connection}
 
 newtype Db a = Db {unDb :: Connection -> IO a}
 
@@ -28,9 +35,30 @@ instance Monad Db where
 instance MonadIO Db where
   liftIO io = Db (const io)
 
-runDb :: Pool Connection -> Db a -> IO a
-runDb pool (Db action) = withResource pool action
+connect :: String -> IO DbPool
+connect databaseUrl = do
+  let numStripes = 4
+      keepOpenTime = 10
+      maxResourcesPerStripe = 5
+      totalMaxConnections = numStripes * maxResourcesPerStripe
+      poolConfig =
+        setNumStripes (Just numStripes) $
+          defaultPoolConfig
+            (PG.connectPostgreSQL $ B8.pack databaseUrl)
+            PG.close
+            keepOpenTime
+            totalMaxConnections
+  DbPool <$> newPool poolConfig
 
-withTransaction :: Pool Connection -> Db a -> IO a
-withTransaction pool (Db action) =
+closePool :: DbPool -> IO ()
+closePool (DbPool pool) = destroyAllResources pool
+
+runDb :: DbPool -> Db a -> IO a
+runDb (DbPool pool) (Db action) = withResource pool action
+
+withConn :: DbPool -> (Connection -> IO a) -> IO a
+withConn (DbPool pool) = withResource pool
+
+withTransaction :: DbPool -> Db a -> IO a
+withTransaction (DbPool pool) (Db action) =
   withResource pool $ \conn -> PG.withTransaction conn (action conn)

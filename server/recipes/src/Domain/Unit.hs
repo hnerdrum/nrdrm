@@ -7,7 +7,7 @@ module Domain.Unit
 where
 
 import Data.Aeson (FromJSON (..), ToJSON (..), Value (String), withText)
-import ORM (Unit (..))
+import ORM.Client.Recipe (Unit (..))
 
 instance ToJSON Unit where
   toJSON G = String "g"

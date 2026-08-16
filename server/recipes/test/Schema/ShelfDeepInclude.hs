@@ -30,7 +30,7 @@ import Data.Kind (Type)
 import Data.Maybe (fromMaybe, isJust, mapMaybe)
 import Data.Text (Text)
 import Data.UUID (UUID)
-import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
+import ORM.PG (FromRow (..), field)
 import ORM.Group (groupByKey)
 import ORM.Include
   ( BuildJoinChain (..),

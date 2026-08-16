@@ -8,12 +8,13 @@ where
 
 import Data.Maybe (isNothing)
 import Data.Text (Text)
-import Database.PostgreSQL.Simple.FromField
+import ORM.PG
   ( FromField (..),
     ResultError (ConversionFailed, UnexpectedNull),
     returnError,
+    ToField (..),
+    toField,
   )
-import Database.PostgreSQL.Simple.ToField (ToField (..), toField)
 
 data Unit = G | Ml | Tsp | Tbsp | Qty
   deriving (Show, Eq)

@@ -18,7 +18,7 @@ where
 
 import Data.Text (Text)
 import Data.UUID (UUID)
-import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
+import ORM.PG (FromRow (..), field)
 import ORM.Core
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)

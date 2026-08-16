@@ -118,7 +118,7 @@ emitWriteClientModule moduleName schema incl =
         ++ [ "import Control.Monad (forM_)",
              "import Data.UUID (UUID)",
              "import qualified Data.UUID.V4 as V4",
-             "import Database.PostgreSQL.Simple.ToField (toField)",
+             "import ORM.PG (toField)",
              "import ORM.Core (fieldColumn)",
              "import ORM.Db (Db, liftIO)",
              "import qualified ORM.Delete as Delete",

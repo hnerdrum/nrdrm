@@ -8,7 +8,8 @@ module ORM.Codegen.Target
     SchemaLayout (..),
     ClientConfig (..),
     ClientLayout (..),
-    allTargets,
+    SchemaEmit (..),
+    testTarget,
     targetOutputs,
     targetSchemas,
   )
@@ -46,7 +47,6 @@ import ORM.Codegen.IR
     schemaIncludes,
     schemaModels,
   )
-import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import ORM.Codegen.Spec.ShelfDeep (shelfDeepSchema)
 import ORM.Codegen.Spec.Widget (widgetSchema)
@@ -100,25 +100,8 @@ testTarget =
       ctClients = NoClients
     }
 
-prodTarget :: CodegenTarget
-prodTarget =
-  CodegenTarget
-    { ctSchemas = [TargetSchema recipeSchema True EmitAll],
-      ctLayout = SchemaLayout "ORM.Schema." ".orm-gen/ORM/Schema/",
-      ctClients =
-        DeriveClients
-          ClientLayout
-            { clModulePrefix = "ORM.Client.",
-              clOutputDir = ".orm-gen/ORM/Client/",
-              clGolden = True
-            }
-    }
-
-allTargets :: [CodegenTarget]
-allTargets = [testTarget, prodTarget]
-
-targetSchemas :: [Schema]
-targetSchemas = map (.tsSchema) (concatMap (.ctSchemas) allTargets)
+targetSchemas :: [CodegenTarget] -> [Schema]
+targetSchemas targets = map (.tsSchema) (concatMap (.ctSchemas) targets)
 
 targetOutputs :: CodegenTarget -> [GenOutput]
 targetOutputs target =

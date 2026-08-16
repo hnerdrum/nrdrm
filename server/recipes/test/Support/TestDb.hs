@@ -14,14 +14,12 @@ import Configuration.Dotenv (Config (..), defaultConfig, loadFile)
 import Control.Applicative ((<|>))
 import Control.Exception (IOException, SomeException, catch, displayException, try)
 import Control.Monad (filterM, void)
-import Data.Pool (Pool, destroyAllResources, withResource)
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
-import Database.Connection (createConnection)
-import Database.PostgreSQL.Simple (Connection)
 import qualified Database.PostgreSQL.Simple as PG
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..))
+import ORM.Db (DbPool, closePool, connect, withConn)
 import Schema.Book (BookTable)
 import Schema.Chapter (ChapterTable)
 import Schema.Shelf (ShelfTable)
@@ -32,7 +30,7 @@ import System.Environment (lookupEnv)
 import Test.Hspec (Spec, SpecWith, afterAll, beforeAll, beforeWith)
 
 newtype TestEnv = TestEnv
-  { envPool :: Pool Connection
+  { envPool :: DbPool
   }
 
 withTestDb :: SpecWith TestEnv -> Spec
@@ -61,7 +59,7 @@ setupTestEnv = do
   databaseUrl <- testDatabaseUrl
   result <- try @SomeException $ do
     runTestMigrations databaseUrl
-    createConnection databaseUrl
+    connect databaseUrl
   case result of
     Left err -> fail (connectionErrorMessage databaseUrl err)
     Right pool -> return TestEnv {envPool = pool}
@@ -83,7 +81,7 @@ connectionErrorMessage databaseUrl err =
 
 destroyTestEnv :: TestEnv -> IO ()
 destroyTestEnv TestEnv {envPool = pool} =
-  destroyAllResources pool
+  closePool pool
 
 resetTestData :: TestEnv -> IO ()
 resetTestData env = do
@@ -98,7 +96,7 @@ truncateTable ::
   TestEnv ->
   IO ()
 truncateTable TestEnv {envPool = pool} =
-  withResource pool $ \conn ->
+  withConn pool $ \conn ->
     void $
       PG.execute_
         conn

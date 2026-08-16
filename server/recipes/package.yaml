@@ -65,7 +65,6 @@ library:
     - API.Utils
     - App
     - Config
-    - Database.Connection
     - Database.Migrations
     - Domain.Errors
     - Domain.Health
@@ -85,6 +84,7 @@ library:
     - ORM.Codegen.IncludePath
     - ORM.Codegen.IR
     - ORM.Codegen.JoinAlias
+    - ORM.Codegen.RecipeTarget
     - ORM.Codegen.Run
     - ORM.Codegen.Spec.Recipe
     - ORM.Codegen.Spec.Shelf
@@ -102,6 +102,7 @@ library:
     - ORM.Insert
     - ORM.JoinChain
     - ORM.Operations
+    - ORM.PG
     - ORM.Query
     - ORM.Relation
     - ORM.Sql

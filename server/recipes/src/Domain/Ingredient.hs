@@ -18,15 +18,14 @@ import Control.Monad (void)
 import Data.Aeson
 import Data.Aeson.TH (deriveJSON)
 import Data.Bifunctor (bimap)
-import Data.Pool (Pool)
 import Data.Text (Text)
 import Data.UUID (UUID)
-import Database.PostgreSQL.Simple (Connection)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Unit (Unit (..))
 import ORM (ORMError (..), runDb)
 import ORM.Client.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
 import qualified ORM.Client.Ingredient as Ingredient
+import ORM.Db (DbPool)
 
 newtype CreateIngredientInput = CreateIngredientInput
   { name :: Text
@@ -66,26 +65,26 @@ data Ingredient = Ingredient
 
 $(deriveJSON defaultOptions ''Ingredient)
 
-getAllIngredients :: Pool Connection -> IO [Ingredient]
+getAllIngredients :: DbPool -> IO [Ingredient]
 getAllIngredients pool =
   map fromIngredientRow <$> runDb pool (Ingredient.findMany Ingredient.emptyQuery)
 
-getIngredient :: Pool Connection -> UUID -> IO (Either AppError Ingredient)
+getIngredient :: DbPool -> UUID -> IO (Either AppError Ingredient)
 getIngredient pool ingredientId =
   bimap fromIngredientError fromIngredientRow
     <$> runDb pool (Ingredient.findUniqueOrFail ingredientId)
 
-createIngredient :: Pool Connection -> CreateIngredientInput -> IO (Either AppError Ingredient)
+createIngredient :: DbPool -> CreateIngredientInput -> IO (Either AppError Ingredient)
 createIngredient pool input =
   bimap fromIngredientError fromIngredientRow
     <$> runDb pool (Ingredient.create (toIngredientCreate input))
 
-updateIngredient :: Pool Connection -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
+updateIngredient :: DbPool -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
 updateIngredient pool ingredientId input =
   bimap fromIngredientError fromIngredientRow
     <$> runDb pool (Ingredient.update ingredientId (toIngredientUpdate input))
 
-deleteIngredient :: Pool Connection -> UUID -> IO ()
+deleteIngredient :: DbPool -> UUID -> IO ()
 deleteIngredient pool ingredientId =
   void (runDb pool (Ingredient.delete ingredientId))
 
