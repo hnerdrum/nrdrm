@@ -26,6 +26,7 @@ import Database.PostgreSQL.Simple (Connection)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..))
 import ORM (ORMError (..))
+import Domain.Unit (Unit (..))
 import qualified ORM.Client.Recipe as Recipe
 import ORM.Core (NullableValue (..))
 import ORM.Schema.Ingredient (IngredientRow (..))
@@ -35,7 +36,6 @@ import ORM.Schema.RecipeInclude
     RecipeWithIngredients (..),
   )
 import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..))
-import ORM.Schema.Unit (Unit (..))
 
 data CreateRecipeInput = CreateRecipeInput
   { name :: Text,

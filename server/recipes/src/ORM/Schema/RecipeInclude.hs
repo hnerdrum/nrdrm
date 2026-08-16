@@ -190,7 +190,7 @@ recipeWithIngredientFromRecipeGroup [] =
   error "recipeWithIngredientFromRecipeGroup: empty group"
 
 recipeIngredientWithIngredientFromGroup :: [RecipeRecipeIngredientIngredientJoinRow] -> Maybe RecipeIngredientWithIngredient
-recipeIngredientWithIngredientFromGroup rows@(firstRow : _)
+recipeIngredientWithIngredientFromGroup (firstRow : _)
   | Just _ <- firstRow.recipeIngredientId =
       Just
         RecipeIngredientWithIngredient

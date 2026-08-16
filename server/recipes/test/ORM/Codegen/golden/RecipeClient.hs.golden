@@ -27,7 +27,6 @@ where
 
 import Control.Monad (forM_)
 import Data.Pool (Pool)
-import Data.Time (UTCTime, getCurrentTime)
 import Data.UUID (UUID)
 import qualified Data.UUID.V4 as V4
 import Database.PostgreSQL.Simple (Connection)
@@ -72,9 +71,6 @@ toRecipeIngredientCreate parentId nested =
       unit = nested.unit,
       recipeId = parentId
     }
-
-applyUpdatedAt :: UTCTime -> RecipeUpdate -> RecipeUpdate
-applyUpdatedAt now input = input { updatedAt = Just now }
 
 withIngredients :: RecipeInclude
 withIngredients =
@@ -122,8 +118,8 @@ createConn ::
   IO (Either ORMError RecipeWithIngredients)
 createConn conn include input = do
   rootId <- maybe V4.nextRandom pure input.root.id
-  let rootInput :: RecipeCreate
-      rootInput = input.root { id = Just rootId }
+  let rootInput =
+        RecipeCreate { id = Just rootId, createdAt = input.root.createdAt, updatedAt = input.root.updatedAt, name = input.root.name, description = input.root.description }
   rootResult <-
     Insert.insertConn @RecipeTable @RecipeRow conn rootInput
   case rootResult of
@@ -149,9 +145,8 @@ updateConn ::
   RecipeWriteUpdate ->
   IO (Either ORMError RecipeWithIngredients)
 updateConn conn include rootId input = do
-  now <- getCurrentTime
   updateResult <-
-    Update.updateConn @RecipeTable @RecipeRow conn rootId (applyUpdatedAt now input.root)
+    Update.updateConn @RecipeTable @RecipeRow conn rootId input.root
   case updateResult of
     Left err -> pure (Left err)
     Right _ -> do
