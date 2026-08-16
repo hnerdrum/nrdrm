@@ -7,15 +7,12 @@
 module ORM.Delete
   ( DeleteBuilder,
     deleteWhere,
-    deleteWhereConn,
     deleteReturning,
-    deleteReturningConn,
     whereDelete,
     emptyDelete,
   )
 where
 
-import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
@@ -25,6 +22,7 @@ import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..))
+import ORM.Db (Db (..))
 
 data DeleteBuilder table = DeleteBuilder
   { dbTable :: Text,
@@ -50,19 +48,22 @@ whereDelete condition params builder =
 deleteWhere ::
   forall table.
   (Entity table) =>
-  Pool Connection ->
   DeleteBuilder table ->
-  IO Int
-deleteWhere pool builder =
-  withResource pool $ \conn -> deleteWhereConn conn builder
+  Db Int
+deleteWhere builder = Db (`runDeleteWhere` builder)
 
-deleteWhereConn ::
-  forall table.
-  (Entity table) =>
+deleteReturning ::
+  forall table result.
+  (Entity table, FromRow result) =>
+  DeleteBuilder table ->
+  Db [result]
+deleteReturning builder = Db (`runDeleteReturning` builder)
+
+runDeleteWhere ::
   Connection ->
   DeleteBuilder table ->
   IO Int
-deleteWhereConn conn builder = do
+runDeleteWhere conn builder = do
   let whereClause =
         if null (dbWhere builder)
           then ""
@@ -74,22 +75,13 @@ deleteWhereConn conn builder = do
       query = Query (TE.encodeUtf8 queryText)
   fromIntegral <$> PGSimple.execute conn query (dbWhereParams builder)
 
-deleteReturning ::
+runDeleteReturning ::
   forall table result.
-  (Entity table, FromRow result) =>
-  Pool Connection ->
-  DeleteBuilder table ->
-  IO [result]
-deleteReturning pool builder =
-  withResource pool $ \conn -> deleteReturningConn conn builder
-
-deleteReturningConn ::
-  forall table result.
-  (Entity table, FromRow result) =>
+  (FromRow result) =>
   Connection ->
   DeleteBuilder table ->
   IO [result]
-deleteReturningConn conn builder = do
+runDeleteReturning conn builder = do
   let whereClause =
         if null (dbWhere builder)
           then ""

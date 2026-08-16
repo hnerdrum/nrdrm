@@ -9,6 +9,7 @@ where
 import Data.List (sort)
 import Data.Text (Text)
 import Database.PostgreSQL.Simple.ToField (toField)
+import ORM (runDb)
 import qualified ORM.JoinChain as JoinChain
 import ORM.Relation (HasMany (..), JoinType (..))
 import qualified ORM.ShelfFixtures as ShelfFixtures
@@ -40,14 +41,14 @@ joinSpec =
       shelf <- ShelfFixtures.insertShelf pool "fiction"
       _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
       _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
-      rows <- JoinChain.runJoinChain @ShelfBookJoinRow pool shelfBookJoin
+      rows <- runDb pool (JoinChain.runJoinChain @ShelfBookJoinRow shelfBookJoin)
       length rows `shouldBe` 2
       sort (map (.bookTitle) rows) `shouldBe` sort [Just "Dune", Just "Neuromancer"]
       map (.shelfId) rows `shouldBe` [shelf.id, shelf.id]
 
     it "leftJoin returns a shelf with no books as one row with null book fields" $ \TestEnv {envPool = pool} -> do
       shelf <- ShelfFixtures.insertShelf pool "empty"
-      (row :: ShelfBookJoinRow) : _ <- JoinChain.runJoinChain @ShelfBookJoinRow pool shelfBookJoin
+      (row :: ShelfBookJoinRow) : _ <- runDb pool (JoinChain.runJoinChain @ShelfBookJoinRow shelfBookJoin)
       row.shelfId `shouldBe` shelf.id
       row.shelfName `shouldBe` "empty"
       row.bookId `shouldBe` Nothing
@@ -61,7 +62,7 @@ joinSpec =
           innerJoin =
             selectShelfBookColumns $
               JoinChain.buildJoinChainFromHasMany innerRelation "s" "b"
-      rows <- JoinChain.runJoinChain @ShelfBookJoinRow pool innerJoin
+      rows <- runDb pool (JoinChain.runJoinChain @ShelfBookJoinRow innerJoin)
       map (.shelfId) rows `shouldBe` [stockedShelf.id]
       map (.shelfId) rows `shouldSatisfy` (notElem emptyShelf.id)
 
@@ -70,8 +71,11 @@ joinSpec =
       _ <- ShelfFixtures.insertShelf pool "nonfiction"
       _ <- ShelfFixtures.insertBook pool fiction.id "Dune"
       rows <-
-        JoinChain.runJoinChain @ShelfBookJoinRow pool $
-          JoinChain.whereJoin "s.name = ?" [toField ("fiction" :: Text)] shelfBookJoin
+        runDb
+          pool
+          ( JoinChain.runJoinChain @ShelfBookJoinRow $
+              JoinChain.whereJoin "s.name = ?" [toField ("fiction" :: Text)] shelfBookJoin
+          )
       length rows `shouldBe` 1
       (head rows).shelfName `shouldBe` "fiction"
 
@@ -80,16 +84,22 @@ joinSpec =
       _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
       _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
       rows <-
-        JoinChain.runJoinChain @ShelfBookJoinRow pool $
-          JoinChain.whereJoin "b.title = ?" [toField ("Dune" :: Text)] shelfBookJoin
+        runDb
+          pool
+          ( JoinChain.runJoinChain @ShelfBookJoinRow $
+              JoinChain.whereJoin "b.title = ?" [toField ("Dune" :: Text)] shelfBookJoin
+          )
       length rows `shouldBe` 1
       (head rows).bookTitle `shouldBe` Just "Dune"
 
     it "whereJoin can return zero rows" $ \TestEnv {envPool = pool} -> do
       _ <- ShelfFixtures.insertShelf pool "fiction"
       rows <-
-        JoinChain.runJoinChain @ShelfBookJoinRow pool $
-          JoinChain.whereJoin "s.name = ?" [toField ("nonexistent" :: Text)] shelfBookJoin
+        runDb
+          pool
+          ( JoinChain.runJoinChain @ShelfBookJoinRow $
+              JoinChain.whereJoin "s.name = ?" [toField ("nonexistent" :: Text)] shelfBookJoin
+          )
       rows `shouldBe` []
 
     it "chained leftJoin returns one row per chapter" $ \TestEnv {envPool = pool} -> do
@@ -107,6 +117,6 @@ joinSpec =
                 JoinChain.col "c" Chapter.chapterHeading
               ]
               (JoinChain.addHasManyJoin Book.bookChapters "b" "c" shelfBookJoin)
-      rows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow pool shelfBookChapterJoin
+      rows <- runDb pool (JoinChain.runJoinChain @ShelfBookChapterJoinRow shelfBookChapterJoin)
       length rows `shouldBe` 2
       sort (map (.chapterHeading) rows) `shouldBe` sort [Just "Arrakis", Just "Caladan"]

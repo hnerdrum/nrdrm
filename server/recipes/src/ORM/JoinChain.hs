@@ -17,13 +17,11 @@ module ORM.JoinChain
     aliasedField,
     buildJoinQuery,
     runJoinChain,
-    runJoinChainConn,
     rootAlias,
     limitJoin,
   )
 where
 
-import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
@@ -33,6 +31,7 @@ import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..))
+import ORM.Db (Db (..))
 import ORM.Relation (BelongsTo (..), HasMany (..), JoinType (..))
 
 data JoinedTable = JoinedTable
@@ -200,6 +199,13 @@ buildJoinQuery jc =
       queryText = "SELECT " <> selectClause <> fromClause <> whereClause <> limitClause
    in (Query (TE.encodeUtf8 queryText), jcParams jc)
 
+runJoinChain ::
+  forall result root.
+  (FromRow result) =>
+  JoinChain root ->
+  Db [result]
+runJoinChain chain = Db (`runJoinChainConn` chain)
+
 runJoinChainConn ::
   forall result root.
   (FromRow result) =>
@@ -209,15 +215,6 @@ runJoinChainConn ::
 runJoinChainConn conn chain = do
   let (query, params) = buildJoinQuery chain
   PGSimple.queryWith fromRow conn query params
-
-runJoinChain ::
-  forall result root.
-  (FromRow result) =>
-  Pool Connection ->
-  JoinChain root ->
-  IO [result]
-runJoinChain pool chain =
-  withResource pool $ \conn -> runJoinChainConn @result conn chain
 
 rootAlias :: JoinChain root -> Text
 rootAlias = jcRootAlias

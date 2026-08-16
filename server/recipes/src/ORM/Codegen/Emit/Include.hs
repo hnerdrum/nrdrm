@@ -148,10 +148,10 @@ emitExecuteInclude :: Schema -> ModelInclude -> Text
 emitExecuteInclude schema incl =
   T.unlines $
     [ "instance {-# OVERLAPPING #-} ExecuteInclude " <> rootTable <> " " <> inclName <> " " <> resultName <> " where",
-      "  executeInclude conn include modifier =",
+      "  executeInclude include modifier =",
       "    case include." <> rootField <> " of",
       "      Nothing -> do",
-      "        roots <- findManyConn @" <> rootTable <> " @" <> rootRow <> " conn modifier",
+      "        roots <- findMany @" <> rootTable <> " @" <> rootRow <> " modifier",
       "        pure $ map (wrapRoot include) roots"
     ]
       ++ concatMap (executeIncludeArm schema incl) (includePresetJoinPaths schema incl)
@@ -169,7 +169,7 @@ executeIncludeArm :: Schema -> ModelInclude -> JoinPath -> [Text]
 executeIncludeArm schema incl path =
   [ "      " <> nestedIncludePatternForPath schema incl path <> " -> do",
     "        let chain = applyRootFilter " <> joinBuilderName path <> " modifier",
-    "        flatRows <- JoinChain.runJoinChainConn @" <> joinRowName path <> " conn chain",
+    "        flatRows <- JoinChain.runJoinChain @" <> joinRowName path <> " chain",
     "        pure $ " <> nestRowsFnName path <> " flatRows"
   ]
 
@@ -271,7 +271,7 @@ emitIncludeImports moduleName schema incl =
         "    applyRootFilter,",
         "  )",
         "import qualified ORM.JoinChain as JoinChain",
-        "import ORM.Operations (findManyConn)",
+        "import ORM.Operations (findMany)",
         rootImport
       ]
       ++ tailImports

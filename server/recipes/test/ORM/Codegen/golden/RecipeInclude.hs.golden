@@ -32,7 +32,7 @@ import ORM.Include
     applyRootFilter,
   )
 import qualified ORM.JoinChain as JoinChain
-import ORM.Operations (findManyConn)
+import ORM.Operations (findMany)
 import ORM.Schema.Recipe (RecipeTable, RecipeRow (..), recipeIngredients)
 import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..), riIngredient)
 import ORM.Schema.Ingredient (IngredientRow (..))
@@ -223,17 +223,17 @@ toIngredientRow row
   | otherwise = Nothing
 
 instance {-# OVERLAPPING #-} ExecuteInclude RecipeTable RecipeInclude RecipeWithIngredients where
-  executeInclude conn include modifier =
+  executeInclude include modifier =
     case include.ingredients of
       Nothing -> do
-        roots <- findManyConn @RecipeTable @RecipeRow conn modifier
+        roots <- findMany @RecipeTable @RecipeRow modifier
         pure $ map (wrapRoot include) roots
       Just RecipeIngredientInclude {ingredient = False} -> do
         let chain = applyRootFilter buildRecipeRecipeIngredientJoin modifier
-        flatRows <- JoinChain.runJoinChainConn @RecipeRecipeIngredientJoinRow conn chain
+        flatRows <- JoinChain.runJoinChain @RecipeRecipeIngredientJoinRow chain
         pure $ nestRecipeRows flatRows
       Just RecipeIngredientInclude {ingredient = True} -> do
         let chain = applyRootFilter buildRecipeRecipeIngredientIngredientJoin modifier
-        flatRows <- JoinChain.runJoinChainConn @RecipeRecipeIngredientIngredientJoinRow conn chain
+        flatRows <- JoinChain.runJoinChain @RecipeRecipeIngredientIngredientJoinRow chain
         pure $ nestRecipeRecipeIngredientIngredientRows flatRows
 

@@ -7,7 +7,7 @@ where
 
 import Data.List (sort)
 import Data.UUID (UUID, nil)
-import ORM (NullableValue (..), ORMError (..))
+import ORM (NullableValue (..), ORMError (..), runDb)
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
 import ORM.Query (OrderDirection (Asc), limit, offset, orderBy, whereEq)
@@ -22,35 +22,35 @@ operationsSpec :: SpecWith TestEnv
 operationsSpec =
   describe "ORM.Operations" $ do
     it "findAll returns an empty list on a clean test_widget table" $ \TestEnv {envPool = pool} -> do
-      rows <- Ops.findAll @WidgetTable @WidgetRow pool
+      rows <- runDb pool (Ops.findAll @WidgetTable @WidgetRow)
       rows `shouldBe` []
 
     it "findAll return all rows in table" $ \TestEnv {envPool = pool} -> do
       alpha <- WidgetFixtures.insertWidget pool "alpha"
       beta <- WidgetFixtures.insertWidget pool "beta"
       gamma <- WidgetFixtures.insertWidget pool "gamma"
-      results <- Ops.findAll @WidgetTable @WidgetRow pool
+      results <- runDb pool (Ops.findAll @WidgetTable @WidgetRow)
       sort (map (.id) results) `shouldBe` sort [alpha.id, beta.id, gamma.id]
 
     it "findUnique returns an element by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "test"
-      result <- Ops.findUnique @WidgetTable @WidgetRow pool widget.id
+      result <- runDb pool (Ops.findUnique @WidgetTable @WidgetRow widget.id)
       result `shouldBe` Just widget
 
     it "findMany returns all elements that pass the filter" $ \TestEnv {envPool = pool} -> do
       alpha1 <- WidgetFixtures.insertWidget pool "alpha"
       alpha2 <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "beta"
-      results <- Ops.findMany @WidgetTable @WidgetRow pool $ whereEq widgetName "alpha"
+      results <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ whereEq widgetName "alpha")
       sort (map (.id) results) `shouldBe` sort [alpha1.id, alpha2.id]
 
     it "findUniqueOrError returns an element by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "test"
-      result <- Ops.findUniqueOrError @WidgetTable @WidgetRow pool widget.id
+      result <- runDb pool (Ops.findUniqueOrError @WidgetTable @WidgetRow widget.id)
       result `shouldBe` Right widget
 
     it "findUniqueOrError returns an error if no element is found" $ \TestEnv {envPool = pool} -> do
-      result <- Ops.findUniqueOrError @WidgetTable @WidgetRow pool (nil :: UUID)
+      result <- runDb pool (Ops.findUniqueOrError @WidgetTable @WidgetRow (nil :: UUID))
       result
         `shouldSatisfy` ( \case
                             Left (RecordNotFound _) -> True
@@ -61,105 +61,117 @@ operationsSpec =
       alpha1 <- WidgetFixtures.insertWidget pool "alpha"
       alpha2 <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "beta"
-      result <- Ops.findFirst @WidgetTable @WidgetRow pool $ whereEq widgetName "alpha"
+      result <- runDb pool (Ops.findFirst @WidgetTable @WidgetRow $ whereEq widgetName "alpha")
       row <- assertJust result
       row.name `shouldBe` "alpha"
       row.id `shouldSatisfy` (`elem` [alpha1.id, alpha2.id])
 
     it "findFirst returns Nothing when no row matches" $ \TestEnv {envPool = pool} -> do
-      result <- Ops.findFirst @WidgetTable @WidgetRow pool $ whereEq widgetName "nonexistent"
+      result <- runDb pool (Ops.findFirst @WidgetTable @WidgetRow $ whereEq widgetName "nonexistent")
       result `shouldBe` Nothing
 
     it "count returns the number of rows matching a filter" $ \TestEnv {envPool = pool} -> do
       _ <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "beta"
-      n <- Ops.count @WidgetTable pool $ whereEq widgetName "alpha"
+      n <- runDb pool (Ops.count @WidgetTable $ whereEq widgetName "alpha")
       n `shouldBe` 2
 
     it "count returns 0 when no rows match" $ \TestEnv {envPool = pool} -> do
-      n <- Ops.count @WidgetTable pool $ whereEq widgetName "nonexistent"
+      n <- runDb pool (Ops.count @WidgetTable $ whereEq widgetName "nonexistent")
       n `shouldBe` 0
 
     it "update changes a widget name by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "before"
       updated <-
-        Update.update @WidgetTable @WidgetRow
+        runDb
           pool
-          widget.id
-          WidgetUpdate
-            { name = Just "after",
-              createdAt = Nothing,
-              updatedAt = Nothing,
-              description = Omit
-            }
+          ( Update.update @WidgetTable @WidgetRow
+              widget.id
+              WidgetUpdate
+                { name = Just "after",
+                  createdAt = Nothing,
+                  updatedAt = Nothing,
+                  description = Omit
+                }
+          )
           >>= assertRight
       updated.name `shouldBe` "after"
-      found <- Ops.findUnique @WidgetTable @WidgetRow pool widget.id
+      found <- runDb pool (Ops.findUnique @WidgetTable @WidgetRow widget.id)
       found `shouldBe` Just updated
 
     it "update with Omit leaves description unchanged" $ \TestEnv {envPool = pool} -> do
       widget <-
-        Insert.insert @WidgetTable @WidgetRow
+        runDb
           pool
-          WidgetCreate
-            { id = Nothing,
-              createdAt = Nothing,
-              updatedAt = Nothing,
-              name = "widget",
-              description = Value "keep me"
-            }
+          ( Insert.insert @WidgetTable @WidgetRow
+              WidgetCreate
+                { id = Nothing,
+                  createdAt = Nothing,
+                  updatedAt = Nothing,
+                  name = "widget",
+                  description = Value "keep me"
+                }
+          )
           >>= assertRight
       updated <-
-        Update.update @WidgetTable @WidgetRow
+        runDb
           pool
-          widget.id
-          WidgetUpdate
-            { name = Just "renamed",
-              createdAt = Nothing,
-              updatedAt = Nothing,
-              description = Omit
-            }
+          ( Update.update @WidgetTable @WidgetRow
+              widget.id
+              WidgetUpdate
+                { name = Just "renamed",
+                  createdAt = Nothing,
+                  updatedAt = Nothing,
+                  description = Omit
+                }
+          )
           >>= assertRight
       updated.name `shouldBe` "renamed"
       updated.description `shouldBe` Just "keep me"
 
     it "insert with Null sets description to NULL" $ \TestEnv {envPool = pool} -> do
       widget <-
-        Insert.insert @WidgetTable @WidgetRow
+        runDb
           pool
-          WidgetCreate
-            { id = Nothing,
-              createdAt = Nothing,
-              updatedAt = Nothing,
-              name = "widget",
-              description = Null
-            }
+          ( Insert.insert @WidgetTable @WidgetRow
+              WidgetCreate
+                { id = Nothing,
+                  createdAt = Nothing,
+                  updatedAt = Nothing,
+                  name = "widget",
+                  description = Null
+                }
+          )
           >>= assertRight
       widget.description `shouldBe` Nothing
 
     it "update with Null clears description" $ \TestEnv {envPool = pool} -> do
       widget <-
-        Insert.insert @WidgetTable @WidgetRow
+        runDb
           pool
-          WidgetCreate
-            { id = Nothing,
-              createdAt = Nothing,
-              updatedAt = Nothing,
-              name = "widget",
-              description = Value "keep me"
-            }
+          ( Insert.insert @WidgetTable @WidgetRow
+              WidgetCreate
+                { id = Nothing,
+                  createdAt = Nothing,
+                  updatedAt = Nothing,
+                  name = "widget",
+                  description = Value "keep me"
+                }
+          )
           >>= assertRight
       updated <-
-        Update.update @WidgetTable @WidgetRow
+        runDb
           pool
-          widget.id
-          WidgetUpdate
-            { name = Nothing,
-              createdAt = Nothing,
-              updatedAt = Nothing,
-              description = Null
-            }
+          ( Update.update @WidgetTable @WidgetRow
+              widget.id
+              WidgetUpdate
+                { name = Nothing,
+                  createdAt = Nothing,
+                  updatedAt = Nothing,
+                  description = Null
+                }
+          )
           >>= assertRight
       updated.description `shouldBe` Nothing
 
@@ -167,20 +179,23 @@ operationsSpec =
       _ <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "alpha"
-      allAlpha <- Ops.findMany @WidgetTable @WidgetRow pool $ whereEq widgetName "alpha"
+      allAlpha <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ whereEq widgetName "alpha")
       paged <-
-        Ops.findMany @WidgetTable @WidgetRow pool $
-          offset 1 . limit 1 . orderBy widgetCreatedAt Asc . whereEq widgetName "alpha"
+        runDb
+          pool
+          ( Ops.findMany @WidgetTable @WidgetRow $
+              offset 1 . limit 1 . orderBy widgetCreatedAt Asc . whereEq widgetName "alpha"
+          )
       length allAlpha `shouldBe` 3
       length paged `shouldBe` 1
 
     it "deleteById removes a widget by id" $ \TestEnv {envPool = pool} -> do
       widget <- WidgetFixtures.insertWidget pool "doomed"
-      deleted <- Ops.deleteById @WidgetTable pool widget.id
+      deleted <- runDb pool (Ops.deleteById @WidgetTable widget.id)
       deleted `shouldBe` 1
-      found <- Ops.findUnique @WidgetTable @WidgetRow pool widget.id
+      found <- runDb pool (Ops.findUnique @WidgetTable @WidgetRow widget.id)
       found `shouldBe` Nothing
 
     it "deleteById returns 0 when no row matches" $ \TestEnv {envPool = pool} -> do
-      deleted <- Ops.deleteById @WidgetTable pool (nil :: UUID)
+      deleted <- runDb pool (Ops.deleteById @WidgetTable (nil :: UUID))
       deleted `shouldBe` 0
