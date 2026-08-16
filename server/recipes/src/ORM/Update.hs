@@ -10,11 +10,8 @@ module ORM.Update
   ( UpdateBuilder,
     Updatable (..),
     update,
-    updateConn,
     updateBuilder,
-    updateBuilderConn,
     updateReturning,
-    updateReturningConn,
     setField,
     setFieldNull,
     setFieldMaybe,
@@ -24,7 +21,6 @@ module ORM.Update
   )
 where
 
-import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
@@ -35,6 +31,7 @@ import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..), NullableValue (..), PrimaryKeyType)
+import ORM.Db (Db (..))
 import ORM.Errors (ORMError (..))
 import qualified ORM.Operations as Ops
 import ORM.Sql (catchSql)
@@ -110,26 +107,15 @@ whereUpdate condition params builder =
 update ::
   forall table result.
   (Updatable table, FromRow result, ToField (PrimaryKeyType table), Show (PrimaryKeyType table)) =>
-  Pool Connection ->
   PrimaryKeyType table ->
   UpdateInput table ->
-  IO (Either ORMError result)
-update pool pkValue input =
-  withResource pool $ \conn -> updateConn @table @result conn pkValue input
-
-updateConn ::
-  forall table result.
-  (Updatable table, FromRow result, ToField (PrimaryKeyType table), Show (PrimaryKeyType table)) =>
-  Connection ->
-  PrimaryKeyType table ->
-  UpdateInput table ->
-  IO (Either ORMError result)
-updateConn conn pkValue input = do
+  Db (Either ORMError result)
+update pkValue input = do
   let builder = toUpdateBuilder @table input
   if null (ubSets builder)
-    then Ops.findUniqueOrErrorConn @table @result conn pkValue
+    then Ops.findUniqueOrError @table @result pkValue
     else do
-      now <- getCurrentTime
+      now <- liftCurrentTime
       let pkField = primaryKey @table
           builderWithTouch = touchUpdatedAt @table now builder
           builderWithWhere =
@@ -137,25 +123,15 @@ updateConn conn pkValue input = do
               (fieldColumn pkField <> " = ?")
               [toField pkValue]
               builderWithTouch
-      updateBuilderConn conn builderWithWhere
+      updateBuilder builderWithWhere
 
 updateBuilder ::
   forall table result.
   (Entity table, FromRow result) =>
-  Pool Connection ->
   UpdateBuilder table ->
-  IO (Either ORMError result)
-updateBuilder pool builder =
-  withResource pool $ \conn -> updateBuilderConn conn builder
-
-updateBuilderConn ::
-  forall table result.
-  (Entity table, FromRow result) =>
-  Connection ->
-  UpdateBuilder table ->
-  IO (Either ORMError result)
-updateBuilderConn conn builder = do
-  result <- catchSql (updateReturningConn conn builder)
+  Db (Either ORMError result)
+updateBuilder builder = Db $ \conn -> do
+  result <- catchSql (runUpdateReturning conn builder)
   case result of
     Left err -> pure $ Left err
     Right [] -> pure $ Left $ RecordNotFound "No record found to update"
@@ -165,19 +141,27 @@ updateBuilderConn conn builder = do
 updateReturning ::
   forall table result.
   (Entity table, FromRow result) =>
-  Pool Connection ->
   UpdateBuilder table ->
-  IO [result]
-updateReturning pool builder =
-  withResource pool $ \conn -> updateReturningConn conn builder
+  Db [result]
+updateReturning builder = Db (`runUpdateReturning` builder)
 
-updateReturningConn ::
+liftCurrentTime :: Db UTCTime
+liftCurrentTime = Db (const getCurrentTime)
+
+buildSetClause :: [(Text, Action)] -> Text
+buildSetClause sets = " SET " <> Text.intercalate ", " (map (\(col, _) -> col <> " = ?") sets)
+
+buildWhereClause :: [Text] -> Text
+buildWhereClause [] = ""
+buildWhereClause conditions = " WHERE " <> Text.intercalate " AND " conditions
+
+runUpdateReturning ::
   forall table result.
-  (Entity table, FromRow result) =>
+  (FromRow result) =>
   Connection ->
   UpdateBuilder table ->
   IO [result]
-updateReturningConn conn builder = do
+runUpdateReturning conn builder = do
   let setClause = buildSetClause (ubSets builder)
       setParams = map snd (ubSets builder)
       whereClause = buildWhereClause (ubWhere builder)
@@ -190,13 +174,6 @@ updateReturningConn conn builder = do
           <> " RETURNING *"
       query = Query (TE.encodeUtf8 queryText)
   PGSimple.queryWith fromRow conn query allParams
-
-buildSetClause :: [(Text, Action)] -> Text
-buildSetClause sets = " SET " <> Text.intercalate ", " (map (\(col, _) -> col <> " = ?") sets)
-
-buildWhereClause :: [Text] -> Text
-buildWhereClause [] = ""
-buildWhereClause conditions = " WHERE " <> Text.intercalate " AND " conditions
 
 touchUpdatedAt ::
   forall table.

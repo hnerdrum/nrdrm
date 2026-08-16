@@ -254,17 +254,17 @@ expectedExecuteInclude :: T.Text
 expectedExecuteInclude =
   T.unlines
     [ "instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfInclude ShelfWithBooks where",
-      "  executeInclude conn include modifier =",
+      "  executeInclude include modifier =",
       "    case include.books of",
       "      Nothing -> do",
-      "        roots <- findManyConn @ShelfTable @ShelfRow conn modifier",
+      "        roots <- findMany @ShelfTable @ShelfRow modifier",
       "        pure $ map (wrapRoot include) roots",
       "      Just BookInclude {chapters = False} -> do",
       "        let chain = applyRootFilter buildShelfBookJoin modifier",
-      "        flatRows <- JoinChain.runJoinChainConn @ShelfBookJoinRow conn chain",
+      "        flatRows <- JoinChain.runJoinChain @ShelfBookJoinRow chain",
       "        pure $ nestShelfRows flatRows",
       "      Just BookInclude {chapters = True} -> do",
       "        let chain = applyRootFilter buildShelfBookChapterJoin modifier",
-      "        flatRows <- JoinChain.runJoinChainConn @ShelfBookChapterJoinRow conn chain",
+      "        flatRows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow chain",
       "        pure $ nestShelfBookChapterRows flatRows"
     ]

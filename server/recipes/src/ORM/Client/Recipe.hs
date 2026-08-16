@@ -7,58 +7,51 @@ module ORM.Client.Recipe
     findManyWith,
     findUniqueWith,
     findUniqueOrErrorWith,
-    findAllWithConn,
-    findManyWithConn,
-    findUniqueWithConn,
-    findUniqueOrErrorWithConn,
     create,
-    createConn,
     update,
-    updateConn,
     deleteById,
-    deleteByIdConn,
     RecipeWriteCreate (..),
     RecipeWriteUpdate (..),
     RecipeIngredientNestedCreate (..),
     withIngredients,
-    noInclude
+    noInclude,
   )
 where
 
 import Control.Monad (forM_)
-import Data.Pool (Pool)
 import Data.UUID (UUID)
 import qualified Data.UUID.V4 as V4
-import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.ToField (toField)
 import ORM.Core (fieldColumn)
+import ORM.Db (Db, liftIO)
 import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
-import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
-import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..))
-import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
-import ORM.Transaction (transaction)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder)
-import qualified ORM.Update as Update
+import ORM.Schema.Recipe (RecipeCreate (..), RecipeRow, RecipeTable, RecipeUpdate (..))
+import ORM.Schema.RecipeInclude (RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..))
+import ORM.Schema.RecipeIngredient (RecipeIngredientCreate (..), RecipeIngredientTable, recipeIngredientRecipeId)
 import ORM.Schema.Unit (Unit)
+import qualified ORM.Update as Update
 
 data RecipeWriteCreate = RecipeWriteCreate
-  { root :: RecipeCreate
-  , ingredients :: [RecipeIngredientNestedCreate]
+  { root :: RecipeCreate,
+    ingredients :: [RecipeIngredientNestedCreate]
   }
   deriving (Show, Eq)
 
 data RecipeIngredientNestedCreate = RecipeIngredientNestedCreate
-  { ingredientId :: UUID, amount :: Int, unit :: Unit
+  { ingredientId :: UUID,
+    amount :: Int,
+    unit :: Unit
   }
   deriving (Show, Eq)
 
 data RecipeWriteUpdate = RecipeWriteUpdate
-  { root :: RecipeUpdate
-  , ingredients :: Maybe [RecipeIngredientNestedCreate]
+  { root :: RecipeUpdate,
+    ingredients :: Maybe [RecipeIngredientNestedCreate]
   }
   deriving (Show, Eq)
 
@@ -79,74 +72,47 @@ withIngredients =
 noInclude :: RecipeInclude
 noInclude = RecipeInclude {ingredients = Nothing}
 
-findAllWith :: Pool Connection -> RecipeInclude -> IO [RecipeWithIngredients]
+findAllWith :: RecipeInclude -> Db [RecipeWithIngredients]
 findAllWith = Include.findAllWith @RecipeTable
 
-findAllWithConn :: Connection -> RecipeInclude -> IO [RecipeWithIngredients]
-findAllWithConn = Include.findAllWithConn @RecipeTable
-
 findManyWith ::
-  Pool Connection ->
   RecipeInclude ->
   (QueryBuilder RecipeTable -> QueryBuilder RecipeTable) ->
-  IO [RecipeWithIngredients]
+  Db [RecipeWithIngredients]
 findManyWith = Include.findManyWith @RecipeTable
 
-findManyWithConn ::
-  Connection ->
-  RecipeInclude ->
-  (QueryBuilder RecipeTable -> QueryBuilder RecipeTable) ->
-  IO [RecipeWithIngredients]
-findManyWithConn = Include.findManyWithConn @RecipeTable
-
-findUniqueWith :: Pool Connection -> RecipeInclude -> UUID -> IO (Maybe RecipeWithIngredients)
+findUniqueWith :: RecipeInclude -> UUID -> Db (Maybe RecipeWithIngredients)
 findUniqueWith = Include.findUniqueWith @RecipeTable
 
-findUniqueWithConn :: Connection -> RecipeInclude -> UUID -> IO (Maybe RecipeWithIngredients)
-findUniqueWithConn = Include.findUniqueWithConn @RecipeTable
-
-findUniqueOrErrorWith :: Pool Connection -> RecipeInclude -> UUID -> IO (Either ORMError RecipeWithIngredients)
+findUniqueOrErrorWith :: RecipeInclude -> UUID -> Db (Either ORMError RecipeWithIngredients)
 findUniqueOrErrorWith = Include.findUniqueOrErrorWith @RecipeTable
 
-findUniqueOrErrorWithConn :: Connection -> RecipeInclude -> UUID -> IO (Either ORMError RecipeWithIngredients)
-findUniqueOrErrorWithConn = Include.findUniqueOrErrorWithConn @RecipeTable
-
-createConn ::
-  Connection ->
+create ::
   RecipeInclude ->
   RecipeWriteCreate ->
-  IO (Either ORMError RecipeWithIngredients)
-createConn conn include input = do
-  rootId <- maybe V4.nextRandom pure input.root.id
+  Db (Either ORMError RecipeWithIngredients)
+create include input = do
+  rootId <- liftIO $ maybe V4.nextRandom pure input.root.id
   let rootInput =
-        RecipeCreate { id = Just rootId, createdAt = input.root.createdAt, updatedAt = input.root.updatedAt, name = input.root.name, description = input.root.description }
+        RecipeCreate {id = Just rootId, createdAt = input.root.createdAt, updatedAt = input.root.updatedAt, name = input.root.name, description = input.root.description}
   rootResult <-
-    Insert.insertConn @RecipeTable @RecipeRow conn rootInput
+    Insert.insert @RecipeTable @RecipeRow rootInput
   case rootResult of
     Left err -> pure (Left err)
     Right _ -> do
       forM_ input.ingredients $ \nested ->
-        Insert.executeInsertConn conn $
+        Insert.executeInsert $
           Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate rootId nested)
-      Include.findUniqueOrErrorWithConn @RecipeTable conn include rootId
+      Include.findUniqueOrErrorWith @RecipeTable include rootId
 
-create ::
-  Pool Connection ->
-  RecipeInclude ->
-  RecipeWriteCreate ->
-  IO (Either ORMError RecipeWithIngredients)
-create pool include input =
-  transaction pool $ \conn -> createConn conn include input
-
-updateConn ::
-  Connection ->
+update ::
   RecipeInclude ->
   UUID ->
   RecipeWriteUpdate ->
-  IO (Either ORMError RecipeWithIngredients)
-updateConn conn include rootId input = do
+  Db (Either ORMError RecipeWithIngredients)
+update include rootId input = do
   updateResult <-
-    Update.updateConn @RecipeTable @RecipeRow conn rootId input.root
+    Update.update @RecipeTable @RecipeRow rootId input.root
   case updateResult of
     Left err -> pure (Left err)
     Right _ -> do
@@ -154,24 +120,12 @@ updateConn conn include rootId input = do
         Nothing -> pure ()
         Just nestedItems -> do
           _ <-
-            Delete.deleteWhereConn conn $
+            Delete.deleteWhere $
               Delete.whereDelete (fieldColumn recipeIngredientRecipeId <> " = ?") [toField rootId] (Delete.emptyDelete @RecipeIngredientTable)
           forM_ nestedItems $ \nested ->
-            Insert.executeInsertConn conn $
+            Insert.executeInsert $
               Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate rootId nested)
-      Include.findUniqueOrErrorWithConn @RecipeTable conn include rootId
+      Include.findUniqueOrErrorWith @RecipeTable include rootId
 
-update ::
-  Pool Connection ->
-  RecipeInclude ->
-  UUID ->
-  RecipeWriteUpdate ->
-  IO (Either ORMError RecipeWithIngredients)
-update pool include rootId input =
-  transaction pool $ \conn -> updateConn conn include rootId input
-
-deleteById :: Pool Connection -> UUID -> IO Int
+deleteById :: UUID -> Db Int
 deleteById = Ops.deleteById @RecipeTable
-
-deleteByIdConn :: Connection -> UUID -> IO Int
-deleteByIdConn = Ops.deleteByIdConn @RecipeTable

@@ -12,25 +12,20 @@ module ORM.Include
     NestInclude (..),
     ExecuteInclude (..),
     findManyWith,
-    findManyWithConn,
     findAllWith,
-    findAllWithConn,
     findUniqueWith,
-    findUniqueWithConn,
     findUniqueOrErrorWith,
-    findUniqueOrErrorWithConn,
     applyRootFilter,
   )
 where
 
 import Data.Kind (Type)
-import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.FromRow (FromRow)
 import Database.PostgreSQL.Simple.ToField (ToField)
 import ORM.Core (Entity (..), PrimaryKeyType)
+import ORM.Db (Db (..))
 import ORM.Errors (ORMError (..))
 import ORM.JoinChain (JoinChain, rootAlias, whereJoin)
 import qualified ORM.JoinChain as JoinChain
@@ -51,10 +46,9 @@ class (IncludesJoin include) => NestInclude include result | include -> result w
 
 class ExecuteInclude root include result | include -> result where
   executeInclude ::
-    Connection ->
     include ->
     (QueryBuilder root -> QueryBuilder root) ->
-    IO [result]
+    Db [result]
 
 instance
   ( Entity root,
@@ -65,75 +59,28 @@ instance
   ) =>
   ExecuteInclude root include result
   where
-  executeInclude conn include modifier
+  executeInclude include modifier
     | includesJoin include = do
         let chain = applyRootFilter (buildJoinChain include) modifier
-        flatRows <- JoinChain.runJoinChainConn @(JoinFlatRow include) conn chain
+        flatRows <- JoinChain.runJoinChain @(JoinFlatRow include) chain
         pure $ nestRows include flatRows
     | otherwise = do
-        roots <- Ops.findManyConn @root @(RootRow include) conn modifier
+        roots <- Ops.findMany @root @(RootRow include) modifier
         pure $ map (wrapRoot include) roots
-
-findManyWithConn ::
-  (ExecuteInclude root include result) =>
-  Connection ->
-  include ->
-  (QueryBuilder root -> QueryBuilder root) ->
-  IO [result]
-findManyWithConn = executeInclude
 
 findManyWith ::
   (ExecuteInclude root include result) =>
-  Pool Connection ->
   include ->
   (QueryBuilder root -> QueryBuilder root) ->
-  IO [result]
-findManyWith pool include modifier =
-  withResource pool $ \conn -> findManyWithConn conn include modifier
-
-findAllWithConn ::
-  forall root include result.
-  (ExecuteInclude root include result) =>
-  Connection ->
-  include ->
-  IO [result]
-findAllWithConn conn include =
-  findManyWithConn @root conn include Prelude.id
+  Db [result]
+findManyWith = executeInclude
 
 findAllWith ::
   forall root include result.
   (ExecuteInclude root include result) =>
-  Pool Connection ->
   include ->
-  IO [result]
-findAllWith pool include =
-  withResource pool $ \conn -> findAllWithConn @root conn include
-
-findUniqueWithConn ::
-  forall root include result.
-  ( Entity root,
-    ToField (PrimaryKeyType root),
-    BuildJoinChain root include,
-    NestInclude include result,
-    FromRow (JoinFlatRow include),
-    FromRow (RootRow include)
-  ) =>
-  Connection ->
-  include ->
-  PrimaryKeyType root ->
-  IO (Maybe result)
-findUniqueWithConn conn include pk
-  | includesJoin include = do
-      let chain =
-            JoinChain.limitJoin 1 $
-              applyRootFilter (buildJoinChain include) (whereEq (primaryKey @root) pk)
-      flatRows <- JoinChain.runJoinChainConn @(JoinFlatRow include) conn chain
-      pure $ case nestRows include flatRows of
-        [] -> Nothing
-        (row : _) -> Just row
-  | otherwise = do
-      mRoot <- Ops.findUniqueConn @root @(RootRow include) conn pk
-      pure $ fmap (wrapRoot include) mRoot
+  Db [result]
+findAllWith include = findManyWith @root include Prelude.id
 
 findUniqueWith ::
   forall root include result.
@@ -144,36 +91,21 @@ findUniqueWith ::
     FromRow (JoinFlatRow include),
     FromRow (RootRow include)
   ) =>
-  Pool Connection ->
   include ->
   PrimaryKeyType root ->
-  IO (Maybe result)
-findUniqueWith pool include pk =
-  withResource pool $ \conn -> findUniqueWithConn @root conn include pk
-
-findUniqueOrErrorWithConn ::
-  forall root include result.
-  ( Entity root,
-    ToField (PrimaryKeyType root),
-    Show (PrimaryKeyType root),
-    BuildJoinChain root include,
-    NestInclude include result,
-    FromRow (JoinFlatRow include),
-    FromRow (RootRow include)
-  ) =>
-  Connection ->
-  include ->
-  PrimaryKeyType root ->
-  IO (Either ORMError result)
-findUniqueOrErrorWithConn conn include pk = do
-  result <- findUniqueWithConn @root conn include pk
-  case result of
-    Nothing ->
-      pure $
-        Left $
-          RecordNotFound $
-            "Record not found with primary key: " <> Text.pack (show pk)
-    Just row -> pure $ Right row
+  Db (Maybe result)
+findUniqueWith include pk
+  | includesJoin include = do
+      let chain =
+            JoinChain.limitJoin 1 $
+              applyRootFilter (buildJoinChain include) (whereEq (primaryKey @root) pk)
+      flatRows <- JoinChain.runJoinChain @(JoinFlatRow include) chain
+      pure $ case nestRows include flatRows of
+        [] -> Nothing
+        (row : _) -> Just row
+  | otherwise = do
+      mRoot <- Ops.findUnique @root @(RootRow include) pk
+      pure $ fmap (wrapRoot include) mRoot
 
 findUniqueOrErrorWith ::
   forall root include result.
@@ -185,12 +117,18 @@ findUniqueOrErrorWith ::
     FromRow (JoinFlatRow include),
     FromRow (RootRow include)
   ) =>
-  Pool Connection ->
   include ->
   PrimaryKeyType root ->
-  IO (Either ORMError result)
-findUniqueOrErrorWith pool include pk =
-  withResource pool $ \conn -> findUniqueOrErrorWithConn @root conn include pk
+  Db (Either ORMError result)
+findUniqueOrErrorWith include pk = do
+  result <- findUniqueWith @root include pk
+  case result of
+    Nothing ->
+      pure $
+        Left $
+          RecordNotFound $
+            "Record not found with primary key: " <> Text.pack (show pk)
+    Just row -> pure $ Right row
 
 applyRootFilter ::
   forall root.

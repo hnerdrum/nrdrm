@@ -8,6 +8,7 @@ where
 import Data.List (sort)
 import Data.Text (Text)
 import Data.UUID (UUID, nil)
+import ORM (runDb)
 import ORM.Include (findAllWith, findManyWith, findUniqueWith)
 import ORM.Query (whereEq)
 import qualified ORM.ShelfFixtures as ShelfFixtures
@@ -52,7 +53,7 @@ includeSpec =
       _ <- ShelfFixtures.insertShelf pool "nonfiction"
       _ <- ShelfFixtures.insertBook pool fiction.id "Dune"
       _ <- ShelfFixtures.insertBook pool fiction.id "Neuromancer"
-      results <- findManyWith @Shelf.ShelfTable pool includeBooks id
+      results <- runDb pool (findManyWith @Shelf.ShelfTable includeBooks id)
       length results `shouldBe` 2
       fictionResult <- lookupShelf fiction.id results
       sort (map ((.title) . (.book)) fictionResult.books) `shouldBe` ["Dune", "Neuromancer"]
@@ -61,14 +62,14 @@ includeSpec =
       empty <- ShelfFixtures.insertShelf pool "empty"
       stocked <- ShelfFixtures.insertShelf pool "stocked"
       _ <- ShelfFixtures.insertBook pool stocked.id "Book"
-      results <- findManyWith @Shelf.ShelfTable pool includeBooks id
+      results <- runDb pool (findManyWith @Shelf.ShelfTable includeBooks id)
       emptyResult <- lookupShelf empty.id results
       emptyResult.books `shouldBe` []
 
     it "findManyWith without include uses single-table read" $ \TestEnv {envPool = pool} -> do
       _ <- ShelfFixtures.insertShelf pool "alpha"
       _ <- ShelfFixtures.insertShelf pool "beta"
-      results <- findManyWith @Shelf.ShelfTable pool (ShelfInclude {books = Nothing}) id
+      results <- runDb pool (findManyWith @Shelf.ShelfTable (ShelfInclude {books = Nothing}) id)
       length results `shouldBe` 2
       map (.books) results `shouldBe` [[], []]
 
@@ -77,7 +78,7 @@ includeSpec =
       _ <- ShelfFixtures.insertShelf pool "nonfiction"
       _ <- ShelfFixtures.insertBook pool fiction.id "Dune"
       results <-
-        findManyWith @Shelf.ShelfTable pool includeBooks (whereEq shelfName "fiction")
+        runDb pool (findManyWith @Shelf.ShelfTable includeBooks (whereEq shelfName "fiction"))
       length results `shouldBe` 1
       (head results).shelf.name `shouldBe` "fiction"
       map ((.title) . (.book)) (head results).books `shouldBe` ["Dune"]
@@ -87,7 +88,7 @@ includeSpec =
       book <- ShelfFixtures.insertBook pool shelf.id "Dune"
       _ <- ShelfFixtures.insertChapter pool book.id "Arrakis"
       _ <- ShelfFixtures.insertChapter pool book.id "Caladan"
-      results <- findManyWith @Shelf.ShelfTable pool includeBooksChapters id
+      results <- runDb pool (findManyWith @Shelf.ShelfTable includeBooksChapters id)
       [result] <- pure results
       result.shelf.name `shouldBe` "fiction"
       [bookWithChapters] <- pure result.books
@@ -99,7 +100,7 @@ includeSpec =
       book <- ShelfFixtures.insertBook pool shelf.id "Dune"
       _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
       _ <- ShelfFixtures.insertChapter pool book.id "Chiba"
-      results <- findManyWith @Shelf.ShelfTable pool includeBooksChapters id
+      results <- runDb pool (findManyWith @Shelf.ShelfTable includeBooksChapters id)
       [result] <- pure results
       dune <- lookupBook "Dune" result
       neuromancer <- lookupBook "Neuromancer" result
@@ -109,17 +110,17 @@ includeSpec =
     it "findAllWith returns all nested results" $ \TestEnv {envPool = pool} -> do
       _ <- ShelfFixtures.insertShelf pool "one"
       _ <- ShelfFixtures.insertShelf pool "two"
-      results <- findAllWith @Shelf.ShelfTable pool includeBooks
+      results <- runDb pool (findAllWith @Shelf.ShelfTable includeBooks)
       length results `shouldBe` 2
 
     it "findUniqueWith returns Just for an existing primary key" $ \TestEnv {envPool = pool} -> do
       shelf <- ShelfFixtures.insertShelf pool "fiction"
       _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
-      result <- findUniqueWith @Shelf.ShelfTable pool includeBooks shelf.id
+      result <- runDb pool (findUniqueWith @Shelf.ShelfTable includeBooks shelf.id)
       fmap ((.name) . (.shelf)) result `shouldBe` Just "fiction"
 
     it "findUniqueWith returns Nothing when missing" $ \TestEnv {envPool = pool} -> do
-      result <- findUniqueWith @Shelf.ShelfTable pool includeBooks (nil :: UUID)
+      result <- runDb pool (findUniqueWith @Shelf.ShelfTable includeBooks (nil :: UUID))
       result `shouldBe` Nothing
 
     it "findManyWith nests sections under chapters at four levels deep" $ \TestEnv {envPool = pool} -> do
@@ -128,7 +129,7 @@ includeSpec =
       chapter <- ShelfFixtures.insertChapter pool book.id "Arrakis"
       _ <- ShelfFixtures.insertSection pool chapter.id "Desert"
       _ <- ShelfFixtures.insertSection pool chapter.id "Sietch"
-      results <- findManyWith @Shelf.ShelfTable pool includeBooksChaptersSections id
+      results <- runDb pool (findManyWith @Shelf.ShelfTable includeBooksChaptersSections id)
       [result] <- pure results
       [bookWithChapters] <- pure result.books
       [chapterWithSections] <- pure bookWithChapters.chapters

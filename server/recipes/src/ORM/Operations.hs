@@ -5,37 +5,29 @@
 
 module ORM.Operations
   ( findAll,
-    findAllConn,
     findMany,
-    findManyConn,
     findUnique,
-    findUniqueConn,
     findUniqueOrError,
-    findUniqueOrErrorConn,
     findFirst,
     findFirstOrError,
     count,
     deleteById,
-    deleteByIdConn,
     ORMError (..),
   )
 where
 
-import Data.Pool (Pool, withResource)
 import qualified Data.Text as Text
-import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.FromRow (FromRow)
 import Database.PostgreSQL.Simple.ToField (ToField, toField)
 import ORM.Core (Entity (..), Field (..), PrimaryKeyType)
+import ORM.Db (Db (..))
 import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError (..))
 import ORM.Query
   ( QueryBuilder,
     runCountQuery,
     runQuery,
-    runQueryConn,
     runQueryOne,
-    runQueryOneConn,
     selectAll,
     whereEq,
   )
@@ -43,74 +35,32 @@ import ORM.Query
 findAll ::
   forall table result.
   (Entity table, FromRow result) =>
-  Pool Connection ->
-  IO [result]
-findAll pool =
-  runQuery pool (selectAll @table)
-
-findAllConn ::
-  forall table result.
-  (Entity table, FromRow result) =>
-  Connection ->
-  IO [result]
-findAllConn conn =
-  runQueryConn conn (selectAll @table)
+  Db [result]
+findAll = runQuery (selectAll @table)
 
 findMany ::
   forall table result.
   (Entity table, FromRow result) =>
-  Pool Connection ->
   (QueryBuilder table -> QueryBuilder table) ->
-  IO [result]
-findMany pool modifier =
-  runQuery pool (modifier (selectAll @table))
-
-findManyConn ::
-  forall table result.
-  (Entity table, FromRow result) =>
-  Connection ->
-  (QueryBuilder table -> QueryBuilder table) ->
-  IO [result]
-findManyConn conn modifier =
-  runQueryConn conn (modifier (selectAll @table))
+  Db [result]
+findMany modifier = runQuery (modifier (selectAll @table))
 
 findUnique ::
   forall table result.
   (Entity table, FromRow result, ToField (PrimaryKeyType table)) =>
-  Pool Connection ->
   PrimaryKeyType table ->
-  IO (Maybe result)
-findUnique pool pkValue =
-  runQueryOne pool $
-    whereEq (primaryKey @table) pkValue (selectAll @table)
-
-findUniqueConn ::
-  forall table result.
-  (Entity table, FromRow result, ToField (PrimaryKeyType table)) =>
-  Connection ->
-  PrimaryKeyType table ->
-  IO (Maybe result)
-findUniqueConn conn pkValue =
-  runQueryOneConn conn $
+  Db (Maybe result)
+findUnique pkValue =
+  runQueryOne $
     whereEq (primaryKey @table) pkValue (selectAll @table)
 
 findUniqueOrError ::
   forall table result.
   (Entity table, FromRow result, ToField (PrimaryKeyType table), Show (PrimaryKeyType table)) =>
-  Pool Connection ->
   PrimaryKeyType table ->
-  IO (Either ORMError result)
-findUniqueOrError pool pkValue =
-  withResource pool $ \conn -> findUniqueOrErrorConn @table @result conn pkValue
-
-findUniqueOrErrorConn ::
-  forall table result.
-  (Entity table, FromRow result, ToField (PrimaryKeyType table), Show (PrimaryKeyType table)) =>
-  Connection ->
-  PrimaryKeyType table ->
-  IO (Either ORMError result)
-findUniqueOrErrorConn conn pkValue = do
-  result <- findUniqueConn @table @result conn pkValue
+  Db (Either ORMError result)
+findUniqueOrError pkValue = do
+  result <- findUnique @table @result pkValue
   case result of
     Nothing ->
       pure $
@@ -121,20 +71,17 @@ findUniqueOrErrorConn conn pkValue = do
 findFirst ::
   forall table result.
   (Entity table, FromRow result) =>
-  Pool Connection ->
   (QueryBuilder table -> QueryBuilder table) ->
-  IO (Maybe result)
-findFirst pool modifier =
-  runQueryOne pool (modifier (selectAll @table))
+  Db (Maybe result)
+findFirst modifier = runQueryOne (modifier (selectAll @table))
 
 findFirstOrError ::
   forall table result.
   (Entity table, FromRow result) =>
-  Pool Connection ->
   (QueryBuilder table -> QueryBuilder table) ->
-  IO (Either ORMError result)
-findFirstOrError pool modifier = do
-  result <- findFirst @table pool modifier
+  Db (Either ORMError result)
+findFirstOrError modifier = do
+  result <- findFirst @table modifier
   case result of
     Nothing -> pure $ Left $ RecordNotFound "No record found matching criteria"
     Just record -> pure $ Right record
@@ -142,28 +89,16 @@ findFirstOrError pool modifier = do
 count ::
   forall table.
   (Entity table) =>
-  Pool Connection ->
   (QueryBuilder table -> QueryBuilder table) ->
-  IO Int
-count pool modifier =
-  runCountQuery pool (modifier (selectAll @table))
+  Db Int
+count modifier = runCountQuery (modifier (selectAll @table))
 
 deleteById ::
   forall table.
   (Entity table, ToField (PrimaryKeyType table)) =>
-  Pool Connection ->
   PrimaryKeyType table ->
-  IO Int
-deleteById pool pkValue =
-  withResource pool $ \conn -> deleteByIdConn @table conn pkValue
-
-deleteByIdConn ::
-  forall table.
-  (Entity table, ToField (PrimaryKeyType table)) =>
-  Connection ->
-  PrimaryKeyType table ->
-  IO Int
-deleteByIdConn conn pkValue =
+  Db Int
+deleteById pkValue =
   let pkField = primaryKey @table
       builder = Delete.whereDelete (fieldColumn pkField <> " = ?") [toField pkValue] (Delete.emptyDelete @table)
-   in Delete.deleteWhereConn conn builder
+   in Delete.deleteWhere builder

@@ -17,25 +17,22 @@ module ORM.Query
     offset,
     OrderDirection (..),
     runQuery,
-    runQueryConn,
     runQueryOne,
-    runQueryOneConn,
     runCountQuery,
-    runCountQueryConn,
   )
 where
 
 import Data.Int (Int64)
-import Data.Pool (Pool, withResource)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import Database.PostgreSQL.Simple (Connection, Only (..))
+import Database.PostgreSQL.Simple (Only (..))
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..))
+import ORM.Db (Db (..))
 
 data QueryBuilder table = QueryBuilder
   { qbTable :: Text,
@@ -125,32 +122,22 @@ buildOffsetClause :: Maybe Int -> Text
 buildOffsetClause Nothing = ""
 buildOffsetClause (Just n) = " OFFSET " <> T.pack (show n)
 
-runQueryConn :: (FromRow result) => Connection -> QueryBuilder table -> IO [result]
-runQueryConn conn qb = do
-  let (query, params) = buildQuery qb
-  PGSimple.queryWith fromRow conn query params
+runQuery :: (FromRow result) => QueryBuilder table -> Db [result]
+runQuery qb =
+  Db $ \conn -> do
+    let (query, params) = buildQuery qb
+    PGSimple.queryWith fromRow conn query params
 
-runQuery :: (FromRow result) => Pool Connection -> QueryBuilder table -> IO [result]
-runQuery pool qb =
-  withResource pool $ \conn -> runQueryConn conn qb
-
-runQueryOneConn :: (FromRow result) => Connection -> QueryBuilder table -> IO (Maybe result)
-runQueryOneConn conn qb = do
-  results <- runQueryConn conn (limit 1 qb)
+runQueryOne :: (FromRow result) => QueryBuilder table -> Db (Maybe result)
+runQueryOne qb = do
+  results <- runQuery (limit 1 qb)
   pure $ case results of
     [] -> Nothing
     (x : _) -> Just x
 
-runQueryOne :: (FromRow result) => Pool Connection -> QueryBuilder table -> IO (Maybe result)
-runQueryOne pool qb =
-  withResource pool $ \conn -> runQueryOneConn conn qb
-
-runCountQueryConn :: Connection -> QueryBuilder table -> IO Int
-runCountQueryConn conn qb = do
-  let (query, params) = buildCountQuery qb
-  [Only count] <- PGSimple.query conn query params
-  pure (fromIntegral (count :: Int64))
-
-runCountQuery :: Pool Connection -> QueryBuilder table -> IO Int
-runCountQuery pool qb =
-  withResource pool $ \conn -> runCountQueryConn conn qb
+runCountQuery :: QueryBuilder table -> Db Int
+runCountQuery qb =
+  Db $ \conn -> do
+    let (query, params) = buildCountQuery qb
+    [Only count] <- PGSimple.query conn query params
+    pure (fromIntegral (count :: Int64))

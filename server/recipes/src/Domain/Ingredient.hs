@@ -14,6 +14,7 @@ module Domain.Ingredient
   )
 where
 
+import Control.Monad (void)
 import Data.Aeson
 import Data.Aeson.TH (deriveJSON)
 import Data.Bifunctor (bimap)
@@ -23,7 +24,7 @@ import Data.UUID (UUID)
 import Database.PostgreSQL.Simple (Connection)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Unit (Unit (..))
-import ORM (ORMError (..))
+import ORM (ORMError (..), runDb)
 import qualified ORM.Client.Ingredient as Ingredient
 import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
 
@@ -66,29 +67,27 @@ data Ingredient = Ingredient
 $(deriveJSON defaultOptions ''Ingredient)
 
 getAllIngredients :: Pool Connection -> IO [Ingredient]
-getAllIngredients pool = do
-  ingredientRows <- Ingredient.findAll pool
-  return $ map fromIngredientRow ingredientRows
+getAllIngredients pool =
+  map fromIngredientRow <$> runDb pool Ingredient.findAll
 
 getIngredient :: Pool Connection -> UUID -> IO (Either AppError Ingredient)
 getIngredient pool ingredientId =
   bimap fromIngredientError fromIngredientRow
-    <$> Ingredient.findUniqueOrError pool ingredientId
+    <$> runDb pool (Ingredient.findUniqueOrError ingredientId)
 
 createIngredient :: Pool Connection -> CreateIngredientInput -> IO (Either AppError Ingredient)
 createIngredient pool input =
   bimap fromIngredientError fromIngredientRow
-    <$> Ingredient.create pool (toIngredientCreate input)
+    <$> runDb pool (Ingredient.create (toIngredientCreate input))
 
 updateIngredient :: Pool Connection -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
 updateIngredient pool ingredientId input =
   bimap fromIngredientError fromIngredientRow
-    <$> Ingredient.update pool ingredientId (toIngredientUpdate input)
+    <$> runDb pool (Ingredient.update ingredientId (toIngredientUpdate input))
 
 deleteIngredient :: Pool Connection -> UUID -> IO ()
-deleteIngredient pool ingredientId = do
-  _ <- Ingredient.deleteById pool ingredientId
-  return ()
+deleteIngredient pool ingredientId =
+  void (runDb pool (Ingredient.deleteById ingredientId))
 
 fromIngredientRow :: IngredientRow -> Ingredient
 fromIngredientRow row =

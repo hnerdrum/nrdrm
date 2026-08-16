@@ -75,8 +75,10 @@ module ORM
     NestInclude (..),
     ExecuteInclude (..),
     applyRootFilter,
-    transaction,
     groupByKey,
+    runDb,
+    withTransaction,
+    Db (..),
     Unit (..),
   )
 where
@@ -84,6 +86,7 @@ where
 import Database.PostgreSQL.Simple.ToField (toField)
 import ORM.Column
 import ORM.Core
+import ORM.Db (Db (..), runDb, withTransaction)
 import ORM.Delete
 import ORM.Errors
 import ORM.Group
@@ -94,5 +97,4 @@ import ORM.Operations
 import ORM.Query
 import ORM.Relation
 import ORM.Schema.Unit (Unit (..))
-import ORM.Transaction
 import ORM.Update

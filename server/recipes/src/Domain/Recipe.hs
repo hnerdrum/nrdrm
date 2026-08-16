@@ -15,6 +15,7 @@ module Domain.Recipe
   )
 where
 
+import Control.Monad (void)
 import Data.Aeson (FromJSON (parseJSON), object, withObject, (.:), (.:?))
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Data.Bifunctor (bimap)
@@ -25,8 +26,8 @@ import Data.UUID (UUID)
 import Database.PostgreSQL.Simple (Connection)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..))
-import ORM (ORMError (..))
 import Domain.Unit (Unit (..))
+import ORM (ORMError (..), runDb, withTransaction)
 import qualified ORM.Client.Recipe as Recipe
 import ORM.Core (NullableValue (..))
 import ORM.Schema.Ingredient (IngredientRow (..))
@@ -124,24 +125,23 @@ data Recipe = Recipe
 $(deriveJSON defaultOptions ''Recipe)
 
 getAllRecipes :: Pool Connection -> IO [Recipe]
-getAllRecipes pool = do
-  recipes <- Recipe.findAllWith pool Recipe.withIngredients
-  pure $ map fromRecipeWithIngredients recipes
+getAllRecipes pool =
+  map fromRecipeWithIngredients <$> runDb pool (Recipe.findAllWith Recipe.withIngredients)
 
 getRecipe :: Pool Connection -> UUID -> IO (Either AppError Recipe)
 getRecipe pool recipeId =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> Recipe.findUniqueOrErrorWith pool Recipe.withIngredients recipeId
+    <$> runDb pool (Recipe.findUniqueOrErrorWith Recipe.withIngredients recipeId)
 
 createRecipe :: Pool Connection -> CreateRecipeInput -> IO (Either AppError Recipe)
 createRecipe pool input =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> Recipe.create pool Recipe.withIngredients (toRecipeWriteCreate input)
+    <$> withTransaction pool (Recipe.create Recipe.withIngredients (toRecipeWriteCreate input))
 
 updateRecipe :: Pool Connection -> UUID -> UpdateRecipeInput -> IO (Either AppError Recipe)
 updateRecipe pool recipeId input =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> Recipe.update pool Recipe.withIngredients recipeId (toRecipeWriteUpdate input)
+    <$> withTransaction pool (Recipe.update Recipe.withIngredients recipeId (toRecipeWriteUpdate input))
 
 toRecipeWriteCreate :: CreateRecipeInput -> Recipe.RecipeWriteCreate
 toRecipeWriteCreate input =
@@ -190,9 +190,8 @@ toRecipeIngredientNestedUpdate input = do
       }
 
 deleteRecipe :: Pool Connection -> UUID -> IO ()
-deleteRecipe pool recipeId = do
-  _ <- Recipe.deleteById pool recipeId
-  pure ()
+deleteRecipe pool recipeId =
+  void (runDb pool (Recipe.deleteById recipeId))
 
 fromRecipeError :: ORMError -> AppError
 fromRecipeError err =
@@ -208,11 +207,11 @@ fromRecipeWithIngredients (RecipeWithIngredients (RecipeRow rid _ _ rname rdesc)
     { id = rid,
       name = rname,
       description = rdesc,
-      ingredients = mapMaybe fromRecipeIngredientWithIngredient ingredients
+      ingredients = mapMaybe fromDbRecipeIngredient ingredients
     }
 
-fromRecipeIngredientWithIngredient :: RecipeIngredientWithIngredient -> Maybe RecipeIngredient
-fromRecipeIngredientWithIngredient
+fromDbRecipeIngredient :: RecipeIngredientWithIngredient -> Maybe RecipeIngredient
+fromDbRecipeIngredient
   ( RecipeIngredientWithIngredient
       (RecipeIngredientRow _ _ _ amount unit)
       (Just (IngredientRow iid _ _ iname))
@@ -224,4 +223,4 @@ fromRecipeIngredientWithIngredient
           amount,
           unit
         }
-fromRecipeIngredientWithIngredient _ = Nothing
+fromDbRecipeIngredient _ = Nothing

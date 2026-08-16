@@ -2,11 +2,11 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoFieldSelectors #-}
 
 module Schema.ShelfDeepInclude
   ( ShelfDeepInclude (..),
@@ -17,7 +17,7 @@ module Schema.ShelfDeepInclude
     ShelfWithBooks (..),
     ShelfBookJoinRow (..),
     ShelfBookChapterJoinRow (..),
-    ShelfBookChapterSectionJoinRow (..)
+    ShelfBookChapterSectionJoinRow (..),
   )
 where
 
@@ -34,15 +34,15 @@ import ORM.Include
     applyRootFilter,
   )
 import qualified ORM.JoinChain as JoinChain
-import ORM.Operations (findManyConn)
-import Schema.Shelf (ShelfTable, ShelfRow (..), shelfBooks)
+import ORM.Operations (findMany)
 import Schema.Book (BookRow (..), bookChapters)
-import Schema.Chapter (ChapterRow (..), chapterSections)
-import Schema.Section (SectionRow (..))
-import qualified Schema.Shelf as Shelf
 import qualified Schema.Book as Book
+import Schema.Chapter (ChapterRow (..), chapterSections)
 import qualified Schema.Chapter as Chapter
+import Schema.Section (SectionRow (..))
 import qualified Schema.Section as Section
+import Schema.Shelf (ShelfRow (..), ShelfTable, shelfBooks)
+import qualified Schema.Shelf as Shelf
 
 newtype ChapterInclude = ChapterInclude
   { sections :: Bool
@@ -307,21 +307,20 @@ toSectionRow row
   | otherwise = Nothing
 
 instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfDeepInclude ShelfWithBooks where
-  executeInclude conn include modifier =
+  executeInclude include modifier =
     case include.books of
       Nothing -> do
-        roots <- findManyConn @ShelfTable @ShelfRow conn modifier
+        roots <- findMany @ShelfTable @ShelfRow modifier
         pure $ map (wrapRoot include) roots
       Just BookInclude {chapters = Just ChapterInclude {sections = False}} -> do
         let chain = applyRootFilter buildShelfBookJoin modifier
-        flatRows <- JoinChain.runJoinChainConn @ShelfBookJoinRow conn chain
+        flatRows <- JoinChain.runJoinChain @ShelfBookJoinRow chain
         pure $ nestShelfRows flatRows
       Just BookInclude {chapters = Just ChapterInclude {sections = False}} -> do
         let chain = applyRootFilter buildShelfBookChapterJoin modifier
-        flatRows <- JoinChain.runJoinChainConn @ShelfBookChapterJoinRow conn chain
+        flatRows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow chain
         pure $ nestShelfBookChapterRows flatRows
       Just BookInclude {chapters = Just ChapterInclude {sections = True}} -> do
         let chain = applyRootFilter buildShelfBookChapterSectionJoin modifier
-        flatRows <- JoinChain.runJoinChainConn @ShelfBookChapterSectionJoinRow conn chain
+        flatRows <- JoinChain.runJoinChain @ShelfBookChapterSectionJoinRow chain
         pure $ nestShelfBookChapterSectionRows flatRows
-

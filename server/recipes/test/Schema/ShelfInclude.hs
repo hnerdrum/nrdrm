@@ -2,11 +2,11 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE NoFieldSelectors #-}
 
 module Schema.ShelfInclude
   ( ShelfInclude (..),
@@ -14,7 +14,7 @@ module Schema.ShelfInclude
     BookWithChapters (..),
     ShelfWithBooks (..),
     ShelfBookJoinRow (..),
-    ShelfBookChapterJoinRow (..)
+    ShelfBookChapterJoinRow (..),
   )
 where
 
@@ -31,13 +31,13 @@ import ORM.Include
     applyRootFilter,
   )
 import qualified ORM.JoinChain as JoinChain
-import ORM.Operations (findManyConn)
-import Schema.Shelf (ShelfTable, ShelfRow (..), shelfBooks)
+import ORM.Operations (findMany)
 import Schema.Book (BookRow (..), bookChapters)
-import Schema.Chapter (ChapterRow (..))
-import qualified Schema.Shelf as Shelf
 import qualified Schema.Book as Book
+import Schema.Chapter (ChapterRow (..))
 import qualified Schema.Chapter as Chapter
+import Schema.Shelf (ShelfRow (..), ShelfTable, shelfBooks)
+import qualified Schema.Shelf as Shelf
 
 newtype BookInclude = BookInclude
   { chapters :: Bool
@@ -197,17 +197,16 @@ toChapterRow row
   | otherwise = Nothing
 
 instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfInclude ShelfWithBooks where
-  executeInclude conn include modifier =
+  executeInclude include modifier =
     case include.books of
       Nothing -> do
-        roots <- findManyConn @ShelfTable @ShelfRow conn modifier
+        roots <- findMany @ShelfTable @ShelfRow modifier
         pure $ map (wrapRoot include) roots
       Just BookInclude {chapters = False} -> do
         let chain = applyRootFilter buildShelfBookJoin modifier
-        flatRows <- JoinChain.runJoinChainConn @ShelfBookJoinRow conn chain
+        flatRows <- JoinChain.runJoinChain @ShelfBookJoinRow chain
         pure $ nestShelfRows flatRows
       Just BookInclude {chapters = True} -> do
         let chain = applyRootFilter buildShelfBookChapterJoin modifier
-        flatRows <- JoinChain.runJoinChainConn @ShelfBookChapterJoinRow conn chain
+        flatRows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow chain
         pure $ nestShelfBookChapterRows flatRows
-
