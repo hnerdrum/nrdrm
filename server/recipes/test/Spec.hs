@@ -6,6 +6,7 @@ import ORM.Codegen.EmitIncludeSpec (emitIncludeSpec)
 import ORM.Codegen.EmitSpec (emitSpec)
 import ORM.Codegen.IncludePathSpec (fourLevelPathSpec, includePathSpec)
 import ORM.Codegen.JoinAliasSpec (joinAliasSpec)
+import ORM.Codegen.TargetSpec (targetSpec)
 import ORM.Codegen.ValidateSpec (validateSpec)
 import ORM.ErrorsSpec (errorsSpec)
 import ORM.IncludeSpec (includeSpec)
@@ -24,5 +25,6 @@ main = hspec $ do
   emitFlatRowSpec
   emitIncludeSpec
   emitClientSpec
+  targetSpec
   errorsSpec
   withTestDb $ operationsSpec >> joinSpec >> includeSpec

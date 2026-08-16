@@ -102,7 +102,9 @@ tests:
       - Schema.Shelf
       - Schema.Book
       - Schema.Chapter
+      - Schema.Section
       - Schema.ShelfInclude
+      - Schema.ShelfDeepInclude
       - Support.Assert
       - Support.TestDb
       - Support.TestMigrations
@@ -117,6 +119,7 @@ tests:
       - ORM.Codegen.EmitFlatRowSpec
       - ORM.Codegen.EmitIncludeSpec
       - ORM.Codegen.EmitClientSpec
+      - ORM.Codegen.TargetSpec
       - ORM.WidgetFixtures
       - ORM.ShelfFixtures
     ghc-options:
