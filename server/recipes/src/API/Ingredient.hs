@@ -11,9 +11,8 @@ import API.Errors (withErrorHandling)
 import App (AppContext (..), AppM)
 import Control.Monad.Reader (asks, liftIO)
 import Data.UUID (UUID)
-import Database.Ingredient (CreateIngredientInput (..), UpdateIngredientInput (..))
 import Domain.Errors (AppError)
-import Domain.Ingredient (Ingredient (..), createIngredient, deleteIngredient, getAllIngredients, getIngredient, updateIngredient)
+import Domain.Ingredient (CreateIngredientInput (..), Ingredient (..), UpdateIngredientInput (..), createIngredient, deleteIngredient, getAllIngredients, getIngredient, updateIngredient)
 import Servant (NoContent (..))
 
 getAllIngredientsRoute :: AppM [Ingredient]
