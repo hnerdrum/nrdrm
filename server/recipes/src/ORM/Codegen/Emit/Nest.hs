@@ -175,9 +175,13 @@ emitInnerFromGroupFn schema incl path levelIdx model _nestedEdges joinRel =
       nextRel = psRel (jpSteps path !! levelIdx)
       nextField = includeFieldName model nextRel
       nextNestedExpr = nestedFieldExprBelow schema incl path levelIdx nextRel
+      groupPattern =
+        if nestedExprUsesRows nextNestedExpr
+          then groupFn <> " rows@(firstRow : _)"
+          else groupFn <> " (firstRow : _)"
    in T.unlines
         [ groupFn <> " :: [" <> flatRow <> "] -> Maybe " <> resultType,
-          groupFn <> " rows@(firstRow : _)",
+          groupPattern,
           "  | Just _ <- firstRow." <> groupKeyBinder <> " =",
           "      Just",
           "        " <> resultType,
@@ -187,6 +191,9 @@ emitInnerFromGroupFn schema incl path levelIdx model _nestedEdges joinRel =
           "  | otherwise = Nothing",
           groupFn <> " [] = Nothing"
         ]
+
+nestedExprUsesRows :: Text -> Bool
+nestedExprUsesRows expr = " rows" `T.isInfixOf` expr
 
 nestedFieldExprAt :: Schema -> ModelInclude -> JoinPath -> Int -> Model -> IncludeTree -> Text
 nestedFieldExprAt schema incl path levelIdx parent edge =

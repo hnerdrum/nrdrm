@@ -22,12 +22,10 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import Database.PostgreSQL.Simple (Connection)
 import Domain.Errors (AppError (..), DomainError (..))
+import Domain.Unit (Unit (..))
 import ORM (ORMError (..))
 import qualified ORM.Client.Ingredient as Ingredient
 import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
-import ORM.Schema.Unit (Unit (..))
-
-$(deriveJSON defaultOptions ''Unit)
 
 newtype CreateIngredientInput = CreateIngredientInput
   { name :: Text

@@ -7,6 +7,9 @@ STACK := stack --arch=aarch64
 help: ## Show available commands
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*##"}; {printf "  %-16s %s\n", $$1, $$2}'
 
+build:
+	$(STACK) build
+
 orm-gen: ## Regenerate ORM schema, include, and client modules from specs
 	$(STACK) build recipes:orm-codegen
 	$(STACK) exec orm-codegen

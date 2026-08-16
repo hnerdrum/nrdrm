@@ -107,7 +107,6 @@ emitWriteClientModule moduleName schema incl =
         ++ ["where", ""]
         ++ [ "import Control.Monad (forM_)",
              "import Data.Pool (Pool)",
-             "import Data.Time (UTCTime, getCurrentTime)",
              "import Data.UUID (UUID)",
              "import qualified Data.UUID.V4 as V4",
              "import Database.PostgreSQL.Simple (Connection)",
@@ -149,8 +148,7 @@ emitWriteClientModule moduleName schema incl =
     <> intercalateSections
       ( [ emitWriteCreateType root child rel,
           emitWriteUpdateType root child rel,
-          emitNestedToChildCreate child rel,
-          applyUpdatedAtHelper root
+          emitNestedToChildCreate child rel
         ]
           ++ emitIncludeReadDefinitions schema incl
           ++ [ emitWriteCreate root incl child rel,
@@ -225,8 +223,8 @@ emitWriteCreate root incl child rel =
       resultName = includeResultName root incl
       createBody =
         [ "  rootId <- maybe V4.nextRandom pure input.root.id",
-          "  let rootInput :: " <> createTypeName root,
-          "      rootInput = input.root { id = Just rootId }",
+          "  let rootInput =",
+          "        " <> createRootInputExpr root,
           "  rootResult <-",
           "    Insert.insertConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn rootInput",
           "  case rootResult of",
@@ -262,9 +260,8 @@ emitWriteUpdate root incl child rel wipeField =
       toChild = "to" <> createTypeName child
       resultName = includeResultName root incl
       updateBody =
-        [ "  now <- getCurrentTime",
-          "  updateResult <-",
-          "    Update.updateConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn rootId (applyUpdatedAt now input.root)",
+        [ "  updateResult <-",
+          "    Update.updateConn @" <> tableTypeName root <> " @" <> rowTypeName root <> " conn rootId input.root",
           "  case updateResult of",
           "    Left err -> pure (Left err)",
           "    Right _ -> do",
@@ -344,19 +341,20 @@ hsType TyInt = "Int"
 hsType TyTimestamptz = "UTCTime"
 hsType (TyEnum name) = name
 
-applyUpdatedAtHelper :: Model -> Text
-applyUpdatedAtHelper model =
-  case find fieldUpdatedAt (modelFields model) of
-    Just f ->
-      T.unlines
-        [ "applyUpdatedAt :: UTCTime -> " <> updateTypeName model <> " -> " <> updateTypeName model,
-          "applyUpdatedAt now input = input { " <> fieldName f <> " = Just now }"
-        ]
-    Nothing ->
-      T.unlines
-        [ "applyUpdatedAt :: UTCTime -> " <> updateTypeName model <> " -> " <> updateTypeName model,
-          "applyUpdatedAt _ input = input"
-        ]
+createRootInputExpr :: Model -> Text
+createRootInputExpr model =
+  let cn = createTypeName model
+      fieldLines =
+        map createRootFieldLine (modelFields model)
+   in cn
+        <> " { "
+        <> T.intercalate ", " fieldLines
+        <> " }"
+
+createRootFieldLine :: FieldSpec -> Text
+createRootFieldLine f
+  | fieldIsPrimaryKey f = fieldName f <> " = Just rootId"
+  | otherwise = fieldName f <> " = input.root." <> fieldName f
 
 nestedEnumImports :: Schema -> Model -> [Text]
 nestedEnumImports schema child =
