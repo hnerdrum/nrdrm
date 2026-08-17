@@ -30,6 +30,7 @@ import ORM.Query
     selectAll,
     whereEq,
   )
+import ORM.Sql (quoteIdent)
 
 findMany ::
   forall table result.
@@ -90,5 +91,5 @@ delete ::
   Db Int
 delete pkValue =
   let pkField = primaryKey @table
-      builder = Delete.whereDelete (fieldColumn pkField <> " = ?") [toField pkValue] (Delete.emptyDelete @table)
+      builder = Delete.whereDelete (quoteIdent (fieldColumn pkField) <> " = ?") [toField pkValue] (Delete.emptyDelete @table)
    in Delete.deleteWhere builder

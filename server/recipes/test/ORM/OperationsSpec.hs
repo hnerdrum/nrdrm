@@ -8,12 +8,14 @@ where
 import Data.List (sort)
 import Data.UUID (UUID, nil)
 import ORM (NullableValue (..), ORMError (..), runDb)
+import qualified ORM.Delete as Delete
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
 import ORM.Query (OrderDirection (Asc), limit, offset, orderBy, whereEq)
 import qualified ORM.Update as Update
 import qualified ORM.WidgetFixtures as WidgetFixtures
-import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable (..), WidgetUpdate (..), widgetCreatedAt, widgetName)
+import Schema.Book (BookCreate (..), BookRow (..), BookTable)
+import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable (..), WidgetUpdate (..), widgetCreatedAt, widgetId, widgetName)
 import Support.Assert (assertJust, assertRight)
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
@@ -199,3 +201,54 @@ operationsSpec =
     it "delete returns 0 when no row matches" $ \TestEnv {envPool = pool} -> do
       deleted <- runDb pool (Ops.delete @WidgetTable (nil :: UUID))
       deleted `shouldBe` 0
+
+    it "deleteMany id returns EmptyWhere" $ \TestEnv {envPool = pool} -> do
+      result <- runDb pool (Delete.deleteMany @WidgetTable id)
+      result
+        `shouldSatisfy` ( \case
+                            Left (EmptyWhere _) -> True
+                            _ -> False
+                        )
+
+    it "updateBuilder without WHERE returns EmptyWhere" $ \TestEnv {envPool = pool} -> do
+      result <-
+        runDb
+          pool
+          ( Update.updateBuilder @WidgetTable @WidgetRow $
+              Update.setField widgetName "x" (Update.emptyUpdate @WidgetTable)
+          )
+      result
+        `shouldSatisfy` ( \case
+                            Left (EmptyWhere _) -> True
+                            _ -> False
+                        )
+
+    it "insert maps not-null violations" $ \TestEnv {envPool = pool} -> do
+      result <-
+        runDb
+          pool
+          ( Insert.insertBuilder @WidgetTable @WidgetRow $
+              Insert.set widgetId nil (Insert.emptyInsert @WidgetTable)
+          )
+      result
+        `shouldSatisfy` ( \case
+                            Left (NotNullViolation _) -> True
+                            _ -> False
+                        )
+
+    it "insert maps foreign key violations" $ \TestEnv {envPool = pool} -> do
+      result <-
+        runDb
+          pool
+          ( Insert.insert @BookTable @BookRow
+              BookCreate
+                { id = Nothing,
+                  shelfId = nil,
+                  title = "ghost"
+                }
+          )
+      result
+        `shouldSatisfy` ( \case
+                            Left (ForeignKeyViolation _) -> True
+                            _ -> False
+                        )

@@ -14,6 +14,7 @@ module ORM.Delete
   )
 where
 
+import Control.Exception (throwIO)
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
 import Database.PostgreSQL.Simple (Connection)
@@ -22,8 +23,10 @@ import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..))
-import ORM.Db (Db (..))
+import ORM.Db (Db (..), liftIO)
+import ORM.Errors (ORMError (..))
 import ORM.Query (QueryBuilder, buildWhereClause, queryWhereClauses, selectAll)
+import ORM.Sql (quoteIdent)
 
 data DeleteBuilder table = DeleteBuilder
   { dbTable :: Text,
@@ -51,16 +54,22 @@ deleteWhere ::
   (Entity table) =>
   DeleteBuilder table ->
   Db Int
-deleteWhere builder = Db (`runDeleteWhere` builder)
+deleteWhere builder
+  | null (dbWhere builder) =
+      liftIO $ throwIO (EmptyWhere "DELETE requires a WHERE clause")
+  | otherwise = Db (`runDeleteWhere` builder)
 
 deleteMany ::
   forall table.
   (Entity table) =>
   (QueryBuilder table -> QueryBuilder table) ->
-  Db Int
+  Db (Either ORMError Int)
 deleteMany modifier =
   let qb = modifier (selectAll @table)
-   in deleteWhere (fromQueryWhere @table qb)
+      builder = fromQueryWhere @table qb
+   in if null (dbWhere builder)
+        then pure (Left (EmptyWhere "DELETE requires a WHERE clause"))
+        else Right <$> deleteWhere builder
 
 fromQueryWhere :: forall table. (Entity table) => QueryBuilder table -> DeleteBuilder table
 fromQueryWhere qb =
@@ -74,7 +83,10 @@ deleteReturning ::
   (Entity table, FromRow result) =>
   DeleteBuilder table ->
   Db [result]
-deleteReturning builder = Db (`runDeleteReturning` builder)
+deleteReturning builder
+  | null (dbWhere builder) =
+      liftIO $ throwIO (EmptyWhere "DELETE requires a WHERE clause")
+  | otherwise = Db (`runDeleteReturning` builder)
 
 runDeleteWhere ::
   Connection ->
@@ -83,7 +95,7 @@ runDeleteWhere ::
 runDeleteWhere conn builder = do
   let queryText =
         "DELETE FROM "
-          <> dbTable builder
+          <> quoteIdent (dbTable builder)
           <> buildWhereClause (dbWhere builder)
       query = Query (TE.encodeUtf8 queryText)
   fromIntegral <$> PGSimple.execute conn query (dbWhereParams builder)
@@ -97,7 +109,7 @@ runDeleteReturning ::
 runDeleteReturning conn builder = do
   let queryText =
         "DELETE FROM "
-          <> dbTable builder
+          <> quoteIdent (dbTable builder)
           <> buildWhereClause (dbWhere builder)
           <> " RETURNING *"
       query = Query (TE.encodeUtf8 queryText)

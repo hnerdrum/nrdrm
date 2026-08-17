@@ -71,6 +71,6 @@ delete :: UUID -> Db Int
 delete = Ops.delete @IngredientTable
 
 
-deleteMany :: (QueryBuilder IngredientTable -> QueryBuilder IngredientTable) -> Db Int
+deleteMany :: (QueryBuilder IngredientTable -> QueryBuilder IngredientTable) -> Db (Either ORMError Int)
 deleteMany = Delete.deleteMany @IngredientTable
 

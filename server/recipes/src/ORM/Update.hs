@@ -21,6 +21,7 @@ module ORM.Update
   )
 where
 
+import Control.Exception (throwIO)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as TE
@@ -31,11 +32,11 @@ import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..), NullableValue (..), PrimaryKeyType)
-import ORM.Db (Db (..))
+import ORM.Db (Db (..), liftIO)
 import ORM.Errors (ORMError (..), parseSingleton)
 import qualified ORM.Operations as Ops
 import ORM.Query (buildWhereClause)
-import ORM.Sql (catchSql)
+import ORM.Sql (catchSql, quoteIdent)
 
 class (Entity table) => Updatable table where
   type UpdateInput table
@@ -121,7 +122,7 @@ update pkValue input = do
           builderWithTouch = touchUpdatedAt @table now builder
           builderWithWhere =
             whereUpdate
-              (fieldColumn pkField <> " = ?")
+              (quoteIdent (fieldColumn pkField) <> " = ?")
               [toField pkValue]
               builderWithTouch
       updateBuilder builderWithWhere
@@ -131,29 +132,35 @@ updateBuilder ::
   (Entity table, FromRow result) =>
   UpdateBuilder table ->
   Db (Either ORMError result)
-updateBuilder builder = Db $ \conn -> do
-  result <- catchSql (runUpdateReturning conn builder)
-  pure $
-    case result of
-      Left err -> Left err
-      Right rows ->
-        parseSingleton
-          rows
-          (RecordNotFound "No record found to update")
-          (MultipleRecordsFound "Update affected multiple rows")
+updateBuilder builder
+  | null (ubWhere builder) =
+      pure (Left (EmptyWhere "UPDATE requires a WHERE clause"))
+  | otherwise = Db $ \conn -> do
+      result <- catchSql (runUpdateReturning conn builder)
+      pure $
+        case result of
+          Left err -> Left err
+          Right rows ->
+            parseSingleton
+              rows
+              (RecordNotFound "No record found to update")
+              (MultipleRecordsFound "Update affected multiple rows")
 
 updateReturning ::
   forall table result.
   (Entity table, FromRow result) =>
   UpdateBuilder table ->
   Db [result]
-updateReturning builder = Db (`runUpdateReturning` builder)
+updateReturning builder
+  | null (ubWhere builder) =
+      liftIO $ throwIO (EmptyWhere "UPDATE requires a WHERE clause")
+  | otherwise = Db (`runUpdateReturning` builder)
 
 liftCurrentTime :: Db UTCTime
 liftCurrentTime = Db (const getCurrentTime)
 
 buildSetClause :: [(Text, Action)] -> Text
-buildSetClause sets = " SET " <> Text.intercalate ", " (map (\(col, _) -> col <> " = ?") sets)
+buildSetClause sets = " SET " <> Text.intercalate ", " (map (\(col, _) -> quoteIdent col <> " = ?") sets)
 
 runUpdateReturning ::
   forall table result.
@@ -168,7 +175,7 @@ runUpdateReturning conn builder = do
       allParams = setParams ++ ubWhereParams builder
       queryText =
         "UPDATE "
-          <> ubTable builder
+          <> quoteIdent (ubTable builder)
           <> setClause
           <> whereClause
           <> " RETURNING *"

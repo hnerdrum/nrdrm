@@ -42,6 +42,7 @@ import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..))
 import ORM.Db (Db (..))
+import ORM.Sql (quoteIdent)
 
 data QueryBuilder table = QueryBuilder
   { qbTable :: Text,
@@ -104,7 +105,7 @@ queryWhereParams :: QueryBuilder table -> [Action]
 queryWhereParams = concatMap snd . queryWhereClauses
 
 wherePredSql :: WherePred -> Text
-wherePredSql (WhereColumnEq col _) = col <> " = ?"
+wherePredSql (WhereColumnEq col _) = quoteIdent col <> " = ?"
 wherePredSql (WhereRaw sql _) = sql
 
 wherePredParams :: WherePred -> [Action]
@@ -135,7 +136,7 @@ applyQueryModifiers mWhere mOrder mLimit mOffset =
 
 buildQuery :: QueryBuilder table -> (Query, [Action])
 buildQuery qb =
-  let baseQuery = "SELECT * FROM " <> qbTable qb
+  let baseQuery = "SELECT * FROM " <> quoteIdent (qbTable qb)
       clauses = queryWhereClauses qb
       whereClause = buildWhereClause (map fst clauses)
       orderClause = buildOrderClause (qbOrderBy qb)
@@ -147,7 +148,7 @@ buildQuery qb =
 buildCountQuery :: QueryBuilder table -> (Query, [Action])
 buildCountQuery qb =
   let clauses = queryWhereClauses qb
-      finalQuery = "SELECT COUNT(*) FROM " <> qbTable qb <> buildWhereClause (map fst clauses)
+      finalQuery = "SELECT COUNT(*) FROM " <> quoteIdent (qbTable qb) <> buildWhereClause (map fst clauses)
    in (Query (TE.encodeUtf8 finalQuery), concatMap snd clauses)
 
 buildWhereClause :: [Text] -> Text
@@ -157,7 +158,7 @@ buildWhereClause conditions = " WHERE " <> T.intercalate " AND " conditions
 buildOrderClause :: Maybe (Text, OrderDirection) -> Text
 buildOrderClause Nothing = ""
 buildOrderClause (Just (col, dir)) =
-  " ORDER BY " <> col <> case dir of
+  " ORDER BY " <> quoteIdent col <> case dir of
     Asc -> " ASC"
     Desc -> " DESC"
 

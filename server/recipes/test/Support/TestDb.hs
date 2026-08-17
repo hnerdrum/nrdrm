@@ -20,6 +20,7 @@ import qualified Database.PostgreSQL.Simple as PG
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..))
 import ORM.Db (DbPool, closePool, connect, withConn)
+import ORM.Sql (quoteIdent)
 import Schema.Book (BookTable)
 import Schema.Chapter (ChapterTable)
 import Schema.Shelf (ShelfTable)
@@ -100,7 +101,7 @@ truncateTable TestEnv {envPool = pool} =
     void $
       PG.execute_
         conn
-        (Query (TE.encodeUtf8 ("TRUNCATE " <> tableName @table <> " RESTART IDENTITY CASCADE" :: Text)))
+        (Query (TE.encodeUtf8 ("TRUNCATE " <> quoteIdent (tableName @table) <> " RESTART IDENTITY CASCADE" :: Text)))
 
 loadTestEnv :: IO ()
 loadTestEnv = do

@@ -34,6 +34,7 @@ import ORM.Core (Entity (..), Field (..))
 import ORM.Db (Db (..))
 import ORM.Query (buildWhereClause)
 import ORM.Relation (BelongsTo (..), HasMany (..), JoinType (..))
+import ORM.Sql (quoteIdent, quoteQualified)
 
 data JoinedTable = JoinedTable
   { jtTable :: Text,
@@ -69,7 +70,7 @@ startJoinChain alias =
       jcSelect = [],
       jcWhere = [],
       jcParams = [],
-      jcOrderBy = [alias <> "." <> fieldColumn (primaryKey @root)],
+      jcOrderBy = [quoteQualified alias (fieldColumn (primaryKey @root))],
       jcLimit = Nothing
     }
 
@@ -99,12 +100,12 @@ addHasManyJoin HasMany {joinType, localKey, foreignKey} leftAlias childAlias cha
                  { jtTable = tableName @child,
                    jtAlias = childAlias,
                    jtJoinType = joinType,
-                   jtOnLeft = leftAlias <> "." <> fieldColumn localKey,
-                   jtOnRight = childAlias <> "." <> fieldColumn foreignKey
+                   jtOnLeft = quoteQualified leftAlias (fieldColumn localKey),
+                   jtOnRight = quoteQualified childAlias (fieldColumn foreignKey)
                  }
              ],
       jcOrderBy =
-        jcOrderBy chain ++ [childAlias <> "." <> fieldColumn (primaryKey @child)]
+        jcOrderBy chain ++ [quoteQualified childAlias (fieldColumn (primaryKey @child))]
     }
 
 addBelongsToJoin ::
@@ -123,12 +124,12 @@ addBelongsToJoin BelongsTo {joinType, foreignKey, references} childAlias parentA
                  { jtTable = tableName @parent,
                    jtAlias = parentAlias,
                    jtJoinType = joinType,
-                   jtOnLeft = childAlias <> "." <> fieldColumn foreignKey,
-                   jtOnRight = parentAlias <> "." <> fieldColumn references
+                   jtOnLeft = quoteQualified childAlias (fieldColumn foreignKey),
+                   jtOnRight = quoteQualified parentAlias (fieldColumn references)
                  }
              ],
       jcOrderBy =
-        jcOrderBy chain ++ [parentAlias <> "." <> fieldColumn (primaryKey @parent)]
+        jcOrderBy chain ++ [quoteQualified parentAlias (fieldColumn (primaryKey @parent))]
     }
 
 selectColumns ::
@@ -161,12 +162,12 @@ limitJoin :: Int -> JoinChain root -> JoinChain root
 limitJoin n chain = chain {jcLimit = Just n}
 
 col :: Text -> Field table a -> Text
-col alias field = alias <> "." <> fieldColumn field
+col alias field = quoteQualified alias (fieldColumn field)
 
 aliasedField :: Maybe Text -> Field table a -> Text
 aliasedField maybeAlias field =
   case maybeAlias of
-    Nothing -> fieldColumn field
+    Nothing -> quoteIdent (fieldColumn field)
     Just alias -> col alias field
 
 joinTypeText :: JoinType -> Text
@@ -178,9 +179,9 @@ buildJoinClause :: JoinedTable -> Text
 buildJoinClause jt =
   joinTypeText (jtJoinType jt)
     <> " "
-    <> jtTable jt
+    <> quoteIdent (jtTable jt)
     <> " "
-    <> jtAlias jt
+    <> quoteIdent (jtAlias jt)
     <> " ON "
     <> jtOnLeft jt
     <> " = "
@@ -188,7 +189,7 @@ buildJoinClause jt =
 
 buildJoinQuery :: JoinChain root -> (Query, [Action])
 buildJoinQuery jc =
-  let rootRef = jcRoot jc <> " " <> jcRootAlias jc
+  let rootRef = quoteIdent (jcRoot jc) <> " " <> quoteIdent (jcRootAlias jc)
       selectClause =
         if null (jcSelect jc)
           then "*"

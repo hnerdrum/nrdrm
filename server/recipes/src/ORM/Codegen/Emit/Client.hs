@@ -621,7 +621,7 @@ emitDeleteFn model =
 emitDeleteManyFn :: Model -> Text
 emitDeleteManyFn model =
   T.unlines
-    [ "deleteMany :: (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ") -> Db Int",
+    [ "deleteMany :: (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ") -> Db (Either ORMError Int)",
       "deleteMany = Delete.deleteMany @" <> tableTypeName model
     ]
 
