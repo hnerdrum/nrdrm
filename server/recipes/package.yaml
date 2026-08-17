@@ -86,6 +86,7 @@ library:
     - ORM.Codegen.Emit.Include
     - ORM.Codegen.Emit.Nest
     - ORM.Codegen.Emit.Schema
+    - ORM.Codegen.Emit.SelectIn
     - ORM.Codegen.IncludePath
     - ORM.Codegen.IR
     - ORM.Codegen.JoinAlias
@@ -110,6 +111,7 @@ library:
     - ORM.PG
     - ORM.Query
     - ORM.Relation
+    - ORM.SelectIn
     - ORM.Sql
     - ORM.Update
   other-modules:
@@ -165,7 +167,9 @@ tests:
       - Schema.Book
       - Schema.Chapter
       - Schema.Section
+      - Schema.Tag
       - Schema.ShelfInclude
+      - Schema.ShelfGraphInclude
       - Schema.ShelfDeepInclude
       - Support.Assert
       - Support.TestDb

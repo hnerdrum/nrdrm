@@ -17,31 +17,29 @@ module Schema.ShelfInclude
     unwrapNoInclude,
     BookInclude (..),
     BookWithChapters (..),
-    ShelfWithBooks (..),
-    ShelfBookJoinRow (..),
-    ShelfBookChapterJoinRow (..)
+    ShelfWithBooks (..)
   )
 where
 
 import Data.Kind (Type)
-import Data.Maybe (fromMaybe, isJust, mapMaybe)
-import Data.Text (Text)
-import Data.UUID (UUID)
-import ORM.PG (FromRow (..), field)
-import ORM.Group (groupByKey)
+import Data.Maybe (isJust)
+import ORM.Db (Db)
 import ORM.Include
-  ( BuildJoinChain (..),
-    ExecuteInclude (..),
+  ( ExecuteInclude (..),
     IncludesJoin (..),
-    NestInclude (..),
-    applyRootFilter,
+    NestInclude (..)
   )
-import qualified ORM.JoinChain as JoinChain
 import ORM.Operations (findMany)
-import Schema.Shelf (ShelfTable, ShelfRow (..), shelfBooks)
-import Schema.Book (BookRow (..), bookChapters)
-import Schema.Chapter (ChapterRow (..))
-import qualified Schema.Shelf as Shelf
+import ORM.SelectIn
+  ( findByIn,
+    prepareIncludeRootQuery,
+    emptyGroups,
+    indexHasMany,
+    lookupGroups
+  )
+import Schema.Shelf (ShelfTable, ShelfRow (..))
+import Schema.Book (BookTable, BookRow (..))
+import Schema.Chapter (ChapterTable, ChapterRow (..))
 import qualified Schema.Book as Book
 import qualified Schema.Chapter as Chapter
 
@@ -86,150 +84,44 @@ unwrapNoInclude (NoInclude include) = include
 instance IncludesJoin ShelfInclude where
   includesJoin ShelfInclude {books} = isJust books
 
-data ShelfBookJoinRow = ShelfBookJoinRow
-  { shelfId :: UUID,
-    shelfName :: Text,
-    bookId :: Maybe UUID,
-    bookTitle :: Maybe Text
-  }
-  deriving (Show, Eq)
-
-instance FromRow ShelfBookJoinRow where
-  fromRow = ShelfBookJoinRow <$> field <*> field <*> field <*> field
-
-shelfBookColumns :: [Text]
-shelfBookColumns =
-  [ JoinChain.col "s" Shelf.shelfId,
-    JoinChain.col "s" Shelf.shelfName,
-    JoinChain.col "b" Book.bookId,
-    JoinChain.col "b" Book.bookTitle
-  ]
-
-buildShelfBookJoin :: JoinChain.JoinChain ShelfTable
-buildShelfBookJoin =
-  JoinChain.selectColumns shelfBookColumns $
-    JoinChain.buildJoinChainFromHasMany shelfBooks "s" "b"
-
-data ShelfBookChapterJoinRow = ShelfBookChapterJoinRow
-  { shelfId :: UUID,
-    shelfName :: Text,
-    bookId :: Maybe UUID,
-    bookTitle :: Maybe Text,
-    chapterId :: Maybe UUID,
-    chapterHeading :: Maybe Text
-  }
-  deriving (Show, Eq)
-
-instance FromRow ShelfBookChapterJoinRow where
-  fromRow = ShelfBookChapterJoinRow <$> field <*> field <*> field <*> field <*> field <*> field
-
-shelfBookChapterColumns :: [Text]
-shelfBookChapterColumns =
-  shelfBookColumns
-    ++ [ JoinChain.col "c" Chapter.chapterId,
-         JoinChain.col "c" Chapter.chapterHeading
-       ]
-
-buildShelfBookChapterJoin :: JoinChain.JoinChain ShelfTable
-buildShelfBookChapterJoin =
-  JoinChain.selectColumns shelfBookChapterColumns $
-    JoinChain.addHasManyJoin bookChapters "b" "c" buildShelfBookJoin
-
-instance BuildJoinChain ShelfTable ShelfInclude where
-  type JoinFlatRow ShelfInclude = ShelfBookJoinRow
-  buildJoinChain ShelfInclude {books = Just BookInclude {chapters = False}} =
-    buildShelfBookJoin
-  buildJoinChain ShelfInclude {books = Just BookInclude {chapters = True}} =
-    buildShelfBookChapterJoin
-  buildJoinChain ShelfInclude {books = Nothing} =
-    buildShelfBookJoin
-
 instance NestInclude ShelfInclude ShelfWithBooks where
   type RootRow ShelfInclude = ShelfRow
-  nestRows _ = nestShelfRows
   wrapRoot _ shelf = ShelfWithBooks {shelf, books = []}
 
-nestShelfRows :: [ShelfBookJoinRow] -> [ShelfWithBooks]
-nestShelfRows =
-  map shelfWithBooksFromGroup . groupByKey (.shelfId)
+loadBookInclude :: BookInclude -> [BookRow] -> Db [BookWithChapters]
+loadBookInclude include roots = do
+  chaptersMap <-
+    if include.chapters
+      then indexHasMany (.bookRef) <$> findByIn @ChapterTable @ChapterRow Chapter.chapterBookRef (map (.id) roots)
+      else pure emptyGroups
+  pure
+    [
+      BookWithChapters {
+        book = root,
+        chapters = lookupGroups root.id chaptersMap
+      }
+    | root <- roots
+    ]
 
-shelfWithBooksFromGroup :: [ShelfBookJoinRow] -> ShelfWithBooks
-shelfWithBooksFromGroup rows@(firstRow : _) =
-  ShelfWithBooks
-    { shelf = toShelfRow firstRow,
-      books = map bookWithNoChapters $ mapMaybe toBookRow rows
-    }
-shelfWithBooksFromGroup [] =
-  error "shelfWithBooksFromGroup: empty group"
-
-bookWithNoChapters :: BookRow -> BookWithChapters
-bookWithNoChapters book = BookWithChapters {book, chapters = []}
-
-toShelfRow :: ShelfBookJoinRow -> ShelfRow
-toShelfRow row = ShelfRow {id = row.shelfId, name = row.shelfName}
-
-toBookRow :: ShelfBookJoinRow -> Maybe BookRow
-toBookRow row
-  | Just bid <- row.bookId,
-    Just title <- row.bookTitle =
-      Just BookRow {id = bid, title = title, shelfId = row.shelfId}
-  | otherwise = Nothing
-
-nestShelfBookChapterRows :: [ShelfBookChapterJoinRow] -> [ShelfWithBooks]
-nestShelfBookChapterRows =
-  map shelfWithChaptersFromShelfGroup . groupByKey (.shelfId)
-
-shelfWithChaptersFromShelfGroup :: [ShelfBookChapterJoinRow] -> ShelfWithBooks
-shelfWithChaptersFromShelfGroup rows@(firstRow : _) =
-  ShelfWithBooks
-    { shelf = toShelfRowFromChapter firstRow,
-      books = mapMaybe bookWithChaptersFromGroup $ groupByKey (.bookId) rows
-    }
-shelfWithChaptersFromShelfGroup [] =
-  error "shelfWithChaptersFromShelfGroup: empty group"
-
-bookWithChaptersFromGroup :: [ShelfBookChapterJoinRow] -> Maybe BookWithChapters
-bookWithChaptersFromGroup rows@(firstRow : _)
-  | Just _ <- firstRow.bookId =
-      Just
-        BookWithChapters
-          { book = toBookRowFromChapter firstRow,
-            chapters = mapMaybe toChapterRow rows
-          }
-  | otherwise = Nothing
-bookWithChaptersFromGroup [] = Nothing
-
-toShelfRowFromChapter :: ShelfBookChapterJoinRow -> ShelfRow
-toShelfRowFromChapter row = ShelfRow {id = row.shelfId, name = row.shelfName}
-
-toBookRowFromChapter :: ShelfBookChapterJoinRow -> BookRow
-toBookRowFromChapter row =
-  BookRow
-    { id = fromMaybe (error "toBookRowFromChapter: missing id") row.bookId,
-      title = fromMaybe (error "toBookRowFromChapter: missing title") row.bookTitle,
-      shelfId = row.shelfId
-    }
-
-toChapterRow :: ShelfBookChapterJoinRow -> Maybe ChapterRow
-toChapterRow row
-  | Just cid <- row.chapterId,
-    Just heading <- row.chapterHeading,
-    Just bid <- row.bookId =
-      Just ChapterRow {id = cid, heading = heading, bookRef = bid}
-  | otherwise = Nothing
+loadShelfInclude :: ShelfInclude -> [ShelfRow] -> Db [ShelfWithBooks]
+loadShelfInclude include roots = do
+  booksMap <- case include.books of
+    Nothing -> pure emptyGroups
+    Just nestedInclude -> do
+      rows <- findByIn @BookTable @BookRow Book.bookShelfId (map (.id) roots)
+      nested <- loadBookInclude nestedInclude rows
+      pure $ indexHasMany ((.shelfId) . (.book)) nested
+  pure
+    [
+      ShelfWithBooks {
+        shelf = root,
+        books = lookupGroups root.id booksMap
+      }
+    | root <- roots
+    ]
 
 instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfInclude ShelfWithBooks where
-  executeInclude include modifier =
-    case include.books of
-      Nothing -> do
-        roots <- findMany @ShelfTable @ShelfRow modifier
-        pure $ map (wrapRoot include) roots
-      Just BookInclude {chapters = False} -> do
-        let chain = applyRootFilter buildShelfBookJoin modifier
-        flatRows <- JoinChain.runJoinChain @ShelfBookJoinRow chain
-        pure $ nestShelfRows flatRows
-      Just BookInclude {chapters = True} -> do
-        let chain = applyRootFilter buildShelfBookChapterJoin modifier
-        flatRows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow chain
-        pure $ nestShelfBookChapterRows flatRows
+  executeInclude include modifier = do
+    roots <- findMany @ShelfTable @ShelfRow (prepareIncludeRootQuery @ShelfTable modifier)
+    loadShelfInclude include roots
 

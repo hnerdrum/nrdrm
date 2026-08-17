@@ -8,6 +8,7 @@ where
 
 import Data.List (sort)
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.UUID (UUID, nil)
 import Database.PostgreSQL.Simple.ToField (toField)
 import ORM (ORMError (..), runDb)
@@ -22,12 +23,18 @@ import Schema.Shelf (shelfName)
 import qualified Schema.Shelf as Shelf
 import Schema.ShelfDeepInclude (ChapterInclude (..), ShelfDeepInclude (..))
 import qualified Schema.ShelfDeepInclude as ShelfDeepInclude
+import Schema.ShelfGraphInclude
+  ( ShelfGraphInclude (..),
+    ShelfWithBooksTags (..),
+  )
+import qualified Schema.ShelfGraphInclude as ShelfGraphInclude
 import Schema.ShelfInclude
   ( BookWithChapters (..),
     ShelfInclude (..),
     ShelfWithBooks (..),
   )
 import qualified Schema.ShelfInclude as ShelfInclude
+import Schema.Tag (TagRow (..))
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, it, shouldBe, shouldThrow)
 
@@ -46,6 +53,13 @@ includeBooksChaptersSections =
             { chapters =
                 Just ChapterInclude {sections = True}
             }
+    }
+
+includeBooksAndTags :: ShelfGraphInclude
+includeBooksAndTags =
+  ShelfGraphInclude
+    { books = Just (ShelfGraphInclude.BookInclude {chapters = False}),
+      tags = True
     }
 
 includeSpec :: SpecWith TestEnv
@@ -152,17 +166,30 @@ includeSpec =
       result <- runDb pool (findUnique @Shelf.ShelfTable includeBooks (nil :: UUID))
       result `shouldBe` Nothing
 
-    it "findMany with include rejects limit" $ \TestEnv {envPool = pool} -> do
-      runDb pool (findMany @Shelf.ShelfTable includeBooks (limit 1))
-        `shouldThrow` isUnsupportedIncludeModifier
+    it "findMany with include paginates parent rows" $ \TestEnv {envPool = pool} -> do
+      mapM_ (\n -> ShelfFixtures.insertShelf pool ("shelf-" <> T.pack (show n))) ([1 .. 12] :: [Int])
+      results <- runDb pool (findMany @Shelf.ShelfTable includeBooks (limit 10))
+      length results `shouldBe` 10
 
-    it "findMany with include rejects offset" $ \TestEnv {envPool = pool} -> do
-      runDb pool (findMany @Shelf.ShelfTable includeBooks (offset 1))
-        `shouldThrow` isUnsupportedIncludeModifier
+    it "findMany with include applies offset to parent rows" $ \TestEnv {envPool = pool} -> do
+      _ <- ShelfFixtures.insertShelf pool "alpha"
+      _ <- ShelfFixtures.insertShelf pool "bravo"
+      _ <- ShelfFixtures.insertShelf pool "charlie"
+      results <-
+        runDb
+          pool
+          ( findMany @Shelf.ShelfTable includeBooks $
+              offset 1 . limit 1 . orderBy shelfName Asc
+          )
+      length results `shouldBe` 1
+      (head results).shelf.name `shouldBe` "bravo"
 
-    it "findMany with include rejects orderBy" $ \TestEnv {envPool = pool} -> do
-      runDb pool (findMany @Shelf.ShelfTable includeBooks (orderBy shelfName Asc))
-        `shouldThrow` isUnsupportedIncludeModifier
+    it "findMany with include orders parent rows" $ \TestEnv {envPool = pool} -> do
+      _ <- ShelfFixtures.insertShelf pool "zeta"
+      _ <- ShelfFixtures.insertShelf pool "alpha"
+      results <-
+        runDb pool (findMany @Shelf.ShelfTable includeBooks (orderBy shelfName Asc))
+      map ((.name) . (.shelf)) results `shouldBe` ["alpha", "zeta"]
 
     it "findMany with include rejects raw WHERE" $ \TestEnv {envPool = pool} -> do
       runDb
@@ -171,6 +198,17 @@ includeSpec =
             where_ "name = ?" [toField ("fiction" :: Text)]
         )
         `shouldThrow` isUnsupportedIncludeModifier
+
+    it "findMany loads sibling hasMany collections independently" $ \TestEnv {envPool = pool} -> do
+      shelf <- ShelfFixtures.insertShelf pool "fiction"
+      _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
+      _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
+      _ <- ShelfFixtures.insertTag pool shelf.id "scifi"
+      _ <- ShelfFixtures.insertTag pool shelf.id "classic"
+      results <- runDb pool (findMany @Shelf.ShelfTable includeBooksAndTags id)
+      [result] <- pure results
+      sort (map ((.title) . (.book)) result.books) `shouldBe` ["Dune", "Neuromancer"]
+      sort (map (.label) result.tags) `shouldBe` ["classic", "scifi"]
 
     it "findMany nests sections under chapters at four levels deep" $ \TestEnv {envPool = pool} -> do
       shelf <- ShelfFixtures.insertShelf pool "fiction"

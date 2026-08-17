@@ -18,6 +18,7 @@ module ORM.Query
     selectAll,
     where_,
     whereEq,
+    whereIn,
     orderBy,
     limit,
     offset,
@@ -39,7 +40,7 @@ import Database.PostgreSQL.Simple (Only (..))
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
-import Database.PostgreSQL.Simple.Types (Query (..))
+import Database.PostgreSQL.Simple.Types (In (..), Query (..))
 import ORM.Core (Entity (..), Field (..))
 import ORM.Db (Db (..))
 import ORM.Sql (quoteIdent)
@@ -56,6 +57,7 @@ data QueryBuilder table = QueryBuilder
 -- raw SQL cannot, and is rejected on include queries.
 data WherePred
   = WhereColumnEq Text Action
+  | WhereColumnIn Text Action
   | WhereRaw Text [Action]
 
 data OrderDirection = Asc | Desc
@@ -80,6 +82,10 @@ where_ condition params qb =
 whereEq :: forall table a. (ToField a) => Field table a -> a -> QueryBuilder table -> QueryBuilder table
 whereEq field value qb =
   qb {qbWhere = qbWhere qb ++ [WhereColumnEq (fieldColumn field) (toField value)]}
+
+whereIn :: forall table a. (ToField a) => Field table a -> [a] -> QueryBuilder table -> QueryBuilder table
+whereIn field values qb =
+  qb {qbWhere = qbWhere qb ++ [WhereColumnIn (fieldColumn field) (toField (In values))]}
 
 orderBy :: Field table a -> OrderDirection -> QueryBuilder table -> QueryBuilder table
 orderBy field dir qb =
@@ -106,10 +112,12 @@ queryWhereParams = concatMap snd . queryWhereClauses
 
 wherePredSql :: WherePred -> Text
 wherePredSql (WhereColumnEq col _) = quoteIdent col <> " = ?"
+wherePredSql (WhereColumnIn col _) = quoteIdent col <> " IN ?"
 wherePredSql (WhereRaw sql _) = sql
 
 wherePredParams :: WherePred -> [Action]
 wherePredParams (WhereColumnEq _ value) = [value]
+wherePredParams (WhereColumnIn _ value) = [value]
 wherePredParams (WhereRaw _ params) = params
 
 queryLimit :: QueryBuilder table -> Maybe Int

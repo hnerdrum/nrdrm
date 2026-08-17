@@ -3,6 +3,7 @@ module ORM.ShelfFixtures
     insertBook,
     insertChapter,
     insertSection,
+    insertTag,
   )
 where
 
@@ -15,6 +16,7 @@ import Schema.Book (BookCreate (..), BookRow (..), BookTable)
 import Schema.Chapter (ChapterCreate (..), ChapterRow (..), ChapterTable)
 import Schema.Section (SectionCreate (..), SectionRow (..), SectionTable)
 import Schema.Shelf (ShelfCreate (..), ShelfRow (..), ShelfTable)
+import Schema.Tag (TagCreate (..), TagRow (..), TagTable)
 import Support.Assert (assertRight)
 
 insertShelf :: DbPool -> Text -> IO ShelfRow
@@ -35,4 +37,9 @@ insertChapter pool bookRef heading =
 insertSection :: DbPool -> UUID -> Text -> IO SectionRow
 insertSection pool chapterRef label =
   runDb pool (Insert.insert @SectionTable @SectionRow (SectionCreate {id = Nothing, chapterRef, label}))
+    >>= assertRight
+
+insertTag :: DbPool -> UUID -> Text -> IO TagRow
+insertTag pool shelfId label =
+  runDb pool (Insert.insert @TagTable @TagRow (TagCreate {id = Nothing, shelfId, label}))
     >>= assertRight

@@ -11,7 +11,7 @@ module ORM.Codegen.JoinAlias
 where
 
 import Data.Char (isUpper, toLower)
-import Data.List (find, nub)
+import Data.List (find, nub, nubBy)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.IR
@@ -40,25 +40,18 @@ assignIncludeAliases schema incl =
 
 includeModelsInOrder :: Schema -> ModelInclude -> [Model]
 includeModelsInOrder schema incl =
-  case includeTree incl of
-    [] ->
-      error $
-        "includeModelsInOrder: include "
-          <> T.unpack (includeName incl)
-          <> " has empty tree"
-    edges ->
-      modelsOnPath schema (lookupModel schema (includeRootModel incl)) edges
+  nubBy (\a b -> modelName a == modelName b) $
+    flattenIncludeModels schema (lookupModel schema (includeRootModel incl)) (includeTree incl)
 
-modelsOnPath :: Schema -> Model -> [IncludeTree] -> [Model]
-modelsOnPath schema from edges =
-  case edges of
-    [] -> [from]
-    (edge : _) ->
-      let rel = lookupRelation from (includeRelation edge)
-          child = lookupModel schema (relToModel rel)
-       in from : case includeChildren edge of
-            [] -> [child]
-            childEdges -> modelsOnPath schema child childEdges
+flattenIncludeModels :: Schema -> Model -> [IncludeTree] -> [Model]
+flattenIncludeModels schema from edges =
+  from : concatMap (edgeModels schema from) edges
+
+edgeModels :: Schema -> Model -> IncludeTree -> [Model]
+edgeModels schema from edge =
+  let rel = lookupRelation from (includeRelation edge)
+      child = lookupModel schema (relToModel rel)
+   in child : concatMap (edgeModels schema child) (includeChildren edge)
 
 assignModelAliases :: [Model] -> [(Model, Text)]
 assignModelAliases models = go models []

@@ -24,6 +24,7 @@ import ORM.Sql (quoteIdent)
 import Schema.Book (BookTable)
 import Schema.Chapter (ChapterTable)
 import Schema.Shelf (ShelfTable)
+import Schema.Tag (TagTable)
 import Schema.Widget (WidgetTable)
 import Support.TestMigrations (runTestMigrations)
 import System.Directory (doesFileExist)
@@ -89,6 +90,7 @@ resetTestData env = do
   truncateTable @WidgetTable env
   truncateTable @ChapterTable env
   truncateTable @BookTable env
+  truncateTable @TagTable env
   truncateTable @ShelfTable env
 
 truncateTable ::

@@ -29,6 +29,7 @@ data ValidationError
   | JoinAliasExhausted Text Text
   | MaxIncludeDepthExceeded Text Int Int
   | ReplaceChildrenNotHasMany Text
+  | DuplicateIncludeRelation Text Text Text
   deriving (Show, Eq)
 
 validateSchema :: Schema -> [ValidationError]
@@ -129,7 +130,9 @@ validateIncludeDepth schema incl =
       ]
 
 validateIncludeTree :: Schema -> Text -> Model -> [IncludeTree] -> [ValidationError]
-validateIncludeTree schema includeName current = concatMap go
+validateIncludeTree schema includeName current edges =
+  map (DuplicateIncludeRelation includeName (modelName current)) (duplicates (map includeRelation edges))
+    ++ concatMap go edges
   where
     go tree =
       case findRelation current (includeRelation tree) of

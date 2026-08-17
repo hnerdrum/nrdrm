@@ -4,7 +4,6 @@ module ORM.Codegen.Emit.Include
   ( emitIncludeADTs,
     emitResultADTs,
     emitIncludesJoin,
-    emitBuildJoinChain,
     emitExecuteInclude,
     emitNestInclude,
     emitIncludePresetTypes,
@@ -12,32 +11,12 @@ module ORM.Codegen.Emit.Include
   )
 where
 
+import Data.List (nubBy)
 import Data.Text (Text)
 import qualified Data.Text as T
-import ORM.Codegen.Emit.FlatRow
-  ( emitColumnList,
-    emitFlatJoinRow,
-    emitJoinBuilder,
-  )
-import ORM.Codegen.Emit.Nest
-  ( emitNestHelpersForPath,
-    includePatternForPath,
-    nestRowsFnName,
-    nestedIncludePatternForPath,
-  )
-import ORM.Codegen.Emit.Schema (enumImportLine)
+import ORM.Codegen.Emit.SelectIn (emitExecuteInclude, emitLoadHelpers)
 import ORM.Codegen.EmitCommon (includeFieldName, resultTypeName)
 import ORM.Codegen.IR
-import ORM.Codegen.IncludePath
-  ( JoinPath (..),
-    PathStep (..),
-    includeLongestJoinPath,
-    includePresetJoinPaths,
-    joinBuilderName,
-    joinPathModels,
-    joinPathTake,
-    joinRowName,
-  )
 import ORM.Codegen.Lookup (lookupModel, lookupRelation)
 import ORM.Codegen.TextUtil (lowerFirst, upperFirst)
 
@@ -62,7 +41,6 @@ emitNestInclude schema incl =
   T.unlines
     [ "instance NestInclude " <> includeName incl <> " " <> resultName <> " where",
       "  type RootRow " <> includeName incl <> " = " <> rootRow,
-      "  nestRows _ = " <> nestFn,
       "  wrapRoot _ " <> rootVar <> " = " <> resultName <> " {" <> rootVar <> ", " <> emptyFields <> "}"
     ]
   where
@@ -70,7 +48,6 @@ emitNestInclude schema incl =
     resultName = resultTypeName schema root (includeTree incl)
     rootRow = modelName root <> "Row"
     rootVar = lowerFirst (modelName root)
-    nestFn = nestRowsName root
     emptyFields =
       T.intercalate ", " $
         map (emptyIncludeField schema root) (includeTree incl)
@@ -85,95 +62,29 @@ emptyIncludeField _schema parent edge =
       RelHasMany -> "[]"
       RelBelongsTo -> "Nothing"
 
-nestRowsName :: Model -> Text
-nestRowsName root = "nest" <> modelName root <> "Rows"
-
 emitIncludesJoin :: Schema -> ModelInclude -> Text
 emitIncludesJoin schema incl =
   T.unlines
     [ "instance IncludesJoin " <> includeName incl <> " where",
-      "  includesJoin " <> includeName incl <> " {" <> fld <> "} = " <> expr
+      "  includesJoin " <> includeName incl <> " {" <> binders <> "} = " <> expr
     ]
   where
     root = lookupModel schema (includeRootModel incl)
-    edge = case includeTree incl of
-      (e : _) -> e
-      [] -> error "emitIncludesJoin: empty include tree"
-    rel = lookupRelation root (includeRelation edge)
-    fld = includeFieldName root rel
-    expr =
-      if null (includeChildren edge)
-        then fld
-        else "isJust " <> fld
+    edges = includeTree incl
+    binders = T.intercalate ", " (map (edgeField schema root) edges)
+    expr = T.intercalate " || " (map (edgeJoinExpr schema root) edges)
 
-emitBuildJoinChain :: Schema -> ModelInclude -> Text
-emitBuildJoinChain schema incl =
-  T.unlines $
-    [ "instance BuildJoinChain " <> rootTable <> " " <> inclName <> " where",
-      "  type JoinFlatRow " <> inclName <> " = " <> shallowRow
-    ]
-      ++ buildJoinChainArms schema incl
+edgeField :: Schema -> Model -> IncludeTree -> Text
+edgeField _schema parent edge =
+  includeFieldName parent (lookupRelation parent (includeRelation edge))
+
+edgeJoinExpr :: Schema -> Model -> IncludeTree -> Text
+edgeJoinExpr schema parent edge =
+  if null (includeChildren edge)
+    then fld
+    else "isJust " <> fld
   where
-    path = includeLongestJoinPath schema incl
-    root = head (joinPathModels path)
-    rootTable = modelName root <> "Table"
-    inclName = includeName incl
-    shallowRow = joinRowName (joinPathTake 1 path)
-
-buildJoinChainArms :: Schema -> ModelInclude -> [Text]
-buildJoinChainArms schema incl =
-  presetArms ++ noJoinArm
-  where
-    root = head (joinPathModels (includeLongestJoinPath schema incl))
-    inclName = includeName incl
-    paths = includePresetJoinPaths schema incl
-    shallowBuilder = joinBuilderName (joinPathTake 1 (includeLongestJoinPath schema incl))
-    presetArms =
-      concatMap
-        ( \path ->
-            [ "  buildJoinChain " <> includePatternForPath schema incl path <> " =",
-              "    " <> joinBuilderName path
-            ]
-        )
-        paths
-    noJoinArm =
-      case includeTree incl of
-        (edge : _)
-          | not (null (includeChildren edge)) ->
-              let rel = lookupRelation root (includeRelation edge)
-               in [ "  buildJoinChain " <> inclName <> " {" <> includeFieldName root rel <> " = Nothing} =",
-                    "    " <> shallowBuilder
-                  ]
-        _ -> ["  buildJoinChain _ = " <> shallowBuilder]
-
-emitExecuteInclude :: Schema -> ModelInclude -> Text
-emitExecuteInclude schema incl =
-  T.unlines $
-    [ "instance {-# OVERLAPPING #-} ExecuteInclude " <> rootTable <> " " <> inclName <> " " <> resultName <> " where",
-      "  executeInclude include modifier =",
-      "    case include." <> rootField <> " of",
-      "      Nothing -> do",
-      "        roots <- findMany @" <> rootTable <> " @" <> rootRow <> " modifier",
-      "        pure $ map (wrapRoot include) roots"
-    ]
-      ++ concatMap (executeIncludeArm schema incl) (includePresetJoinPaths schema incl)
-  where
-    path = includeLongestJoinPath schema incl
-    root = head (joinPathModels path)
-    rootRel = psRel (head (jpSteps path))
-    rootTable = modelName root <> "Table"
-    inclName = includeName incl
-    resultName = resultTypeName schema root (includeTree incl)
-    rootRow = modelName root <> "Row"
-    rootField = includeFieldName root rootRel
-
-executeIncludeArm :: Schema -> ModelInclude -> JoinPath -> [Text]
-executeIncludeArm schema incl path =
-  [ "      " <> nestedIncludePatternForPath schema incl path <> " -> do",
-    "        let chain = applyRootFilter " <> joinBuilderName path <> " modifier",
-    "        flatRows <- JoinChain.runJoinChain @" <> joinRowName path <> " chain",
-    "        pure $ " <> nestRowsFnName path <> " flatRows"
-  ]
+    fld = edgeField schema parent edge
 
 emitIncludePresetTypes :: Schema -> ModelInclude -> Text
 emitIncludePresetTypes schema incl =
@@ -231,31 +142,12 @@ emitIncludeModule moduleName schema incl =
         [ emitIncludeADTs schema incl,
           emitResultADTs schema incl,
           emitIncludePresetTypes schema incl,
-          emitIncludesJoin schema incl
-        ],
-        pathPieces schema incl,
-        [ emitBuildJoinChain schema incl,
-          emitNestInclude schema incl
-        ],
-        nestPieces schema incl,
-        [emitExecuteInclude schema incl | hasIncludeJoins incl]
+          emitIncludesJoin schema incl,
+          emitNestInclude schema incl,
+          emitLoadHelpers schema incl,
+          emitExecuteInclude schema incl
+        ]
       ]
-  where
-    pathPieces schema' incl' =
-      concatMap
-        ( \path ->
-            [ emitFlatJoinRow schema' path,
-              emitColumnList schema' path,
-              emitJoinBuilder schema' path
-            ]
-        )
-        (includePresetJoinPaths schema' incl')
-
-    nestPieces schema' incl' =
-      map (emitNestHelpersForPath schema' incl') (includePresetJoinPaths schema' incl')
-
-hasIncludeJoins :: ModelInclude -> Bool
-hasIncludeJoins incl = not (null (includeTree incl))
 
 includePragmas :: [Text]
 includePragmas =
@@ -286,16 +178,11 @@ emitIncludeExports schema incl =
       [ itdName d <> " (..)"
         | d <- collectResultTypes schema incl
       ]
-    flatExports =
-      [ joinRowName path <> " (..)"
-        | path <- includePresetJoinPaths schema incl
-      ]
     items =
       [includeName incl <> " (..)"]
         ++ presetExportItems schema incl
         ++ nestedExport
         ++ resultExports
-        ++ flatExports
 
 presetExportItems :: Schema -> ModelInclude -> [Text]
 presetExportItems schema incl =
@@ -312,72 +199,69 @@ emitIncludeImports moduleName schema incl =
     filter
       (not . T.null)
       [ "import Data.Kind (Type)",
-        "import Data.Maybe (fromMaybe, isJust, mapMaybe)",
-        if needsText then "import Data.Text (Text)" else "",
-        if needsUuid then "import Data.UUID (UUID)" else "",
-        if needsTime then "import Data.Time (UTCTime)" else "",
-        "import ORM.PG (FromRow (..), field)",
-        "import ORM.Group (groupByKey)",
+        if (not . all (null . includeChildren)) (includeTree incl) then "import Data.Maybe (isJust)" else "",
+        "import ORM.Db (Db)",
         "import ORM.Include",
-        "  ( BuildJoinChain (..),",
-        "    ExecuteInclude (..),",
+        "  ( ExecuteInclude (..),",
         "    IncludesJoin (..),",
-        "    NestInclude (..),",
-        "    applyRootFilter,",
+        "    NestInclude (..)",
         "  )",
-        "import qualified ORM.JoinChain as JoinChain",
         "import ORM.Operations (findMany)",
-        rootImport
+        selectInImport schema incl
       ]
-      ++ tailImports
-      ++ map (qualifiedImport moduleName) models
-      ++ enumImports (schemaModulePrefix moduleName) schema incl
+      ++ map (unqualifiedRowImport moduleName) models
+      ++ map (qualifiedImport moduleName) childModels
   where
-    path = includeLongestJoinPath schema incl
-    models = joinPathModels path
-    steps = jpSteps path
-    sjRoot = head models
-    sjRel = psRel (head steps)
-    allFields = includeFields schema incl
-    needsText = any ((== TyText) . fieldType) allFields
-    needsUuid = any ((== TyUuid) . fieldType) allFields
-    needsTime = any ((== TyTimestamptz) . fieldType) allFields
-    rootMod = schemaModulePrefix moduleName <> modelName sjRoot
-    rootImport =
-      "import "
-        <> rootMod
-        <> " ("
-        <> T.intercalate
-          ", "
-          [ modelName sjRoot <> "Table",
-            modelName sjRoot <> "Row (..)",
-            relName sjRel
-          ]
-        <> ")"
-    tailImports =
-      map (modelImport moduleName path) (drop 1 models)
+    root = lookupModel schema (includeRootModel incl)
+    models = includeTreeModels schema root (includeTree incl)
+    childModels = filter ((/= modelName root) . modelName) models
 
-modelImport :: Text -> JoinPath -> Model -> Text
-modelImport moduleName path model =
-  let modName = schemaModulePrefix moduleName <> modelName model
-      rels =
-        [ relName (psRel step)
-          | step <- jpSteps path,
-            modelName (psFrom step) == modelName model
-        ]
-   in case rels of
-        [] ->
-          "import "
-            <> modName
-            <> " ("
-            <> modelName model
-            <> "Row (..))"
-        _ ->
-          "import "
-            <> modName
-            <> " ("
-            <> T.intercalate ", " (modelName model <> "Row (..)" : rels)
-            <> ")"
+unqualifiedRowImport :: Text -> Model -> Text
+unqualifiedRowImport moduleName model =
+  "import "
+    <> schemaModulePrefix moduleName
+    <> modelName model
+    <> " ("
+    <> tableTypeNameFor model
+    <> ", "
+    <> modelName model
+    <> "Row (..))"
+
+tableTypeNameFor :: Model -> Text
+tableTypeNameFor model = modelName model <> "Table"
+
+selectInImport :: Schema -> ModelInclude -> Text
+selectInImport schema incl =
+  "import ORM.SelectIn\n  ( "
+    <> T.intercalate ",\n    " names
+    <> "\n  )"
+  where
+    names =
+      ["findByIn", "prepareIncludeRootQuery"]
+        ++ hasManyImports
+        ++ belongsToImports
+    hasManyImports =
+      if treeHasKind schema incl RelHasMany
+        then ["emptyGroups", "indexHasMany", "lookupGroups"]
+        else []
+    belongsToImports =
+      if treeHasKind schema incl RelBelongsTo
+        then ["emptyByPk", "indexByPk", "lookupByPk"]
+        else []
+
+treeHasKind :: Schema -> ModelInclude -> RelationKind -> Bool
+treeHasKind schema incl wanted =
+  let root = lookupModel schema (includeRootModel incl)
+   in anyEdgeKind schema root (includeTree incl) wanted
+
+anyEdgeKind :: Schema -> Model -> [IncludeTree] -> RelationKind -> Bool
+anyEdgeKind schema current edges wanted =
+  any go edges
+  where
+    go edge =
+      let rel = lookupRelation current (includeRelation edge)
+          child = lookupModel schema (relToModel rel)
+       in relKind rel == wanted || anyEdgeKind schema child (includeChildren edge) wanted
 
 qualifiedImport :: Text -> Model -> Text
 qualifiedImport moduleName model =
@@ -393,38 +277,15 @@ schemaModulePrefix moduleName =
     (prefix, _) | not (T.null prefix) -> prefix
     _ -> ""
 
-enumImports :: Text -> Schema -> ModelInclude -> [Text]
-enumImports prefix schema incl =
-  [ enumImportLine prefix e
-    | e <- schemaEnums schema,
-      enumName e `elem` usedEnumNames schema incl
-  ]
-
-usedEnumNames :: Schema -> ModelInclude -> [Text]
-usedEnumNames schema incl =
-  [ name
-    | f <- includeFields schema incl,
-      TyEnum name <- [fieldType f]
-  ]
-
-includeFields :: Schema -> ModelInclude -> [FieldSpec]
-includeFields schema incl =
-  let path = includeLongestJoinPath schema incl
-   in concat
-        [ fieldsAtPathIndex path idx model
-          | (idx, model) <- zip [0 ..] (joinPathModels path)
-        ]
-
-fieldsAtPathIndex :: JoinPath -> Int -> Model -> [FieldSpec]
-fieldsAtPathIndex path idx model =
-  case idx of
-    0 -> modelFields model
-    _ ->
-      let step = jpSteps path !! (idx - 1)
-       in filter (not . isRelationFkField (psRel step)) (modelFields model)
-
-isRelationFkField :: RelationSpec -> FieldSpec -> Bool
-isRelationFkField rel f = fieldName f == relForeignField rel
+includeTreeModels :: Schema -> Model -> [IncludeTree] -> [Model]
+includeTreeModels schema root edges =
+  nubBy (\a b -> modelName a == modelName b) $
+    root : concatMap (go root) edges
+  where
+    go current edge =
+      let rel = lookupRelation current (includeRelation edge)
+          child = lookupModel schema (relToModel rel)
+       in child : concatMap (go child) (includeChildren edge)
 
 collectIncludeTypes :: Schema -> ModelInclude -> [IncludeTypeDecl]
 collectIncludeTypes schema incl =

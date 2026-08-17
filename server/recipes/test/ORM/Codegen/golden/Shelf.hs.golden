@@ -11,7 +11,8 @@ module Schema.Shelf
     ShelfUpdate (..),
     shelfId,
     shelfName,
-    shelfBooks
+    shelfBooks,
+    shelfTags
   )
 where
 
@@ -23,6 +24,7 @@ import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 import ORM.Relation (HasMany (..), JoinType (..))
 import Schema.Book (BookTable, bookShelfId)
+import Schema.Tag (TagTable, tagShelfId)
 
 data ShelfTable = ShelfTable
 
@@ -83,6 +85,14 @@ shelfBooks =
   HasMany
     { localKey = shelfId,
       foreignKey = bookShelfId,
+      joinType = LeftJoin
+    }
+
+shelfTags :: HasMany ShelfTable TagTable UUID
+shelfTags =
+  HasMany
+    { localKey = shelfId,
+      foreignKey = tagShelfId,
       joinType = LeftJoin
     }
 
