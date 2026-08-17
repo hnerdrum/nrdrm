@@ -200,6 +200,7 @@ fromRecipeError err =
     MultipleRecordsFound message -> AppError MultipleEntitiesError message (object [])
     UniqueViolation message -> AppError ConflictError message (object [])
     DatabaseError message -> AppError InternalError message (object [])
+    UnsupportedIncludeModifier message -> AppError InternalError message (object [])
 
 fromRecipeWithIngredients :: RecipeWithIngredients -> Recipe
 fromRecipeWithIngredients (RecipeWithIngredients (RecipeRow rid _ _ rname rdesc) ingredients) =

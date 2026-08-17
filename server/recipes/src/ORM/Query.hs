@@ -9,6 +9,8 @@ module ORM.Query
     queryWhereConditions,
     queryWhereParams,
     queryLimit,
+    queryOffset,
+    queryOrderBy,
     select,
     selectAll,
     where_,
@@ -94,6 +96,12 @@ queryWhereParams = qbParams
 
 queryLimit :: QueryBuilder table -> Maybe Int
 queryLimit = qbLimit
+
+queryOffset :: QueryBuilder table -> Maybe Int
+queryOffset = qbOffset
+
+queryOrderBy :: QueryBuilder table -> Maybe (Text, OrderDirection)
+queryOrderBy = qbOrderBy
 
 applyQueryModifiers ::
   Maybe (QueryBuilder table -> QueryBuilder table) ->

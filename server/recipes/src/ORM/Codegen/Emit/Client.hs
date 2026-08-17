@@ -130,7 +130,7 @@ emitWriteClientModule moduleName schema incl =
              "import qualified Data.UUID.V4 as V4",
              "import ORM.PG (toField)",
              "import ORM.Core (fieldColumn)",
-             "import ORM.Db (Db, liftIO)",
+             "import ORM.Db (Db, liftIO, transaction)",
              "import qualified ORM.Delete as Delete",
              "import ORM.Errors (ORMError)",
              "import qualified ORM.Include as Include",
@@ -263,7 +263,7 @@ emitWriteCreate schema root incl child rel =
           "  " <> withPreset <> " ->",
           "  " <> writeCreateTypeName root <> " ->",
           "  Db (Either ORMError " <> resultName <> ")",
-          "create include input = do"
+          "create include input = transaction $ do"
         ]
           ++ createBody
 
@@ -297,7 +297,7 @@ emitWriteUpdate schema root incl child rel wipeField =
           "  UUID ->",
           "  " <> writeUpdateTypeName root <> " ->",
           "  Db (Either ORMError " <> resultName <> ")",
-          "update include rootId input = do"
+          "update include rootId input = transaction $ do"
         ]
           ++ updateBody
 

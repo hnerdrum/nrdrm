@@ -8,7 +8,7 @@ module API.Recipe
 where
 
 import API.Errors (withErrorHandling)
-import App (AppM, runDbAction, runTxAction)
+import App (AppM, runDbAction)
 import Data.UUID (UUID)
 import Domain.Errors (AppError)
 import Domain.Recipe (CreateRecipeInput (..), Recipe (..), UpdateRecipeInput (..), createRecipe, deleteRecipe, getAllRecipes, getRecipe, updateRecipe)
@@ -27,13 +27,13 @@ createRecipeRoute :: CreateRecipeInput -> AppM Recipe
 createRecipeRoute = withErrorHandling . createRecipeHandler
 
 createRecipeHandler :: CreateRecipeInput -> AppM (Either AppError Recipe)
-createRecipeHandler input = runTxAction (createRecipe input)
+createRecipeHandler input = runDbAction (createRecipe input)
 
 updateRecipeRoute :: UUID -> UpdateRecipeInput -> AppM Recipe
 updateRecipeRoute recipeId input = withErrorHandling $ updateRecipeHandler recipeId input
 
 updateRecipeHandler :: UUID -> UpdateRecipeInput -> AppM (Either AppError Recipe)
-updateRecipeHandler recipeId input = runTxAction (updateRecipe recipeId input)
+updateRecipeHandler recipeId input = runDbAction (updateRecipe recipeId input)
 
 deleteRecipeHandler :: UUID -> AppM NoContent
 deleteRecipeHandler recipeId = do

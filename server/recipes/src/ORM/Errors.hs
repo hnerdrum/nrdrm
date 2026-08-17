@@ -5,6 +5,7 @@ module ORM.Errors
   )
 where
 
+import Control.Exception (Exception)
 import Data.Text (Text)
 
 data ORMError
@@ -12,7 +13,10 @@ data ORMError
   | MultipleRecordsFound Text
   | UniqueViolation Text
   | DatabaseError Text
+  | UnsupportedIncludeModifier Text
   deriving (Show, Eq)
+
+instance Exception ORMError
 
 requireFound :: Maybe a -> ORMError -> Either ORMError a
 requireFound Nothing err = Left err

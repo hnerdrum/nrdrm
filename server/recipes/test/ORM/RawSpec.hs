@@ -7,15 +7,18 @@ module ORM.RawSpec
   )
 where
 
+import Control.Exception (ErrorCall (..), throwIO, try)
 import Data.Int (Int64)
 import Data.Text (Text)
 import Database.PostgreSQL.Simple.FromRow (FromRow (..), field)
 import Database.PostgreSQL.Simple.Types (Query (..))
-import ORM (ORMError (..), runDb, withTransaction)
+import ORM (NullableValue (Omit), ORMError (..), runDb, transaction, withTransaction)
+import ORM.Db (liftIO)
+import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
 import ORM.Sql (catchDb, executeRaw, param, queryRaw)
 import qualified ORM.WidgetFixtures as WidgetFixtures
-import Schema.Widget (WidgetRow (..), WidgetTable)
+import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable)
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
 
@@ -97,3 +100,41 @@ rawSpec =
                             Left (DatabaseError _) -> True
                             _ -> False
                         )
+
+    it "transaction commits on success" $ \TestEnv {envPool = pool} -> do
+      inserted <-
+        runDb pool $
+          transaction $
+            Insert.insert @WidgetTable @WidgetRow
+              WidgetCreate
+                { id = Nothing,
+                  createdAt = Nothing,
+                  updatedAt = Nothing,
+                  name = "tx-commit",
+                  description = Omit
+                }
+      inserted
+        `shouldSatisfy` ( \case
+                            Right row -> row.name == "tx-commit"
+                            Left _ -> False
+                        )
+      rows <- runDb pool (Ops.findMany @WidgetTable @WidgetRow id)
+      length rows `shouldBe` 1
+
+    it "transaction rolls back when the action throws" $ \TestEnv {envPool = pool} -> do
+      _ <-
+        try @ErrorCall $
+          runDb pool $
+            transaction $ do
+              _ <-
+                Insert.insert @WidgetTable @WidgetRow
+                  WidgetCreate
+                    { id = Nothing,
+                      createdAt = Nothing,
+                      updatedAt = Nothing,
+                      name = "tx-rollback",
+                      description = Omit
+                    }
+              liftIO $ throwIO (ErrorCall "boom")
+      rows <- runDb pool (Ops.findMany @WidgetTable @WidgetRow id)
+      rows `shouldBe` []

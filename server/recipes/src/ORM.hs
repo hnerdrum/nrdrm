@@ -80,6 +80,7 @@ module ORM
     requireFound,
     runDb,
     withTransaction,
+    transaction,
     Db (..),
     DbPool (..),
     connect,
@@ -93,7 +94,7 @@ where
 import Database.PostgreSQL.Simple.ToField (toField)
 import ORM.Column
 import ORM.Core
-import ORM.Db (Db (..), DbPool (..), connect, runDb, withTransaction)
+import ORM.Db (Db (..), DbPool (..), connect, runDb, transaction, withTransaction)
 import ORM.Delete
 import ORM.Errors
 import ORM.Group

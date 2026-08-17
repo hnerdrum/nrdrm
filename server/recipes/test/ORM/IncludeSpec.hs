@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
 
 module ORM.IncludeSpec
@@ -8,10 +9,10 @@ where
 import Data.List (sort)
 import Data.Text (Text)
 import Data.UUID (UUID, nil)
-import ORM (runDb)
+import ORM (ORMError (..), runDb)
 import ORM.Include (findMany, findUnique)
 import qualified ORM.Operations as Ops
-import ORM.Query (whereEq)
+import ORM.Query (OrderDirection (Asc), limit, offset, orderBy, whereEq)
 import qualified ORM.ShelfFixtures as ShelfFixtures
 import Schema.Book (BookRow (..))
 import Schema.Chapter (ChapterRow (..))
@@ -27,7 +28,7 @@ import Schema.ShelfInclude
   )
 import qualified Schema.ShelfInclude as ShelfInclude
 import Support.TestDb (TestEnv (..))
-import Test.Hspec (SpecWith, describe, it, shouldBe)
+import Test.Hspec (SpecWith, describe, it, shouldBe, shouldThrow)
 
 includeBooks :: ShelfInclude
 includeBooks = ShelfInclude {books = Just (ShelfInclude.BookInclude {chapters = False})}
@@ -120,9 +121,35 @@ includeSpec =
       result <- runDb pool (findUnique @Shelf.ShelfTable includeBooks shelf.id)
       fmap ((.name) . (.shelf)) result `shouldBe` Just "fiction"
 
+    it "findUnique returns all children for a parent with several has-many rows" $ \TestEnv {envPool = pool} -> do
+      shelf <- ShelfFixtures.insertShelf pool "fiction"
+      _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
+      _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
+      result <- runDb pool (findUnique @Shelf.ShelfTable includeBooks shelf.id)
+      fmap (sort . map ((.title) . (.book)) . (.books)) result
+        `shouldBe` Just ["Dune", "Neuromancer"]
+
+    it "findUnique includes a shelf with no books as Just with an empty list" $ \TestEnv {envPool = pool} -> do
+      empty <- ShelfFixtures.insertShelf pool "empty"
+      result <- runDb pool (findUnique @Shelf.ShelfTable includeBooks empty.id)
+      fmap ((.name) . (.shelf)) result `shouldBe` Just "empty"
+      fmap (.books) result `shouldBe` Just []
+
     it "findUnique returns Nothing when missing" $ \TestEnv {envPool = pool} -> do
       result <- runDb pool (findUnique @Shelf.ShelfTable includeBooks (nil :: UUID))
       result `shouldBe` Nothing
+
+    it "findMany with include rejects limit" $ \TestEnv {envPool = pool} -> do
+      runDb pool (findMany @Shelf.ShelfTable includeBooks (limit 1))
+        `shouldThrow` isUnsupportedIncludeModifier
+
+    it "findMany with include rejects offset" $ \TestEnv {envPool = pool} -> do
+      runDb pool (findMany @Shelf.ShelfTable includeBooks (offset 1))
+        `shouldThrow` isUnsupportedIncludeModifier
+
+    it "findMany with include rejects orderBy" $ \TestEnv {envPool = pool} -> do
+      runDb pool (findMany @Shelf.ShelfTable includeBooks (orderBy shelfName Asc))
+        `shouldThrow` isUnsupportedIncludeModifier
 
     it "findMany nests sections under chapters at four levels deep" $ \TestEnv {envPool = pool} -> do
       shelf <- ShelfFixtures.insertShelf pool "fiction"
@@ -147,3 +174,8 @@ lookupBook title result =
   case filter ((== title) . (.title) . (.book)) result.books of
     [book] -> pure book
     _ -> fail "expected exactly one book in results"
+
+isUnsupportedIncludeModifier :: ORMError -> Bool
+isUnsupportedIncludeModifier = \case
+  UnsupportedIncludeModifier _ -> True
+  _ -> False
