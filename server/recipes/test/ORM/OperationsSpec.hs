@@ -11,11 +11,12 @@ import ORM (NullableValue (..), ORMError (..), runDb)
 import qualified ORM.Delete as Delete
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
-import ORM.Query (OrderDirection (Asc), limit, offset, orderBy, whereEq)
+import ORM.Query (OrderDirection (Asc), limit, matching, offset, orderBy)
 import qualified ORM.Update as Update
+import ORM.Where (contains, eq, in_, isNull, or_)
 import qualified ORM.WidgetFixtures as WidgetFixtures
 import Schema.Book (BookCreate (..), BookRow (..), BookTable)
-import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable (..), WidgetUpdate (..), widgetCreatedAt, widgetId, widgetName)
+import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable (..), WidgetUpdate (..), widgetCreatedAt, widgetDescription, widgetId, widgetName)
 import Support.Assert (assertJust, assertRight)
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
@@ -43,7 +44,7 @@ operationsSpec =
       alpha1 <- WidgetFixtures.insertWidget pool "alpha"
       alpha2 <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "beta"
-      results <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ whereEq widgetName "alpha")
+      results <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ matching (eq widgetName "alpha"))
       sort (map (.id) results) `shouldBe` sort [alpha1.id, alpha2.id]
 
     it "findUniqueOrFail returns an element by id" $ \TestEnv {envPool = pool} -> do
@@ -63,24 +64,24 @@ operationsSpec =
       alpha1 <- WidgetFixtures.insertWidget pool "alpha"
       alpha2 <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "beta"
-      result <- runDb pool (Ops.findFirst @WidgetTable @WidgetRow $ whereEq widgetName "alpha")
+      result <- runDb pool (Ops.findFirst @WidgetTable @WidgetRow $ matching (eq widgetName "alpha"))
       row <- assertJust result
       row.name `shouldBe` "alpha"
       row.id `shouldSatisfy` (`elem` [alpha1.id, alpha2.id])
 
     it "findFirst returns Nothing when no row matches" $ \TestEnv {envPool = pool} -> do
-      result <- runDb pool (Ops.findFirst @WidgetTable @WidgetRow $ whereEq widgetName "nonexistent")
+      result <- runDb pool (Ops.findFirst @WidgetTable @WidgetRow $ matching (eq widgetName "nonexistent"))
       result `shouldBe` Nothing
 
     it "count returns the number of rows matching a filter" $ \TestEnv {envPool = pool} -> do
       _ <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "beta"
-      n <- runDb pool (Ops.count @WidgetTable $ whereEq widgetName "alpha")
+      n <- runDb pool (Ops.count @WidgetTable $ matching (eq widgetName "alpha"))
       n `shouldBe` 2
 
     it "count returns 0 when no rows match" $ \TestEnv {envPool = pool} -> do
-      n <- runDb pool (Ops.count @WidgetTable $ whereEq widgetName "nonexistent")
+      n <- runDb pool (Ops.count @WidgetTable $ matching (eq widgetName "nonexistent"))
       n `shouldBe` 0
 
     it "update changes a widget name by id" $ \TestEnv {envPool = pool} -> do
@@ -181,12 +182,12 @@ operationsSpec =
       _ <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "alpha"
       _ <- WidgetFixtures.insertWidget pool "alpha"
-      allAlpha <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ whereEq widgetName "alpha")
+      allAlpha <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ matching (eq widgetName "alpha"))
       paged <-
         runDb
           pool
           ( Ops.findMany @WidgetTable @WidgetRow $
-              offset 1 . limit 1 . orderBy widgetCreatedAt Asc . whereEq widgetName "alpha"
+              offset 1 . limit 1 . orderBy widgetCreatedAt Asc . matching (eq widgetName "alpha")
           )
       length allAlpha `shouldBe` 3
       length paged `shouldBe` 1
@@ -202,13 +203,48 @@ operationsSpec =
       deleted <- runDb pool (Ops.delete @WidgetTable (nil :: UUID))
       deleted `shouldBe` 0
 
-    it "deleteMany id returns EmptyWhere" $ \TestEnv {envPool = pool} -> do
-      result <- runDb pool (Delete.deleteMany @WidgetTable id)
-      result
-        `shouldSatisfy` ( \case
-                            Left (EmptyWhere _) -> True
-                            _ -> False
-                        )
+    it "deleteMany removes rows matching a Where predicate" $ \TestEnv {envPool = pool} -> do
+      _ <- WidgetFixtures.insertWidget pool "doomed"
+      _ <- WidgetFixtures.insertWidget pool "keep"
+      deleted <- runDb pool (Delete.deleteMany @WidgetTable (eq widgetName "doomed")) >>= assertRight
+      deleted `shouldBe` 1
+      remaining <- runDb pool (Ops.findMany @WidgetTable @WidgetRow id)
+      map (.name) remaining `shouldBe` ["keep"]
+
+    it "findMany contains matches a substring case-insensitively" $ \TestEnv {envPool = pool} -> do
+      _ <- WidgetFixtures.insertWidget pool "Sea Salt"
+      _ <- WidgetFixtures.insertWidget pool "pepper"
+      results <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ matching (contains widgetName "salt"))
+      map (.name) results `shouldBe` ["Sea Salt"]
+
+    it "findMany isNull matches NULL description" $ \TestEnv {envPool = pool} -> do
+      widget <- WidgetFixtures.insertWidget pool "blank"
+      results <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ matching (isNull widgetDescription))
+      map (.id) results `shouldBe` [widget.id]
+
+    it "findMany in_ matches any listed value" $ \TestEnv {envPool = pool} -> do
+      alpha <- WidgetFixtures.insertWidget pool "alpha"
+      _ <- WidgetFixtures.insertWidget pool "beta"
+      gamma <- WidgetFixtures.insertWidget pool "gamma"
+      results <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ matching (in_ widgetName ["alpha", "gamma"]))
+      sort (map (.id) results) `shouldBe` sort [alpha.id, gamma.id]
+
+    it "findMany in_ [] matches nothing" $ \TestEnv {envPool = pool} -> do
+      _ <- WidgetFixtures.insertWidget pool "alpha"
+      results <- runDb pool (Ops.findMany @WidgetTable @WidgetRow $ matching (in_ widgetName []))
+      results `shouldBe` []
+
+    it "findMany or_ combines predicates" $ \TestEnv {envPool = pool} -> do
+      _ <- WidgetFixtures.insertWidget pool "alpha"
+      _ <- WidgetFixtures.insertWidget pool "beta"
+      _ <- WidgetFixtures.insertWidget pool "gamma"
+      results <-
+        runDb
+          pool
+          ( Ops.findMany @WidgetTable @WidgetRow $
+              matching (eq widgetName "alpha" `or_` eq widgetName "gamma")
+          )
+      sort (map (.name) results) `shouldBe` ["alpha", "gamma"]
 
     it "updateBuilder without WHERE returns EmptyWhere" $ \TestEnv {envPool = pool} -> do
       result <-

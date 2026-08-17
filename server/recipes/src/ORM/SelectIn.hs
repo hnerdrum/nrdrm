@@ -16,25 +16,22 @@ module ORM.SelectIn
   )
 where
 
-import Control.Exception (throw)
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Database.PostgreSQL.Simple.FromRow (FromRow)
 import Database.PostgreSQL.Simple.ToField (ToField)
 import ORM.Core (Entity (..), Field (..))
 import ORM.Db (Db)
-import ORM.Errors (ORMError (..))
 import ORM.Group (groupByKey)
 import qualified ORM.Operations as Ops
 import ORM.Query
   ( OrderDirection (Asc),
     QueryBuilder,
-    WherePred (..),
+    matching,
     orderBy,
     queryOrderBy,
-    queryWherePreds,
-    whereIn,
   )
+import ORM.Where (in_)
 
 newtype GroupIndex k a = GroupIndex (Map k [a])
 
@@ -50,7 +47,7 @@ findByIn field keys
   | null keys = pure []
   | otherwise =
       Ops.findMany @table @result $
-        orderBy (primaryKey @table) Asc . whereIn field keys
+        orderBy (primaryKey @table) Asc . matching (in_ field keys)
 
 emptyGroups :: GroupIndex k a
 emptyGroups = GroupIndex Map.empty
@@ -81,23 +78,8 @@ prepareIncludeRootQuery ::
   (QueryBuilder table -> QueryBuilder table) ->
   QueryBuilder table ->
   QueryBuilder table
-prepareIncludeRootQuery modifier qb0 =
-  let qb = modifier qb0
-   in case rawWhereError qb of
-        Just err -> throw err
-        Nothing -> defaultPkOrder @table qb
-
-rawWhereError :: QueryBuilder table -> Maybe ORMError
-rawWhereError qb
-  | any isRaw (queryWherePreds qb) =
-      Just $
-        UnsupportedIncludeModifier
-          "raw WHERE is not supported on include queries; use whereEq"
-  | otherwise = Nothing
-
-isRaw :: WherePred -> Bool
-isRaw (WhereRaw _ _) = True
-isRaw _ = False
+prepareIncludeRootQuery modifier =
+  defaultPkOrder @table . modifier
 
 defaultPkOrder ::
   forall table.

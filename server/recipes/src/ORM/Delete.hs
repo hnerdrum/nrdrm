@@ -25,8 +25,9 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..))
 import ORM.Db (Db (..), liftIO)
 import ORM.Errors (ORMError (..))
-import ORM.Query (QueryBuilder, buildWhereClause, queryWhereClauses, selectAll)
+import ORM.Query (buildWhereClause)
 import ORM.Sql (quoteIdent)
+import ORM.Where (Where, compileWhere)
 
 data DeleteBuilder table = DeleteBuilder
   { dbTable :: Text,
@@ -62,21 +63,12 @@ deleteWhere builder
 deleteMany ::
   forall table.
   (Entity table) =>
-  (QueryBuilder table -> QueryBuilder table) ->
+  Where table ->
   Db (Either ORMError Int)
-deleteMany modifier =
-  let qb = modifier (selectAll @table)
-      builder = fromQueryWhere @table qb
-   in if null (dbWhere builder)
-        then pure (Left (EmptyWhere "DELETE requires a WHERE clause"))
-        else Right <$> deleteWhere builder
-
-fromQueryWhere :: forall table. (Entity table) => QueryBuilder table -> DeleteBuilder table
-fromQueryWhere qb =
-  foldl
-    (\builder (condition, params) -> whereDelete condition params builder)
-    (emptyDelete @table)
-    (queryWhereClauses qb)
+deleteMany clause =
+  let (sql, params) = compileWhere clause
+      builder = whereDelete sql params (emptyDelete @table)
+   in Right <$> deleteWhere builder
 
 deleteReturning ::
   forall table result.

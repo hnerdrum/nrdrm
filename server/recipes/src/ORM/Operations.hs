@@ -17,20 +17,20 @@ where
 
 import qualified Data.Text as Text
 import Database.PostgreSQL.Simple.FromRow (FromRow)
-import Database.PostgreSQL.Simple.ToField (ToField, toField)
-import ORM.Core (Entity (..), Field (..), PrimaryKeyType)
+import Database.PostgreSQL.Simple.ToField (ToField)
+import ORM.Core (Entity (..), PrimaryKeyType)
 import ORM.Db (Db (..))
 import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError (..), requireFound)
 import ORM.Query
   ( QueryBuilder,
+    matching,
     runCountQuery,
     runQuery,
     runQueryOne,
     selectAll,
-    whereEq,
   )
-import ORM.Sql (quoteIdent)
+import ORM.Where (compileWhere, eq)
 
 findMany ::
   forall table result.
@@ -46,7 +46,7 @@ findUnique ::
   Db (Maybe result)
 findUnique pkValue =
   runQueryOne $
-    whereEq (primaryKey @table) pkValue (selectAll @table)
+    matching (eq (primaryKey @table) pkValue) (selectAll @table)
 
 findUniqueOrFail ::
   forall table result.
@@ -90,6 +90,6 @@ delete ::
   PrimaryKeyType table ->
   Db Int
 delete pkValue =
-  let pkField = primaryKey @table
-      builder = Delete.whereDelete (quoteIdent (fieldColumn pkField) <> " = ?") [toField pkValue] (Delete.emptyDelete @table)
+  let (sql, params) = compileWhere (eq (primaryKey @table) pkValue)
+      builder = Delete.whereDelete sql params (Delete.emptyDelete @table)
    in Delete.deleteWhere builder

@@ -41,6 +41,7 @@ emitSimpleClientModule moduleName model =
       "import qualified ORM.Insert as Insert",
       "import qualified ORM.Operations as Ops",
       "import ORM.Query (QueryBuilder, applyQueryModifiers)",
+      "import ORM.Where (Where)",
       "import "
         <> schemaModule moduleName model
         <> " ("
@@ -160,6 +161,7 @@ emitWriteClientModule moduleName schema incl =
                <> ")",
              "import qualified ORM.Operations as Ops",
              "import ORM.Query (QueryBuilder, applyQueryModifiers)",
+             "import ORM.Where (Where)",
              "import qualified ORM.Update as Update"
            ]
         ++ writeClientRelatedRowImportLines moduleName schema root child incl
@@ -449,6 +451,7 @@ includeReadImportLines moduleName schema incl =
     "import qualified ORM.Include as Include",
     "import qualified ORM.Operations as Ops",
     "import ORM.Query (QueryBuilder, applyQueryModifiers)",
+    "import ORM.Where (Where)",
     "import "
       <> schemaModule moduleName root
       <> " ("
@@ -590,7 +593,7 @@ emitQueryType :: Model -> Text
 emitQueryType model =
   T.unlines
     [ "data " <> queryTypeName model <> " = " <> queryTypeName model,
-      "  { where_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
+      "  { where_ :: Maybe (Where " <> tableTypeName model <> ")",
       "  , orderBy_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
       "  , limit_ :: Maybe Int",
       "  , offset_ :: Maybe Int",
@@ -621,7 +624,7 @@ emitDeleteFn model =
 emitDeleteManyFn :: Model -> Text
 emitDeleteManyFn model =
   T.unlines
-    [ "deleteMany :: (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ") -> Db (Either ORMError Int)",
+    [ "deleteMany :: Where " <> tableTypeName model <> " -> Db (Either ORMError Int)",
       "deleteMany = Delete.deleteMany @" <> tableTypeName model
     ]
 
@@ -645,7 +648,7 @@ emitIncludeQueryType :: Model -> ModelInclude -> Text
 emitIncludeQueryType model _incl =
   T.unlines
     [ "data " <> queryTypeName model <> " preset = " <> queryTypeName model,
-      "  { where_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
+      "  { where_ :: Maybe (Where " <> tableTypeName model <> ")",
       "  , orderBy_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
       "  , limit_ :: Maybe Int",
       "  , offset_ :: Maybe Int",
