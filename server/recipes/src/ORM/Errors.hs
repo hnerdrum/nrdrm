@@ -1,5 +1,7 @@
 module ORM.Errors
   ( ORMError (..),
+    DatabaseErrorInfo (..),
+    DriverErrorKind (..),
     requireFound,
     parseSingleton,
   )
@@ -8,12 +10,29 @@ where
 import Control.Exception (Exception)
 import Data.Text (Text)
 
+data DatabaseErrorInfo = DatabaseErrorInfo
+  { sqlState :: Text,
+    message :: Text,
+    detail :: Text
+  }
+  deriving (Show, Eq)
+
+data DriverErrorKind
+  = FormatMismatch
+  | ClientQuery
+  | ResultDecode
+  deriving (Show, Eq)
+
 data ORMError
   = RecordNotFound Text
   | MultipleRecordsFound Text
   | UniqueViolation Text
-  | DatabaseError Text
+  | ForeignKeyViolation Text
+  | NotNullViolation Text
+  | EmptyWhere Text
   | UnsupportedIncludeModifier Text
+  | DatabaseError DatabaseErrorInfo
+  | DriverError DriverErrorKind Text
   deriving (Show, Eq)
 
 instance Exception ORMError

@@ -10,6 +10,8 @@ module ORM
     deleteMany,
     offset,
     ORMError (..),
+    DatabaseErrorInfo (..),
+    DriverErrorKind (..),
     selectAll,
     select,
     where_,
@@ -18,8 +20,6 @@ module ORM
     limit,
     applyQueryModifiers,
     OrderDirection (..),
-    runQuery,
-    runQueryOne,
     QueryBuilder,
     insert,
     insertBuilder,
@@ -52,31 +52,9 @@ module ORM
     PrimaryKeyType,
     NullableValue (..),
     toField,
-    -- Relations
     JoinType (..),
     HasMany (..),
     BelongsTo (..),
-    -- Join chain (N-table)
-    JoinChain,
-    JoinedTable (..),
-    startJoinChain,
-    buildJoinChainFromHasMany,
-    addHasManyJoin,
-    addBelongsToJoin,
-    selectColumns,
-    selectFields,
-    whereJoin,
-    col,
-    aliasedField,
-    buildJoinQuery,
-    runJoinChain,
-    rootAlias,
-    IncludesJoin (..),
-    BuildJoinChain (..),
-    NestInclude (..),
-    ExecuteInclude (..),
-    applyRootFilter,
-    groupByKey,
     requireFound,
     runDb,
     withTransaction,
@@ -97,10 +75,7 @@ import ORM.Core
 import ORM.Db (Db (..), DbPool (..), connect, runDb, transaction, withTransaction)
 import ORM.Delete
 import ORM.Errors
-import ORM.Group
-import ORM.Include hiding (findMany, findUnique, findUniqueOrFail)
 import ORM.Insert
-import ORM.JoinChain
 import ORM.Operations
 import ORM.Query
 import ORM.Relation

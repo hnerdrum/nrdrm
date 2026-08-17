@@ -41,6 +41,7 @@ import ORM.Query
     selectAll,
     whereEq,
   )
+import ORM.Sql (quoteQualified)
 
 class IncludesJoin include where
   includesJoin :: include -> Bool
@@ -137,7 +138,7 @@ applyRootFilter chain modifier =
 
 qualifyIncludeWhere :: Text -> WherePred -> Either ORMError (Text, [Action])
 qualifyIncludeWhere alias (WhereColumnEq col value) =
-  Right (alias <> "." <> col <> " = ?", [value])
+  Right (quoteQualified alias col <> " = ?", [value])
 qualifyIncludeWhere _ (WhereRaw _ _) =
   Left $
     UnsupportedIncludeModifier

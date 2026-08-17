@@ -25,7 +25,7 @@ import Data.UUID (UUID)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..))
 import Domain.Unit (Unit (..), fromDbUnit, toDbUnit)
-import ORM (ORMError (..))
+import ORM (DatabaseErrorInfo (..), ORMError (..))
 import ORM.Client.Recipe
   ( IngredientRow (..),
     RecipeCreate (..),
@@ -199,7 +199,11 @@ fromRecipeError err =
     RecordNotFound message -> AppError NotFoundError message (object [])
     MultipleRecordsFound message -> AppError MultipleEntitiesError message (object [])
     UniqueViolation message -> AppError ConflictError message (object [])
-    DatabaseError message -> AppError InternalError message (object [])
+    ForeignKeyViolation message -> AppError ConflictError message (object [])
+    NotNullViolation message -> AppError ConflictError message (object [])
+    EmptyWhere message -> AppError InternalError message (object [])
+    DatabaseError DatabaseErrorInfo {message} -> AppError InternalError message (object [])
+    DriverError _ message -> AppError InternalError message (object [])
     UnsupportedIncludeModifier message -> AppError InternalError message (object [])
 
 fromRecipeWithIngredients :: RecipeWithIngredients -> Recipe

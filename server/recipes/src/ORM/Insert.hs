@@ -31,7 +31,7 @@ import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..), NullableValue (..))
 import ORM.Db (Db (..))
 import ORM.Errors (ORMError (..), parseSingleton)
-import ORM.Sql (catchSql)
+import ORM.Sql (catchSql, quoteIdent)
 
 class (Entity table) => Insertable table where
   type CreateInput table
@@ -153,10 +153,10 @@ insertQueryParts builder suffix =
   let allColumns = ibColumns builder
       allValues = ibValues builder
       placeholders = Text.intercalate ", " $ replicate (length allValues) "?"
-      columnsText = Text.intercalate ", " allColumns
+      columnsText = Text.intercalate ", " (map quoteIdent allColumns)
       queryText =
         "INSERT INTO "
-          <> ibTable builder
+          <> quoteIdent (ibTable builder)
           <> " ("
           <> columnsText
           <> ") VALUES ("

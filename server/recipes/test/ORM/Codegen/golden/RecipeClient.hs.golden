@@ -184,5 +184,5 @@ update include rootId input = transaction $ do
 delete :: UUID -> Db Int
 delete = Ops.delete @RecipeTable
 
-deleteMany :: (QueryBuilder RecipeTable -> QueryBuilder RecipeTable) -> Db Int
+deleteMany :: (QueryBuilder RecipeTable -> QueryBuilder RecipeTable) -> Db (Either ORMError Int)
 deleteMany = Delete.deleteMany @RecipeTable
