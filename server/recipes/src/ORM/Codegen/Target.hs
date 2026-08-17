@@ -38,8 +38,6 @@ import ORM.Codegen.IR
     includeRootModel,
     includeTree,
     modelName,
-    modelRelations,
-    relName,
     relReplaceChildren,
     relToModel,
     schemaEnums,

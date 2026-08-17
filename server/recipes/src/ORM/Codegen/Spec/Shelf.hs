@@ -11,8 +11,8 @@ shelfSchema :: Schema
 shelfSchema =
   Schema
     { schemaEnums = [],
-      schemaModels = [shelfModel, bookModel, chapterModel, sectionModel],
-      schemaIncludes = [shelfInclude]
+      schemaModels = [shelfModel, bookModel, chapterModel, sectionModel, tagModel],
+      schemaIncludes = [shelfInclude, shelfGraphInclude]
     }
 
 shelfModel :: Model
@@ -25,7 +25,8 @@ shelfModel =
           text "name"
         ],
       modelRelations =
-        [ hasMany "shelfBooks" "Shelf" "Book" "id" "shelfId"
+        [ hasMany "shelfBooks" "Shelf" "Book" "id" "shelfId",
+          hasMany "shelfTags" "Shelf" "Tag" "id" "shelfId"
         ]
     }
 
@@ -72,6 +73,19 @@ sectionModel =
       modelRelations = []
     }
 
+tagModel :: Model
+tagModel =
+  Model
+    { modelName = "Tag",
+      modelTable = "test_tag",
+      modelFields =
+        [ pk (withDefault DefaultUuidV4 (uuid "id")),
+          column "shelf_id" (uuid "shelfId"),
+          text "label"
+        ],
+      modelRelations = []
+    }
+
 shelfInclude :: ModelInclude
 shelfInclude =
   ModelInclude
@@ -86,6 +100,28 @@ shelfInclude =
                       includeChildren = []
                     }
                 ]
+            }
+        ]
+    }
+
+shelfGraphInclude :: ModelInclude
+shelfGraphInclude =
+  ModelInclude
+    { includeName = "ShelfGraphInclude",
+      includeRootModel = "Shelf",
+      includeTree =
+        [ IncludeTree
+            { includeRelation = "shelfBooks",
+              includeChildren =
+                [ IncludeTree
+                    { includeRelation = "bookChapters",
+                      includeChildren = []
+                    }
+                ]
+            },
+          IncludeTree
+            { includeRelation = "shelfTags",
+              includeChildren = []
             }
         ]
     }

@@ -58,7 +58,18 @@ joinPathTake n JoinPath {jpSteps = steps} =
 
 includeMaxDepth :: Schema -> ModelInclude -> Int
 includeMaxDepth schema incl =
-  length (joinPathModels (includeLongestJoinPath schema incl))
+  includeTreeDepth schema (lookupModel schema (includeRootModel incl)) (includeTree incl)
+
+includeTreeDepth :: Schema -> Model -> [IncludeTree] -> Int
+includeTreeDepth _ _ [] = 1
+includeTreeDepth schema model edges =
+  1
+    + maximum
+      [ includeTreeDepth schema child (includeChildren edge)
+        | edge <- edges,
+          let rel = lookupRelation model (includeRelation edge),
+          let child = lookupModel schema (relToModel rel)
+      ]
 
 includeLongestJoinPath :: Schema -> ModelInclude -> JoinPath
 includeLongestJoinPath schema incl =

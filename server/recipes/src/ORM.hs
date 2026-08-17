@@ -16,6 +16,7 @@ module ORM
     select,
     where_,
     whereEq,
+    whereIn,
     orderBy,
     limit,
     applyQueryModifiers,

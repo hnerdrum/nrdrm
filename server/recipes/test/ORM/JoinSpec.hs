@@ -1,5 +1,8 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE NoFieldSelectors #-}
 
 module ORM.JoinSpec
   ( joinSpec,
@@ -8,17 +11,42 @@ where
 
 import Data.List (sort)
 import Data.Text (Text)
+import Data.UUID (UUID)
 import Database.PostgreSQL.Simple.ToField (toField)
 import ORM (runDb)
 import qualified ORM.JoinChain as JoinChain
+import ORM.PG (FromRow (..), field)
 import ORM.Relation (HasMany (..), JoinType (..))
 import qualified ORM.ShelfFixtures as ShelfFixtures
 import qualified Schema.Book as Book
 import qualified Schema.Chapter as Chapter
 import qualified Schema.Shelf as Shelf
-import Schema.ShelfInclude (ShelfBookChapterJoinRow (..), ShelfBookJoinRow (..))
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
+
+data ShelfBookJoinRow = ShelfBookJoinRow
+  { shelfId :: UUID,
+    shelfName :: Text,
+    bookId :: Maybe UUID,
+    bookTitle :: Maybe Text
+  }
+  deriving (Show, Eq)
+
+instance FromRow ShelfBookJoinRow where
+  fromRow = ShelfBookJoinRow <$> field <*> field <*> field <*> field
+
+data ShelfBookChapterJoinRow = ShelfBookChapterJoinRow
+  { shelfId :: UUID,
+    shelfName :: Text,
+    bookId :: Maybe UUID,
+    bookTitle :: Maybe Text,
+    chapterId :: Maybe UUID,
+    chapterHeading :: Maybe Text
+  }
+  deriving (Show, Eq)
+
+instance FromRow ShelfBookChapterJoinRow where
+  fromRow = ShelfBookChapterJoinRow <$> field <*> field <*> field <*> field <*> field <*> field
 
 selectShelfBookColumns :: JoinChain.JoinChain Shelf.ShelfTable -> JoinChain.JoinChain Shelf.ShelfTable
 selectShelfBookColumns =

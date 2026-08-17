@@ -17,35 +17,34 @@ module ORM.Schema.RecipeInclude
     unwrapNoInclude,
     RecipeIngredientInclude (..),
     RecipeIngredientWithIngredient (..),
-    RecipeWithIngredients (..),
-    RecipeRecipeIngredientJoinRow (..),
-    RecipeRecipeIngredientIngredientJoinRow (..)
+    RecipeWithIngredients (..)
   )
 where
 
 import Data.Kind (Type)
-import Data.Maybe (fromMaybe, isJust, mapMaybe)
-import Data.Text (Text)
-import Data.UUID (UUID)
-import Data.Time (UTCTime)
-import ORM.PG (FromRow (..), field)
-import ORM.Group (groupByKey)
+import Data.Maybe (isJust)
+import ORM.Db (Db)
 import ORM.Include
-  ( BuildJoinChain (..),
-    ExecuteInclude (..),
+  ( ExecuteInclude (..),
     IncludesJoin (..),
-    NestInclude (..),
-    applyRootFilter,
+    NestInclude (..)
   )
-import qualified ORM.JoinChain as JoinChain
 import ORM.Operations (findMany)
-import ORM.Schema.Recipe (RecipeTable, RecipeRow (..), recipeIngredients)
-import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..), riIngredient)
-import ORM.Schema.Ingredient (IngredientRow (..))
-import qualified ORM.Schema.Recipe as Recipe
+import ORM.SelectIn
+  ( findByIn,
+    prepareIncludeRootQuery,
+    emptyGroups,
+    indexHasMany,
+    lookupGroups,
+    emptyByPk,
+    indexByPk,
+    lookupByPk
+  )
+import ORM.Schema.Recipe (RecipeTable, RecipeRow (..))
+import ORM.Schema.RecipeIngredient (RecipeIngredientTable, RecipeIngredientRow (..))
+import ORM.Schema.Ingredient (IngredientTable, IngredientRow (..))
 import qualified ORM.Schema.RecipeIngredient as RecipeIngredient
 import qualified ORM.Schema.Ingredient as Ingredient
-import ORM.Schema.Unit (Unit)
 
 newtype RecipeIngredientInclude = RecipeIngredientInclude
   { ingredient :: Bool
@@ -88,174 +87,44 @@ unwrapNoInclude (NoInclude include) = include
 instance IncludesJoin RecipeInclude where
   includesJoin RecipeInclude {ingredients} = isJust ingredients
 
-data RecipeRecipeIngredientJoinRow = RecipeRecipeIngredientJoinRow
-  { recipeId :: UUID,
-    recipeCreatedAt :: UTCTime,
-    recipeUpdatedAt :: UTCTime,
-    recipeName :: Text,
-    recipeDescription :: Maybe Text,
-    recipeIngredientId :: Maybe UUID,
-    recipeIngredientIngredientId :: Maybe UUID,
-    recipeIngredientAmount :: Maybe Int,
-    recipeIngredientUnit :: Maybe Unit
-  }
-  deriving (Show, Eq)
-
-instance FromRow RecipeRecipeIngredientJoinRow where
-  fromRow = RecipeRecipeIngredientJoinRow <$> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field
-
-recipeRecipeIngredientColumns :: [Text]
-recipeRecipeIngredientColumns =
-  [ JoinChain.col "r" Recipe.recipeId,
-    JoinChain.col "r" Recipe.recipeCreatedAt,
-    JoinChain.col "r" Recipe.recipeUpdatedAt,
-    JoinChain.col "r" Recipe.recipeName,
-    JoinChain.col "r" Recipe.recipeDescription,
-    JoinChain.col "ri" RecipeIngredient.recipeIngredientId,
-    JoinChain.col "ri" RecipeIngredient.recipeIngredientIngredientId,
-    JoinChain.col "ri" RecipeIngredient.recipeIngredientAmount,
-    JoinChain.col "ri" RecipeIngredient.recipeIngredientUnit
-  ]
-
-buildRecipeRecipeIngredientJoin :: JoinChain.JoinChain RecipeTable
-buildRecipeRecipeIngredientJoin =
-  JoinChain.selectColumns recipeRecipeIngredientColumns $
-    JoinChain.buildJoinChainFromHasMany recipeIngredients "r" "ri"
-
-data RecipeRecipeIngredientIngredientJoinRow = RecipeRecipeIngredientIngredientJoinRow
-  { recipeId :: UUID,
-    recipeCreatedAt :: UTCTime,
-    recipeUpdatedAt :: UTCTime,
-    recipeName :: Text,
-    recipeDescription :: Maybe Text,
-    recipeIngredientId :: Maybe UUID,
-    recipeIngredientIngredientId :: Maybe UUID,
-    recipeIngredientAmount :: Maybe Int,
-    recipeIngredientUnit :: Maybe Unit,
-    ingredientId :: Maybe UUID,
-    ingredientCreatedAt :: Maybe UTCTime,
-    ingredientUpdatedAt :: Maybe UTCTime,
-    ingredientName :: Maybe Text
-  }
-  deriving (Show, Eq)
-
-instance FromRow RecipeRecipeIngredientIngredientJoinRow where
-  fromRow = RecipeRecipeIngredientIngredientJoinRow <$> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field <*> field
-
-recipeRecipeIngredientIngredientColumns :: [Text]
-recipeRecipeIngredientIngredientColumns =
-  recipeRecipeIngredientColumns
-    ++ [ JoinChain.col "i" Ingredient.ingredientId,
-         JoinChain.col "i" Ingredient.ingredientCreatedAt,
-         JoinChain.col "i" Ingredient.ingredientUpdatedAt,
-         JoinChain.col "i" Ingredient.ingredientName
-       ]
-
-buildRecipeRecipeIngredientIngredientJoin :: JoinChain.JoinChain RecipeTable
-buildRecipeRecipeIngredientIngredientJoin =
-  JoinChain.selectColumns recipeRecipeIngredientIngredientColumns $
-    JoinChain.addBelongsToJoin riIngredient "ri" "i" buildRecipeRecipeIngredientJoin
-
-instance BuildJoinChain RecipeTable RecipeInclude where
-  type JoinFlatRow RecipeInclude = RecipeRecipeIngredientJoinRow
-  buildJoinChain RecipeInclude {ingredients = Just RecipeIngredientInclude {ingredient = False}} =
-    buildRecipeRecipeIngredientJoin
-  buildJoinChain RecipeInclude {ingredients = Just RecipeIngredientInclude {ingredient = True}} =
-    buildRecipeRecipeIngredientIngredientJoin
-  buildJoinChain RecipeInclude {ingredients = Nothing} =
-    buildRecipeRecipeIngredientJoin
-
 instance NestInclude RecipeInclude RecipeWithIngredients where
   type RootRow RecipeInclude = RecipeRow
-  nestRows _ = nestRecipeRows
   wrapRoot _ recipe = RecipeWithIngredients {recipe, ingredients = []}
 
-nestRecipeRows :: [RecipeRecipeIngredientJoinRow] -> [RecipeWithIngredients]
-nestRecipeRows =
-  map recipeWithIngredientsFromGroup . groupByKey (.recipeId)
+loadRecipeIngredientInclude :: RecipeIngredientInclude -> [RecipeIngredientRow] -> Db [RecipeIngredientWithIngredient]
+loadRecipeIngredientInclude include roots = do
+  ingredientMap <-
+    if include.ingredient
+      then indexByPk (.id) <$> findByIn @IngredientTable @IngredientRow Ingredient.ingredientId (map (.ingredientId) roots)
+      else pure emptyByPk
+  pure
+    [
+      RecipeIngredientWithIngredient {
+        recipeIngredient = root,
+        ingredient = lookupByPk root.ingredientId ingredientMap
+      }
+    | root <- roots
+    ]
 
-recipeWithIngredientsFromGroup :: [RecipeRecipeIngredientJoinRow] -> RecipeWithIngredients
-recipeWithIngredientsFromGroup rows@(firstRow : _) =
-  RecipeWithIngredients
-    { recipe = toRecipeRow firstRow,
-      ingredients = map recipeIngredientWithNoRiIngredient $ mapMaybe toRecipeIngredientRow rows
-    }
-recipeWithIngredientsFromGroup [] =
-  error "recipeWithIngredientsFromGroup: empty group"
-
-recipeIngredientWithNoRiIngredient :: RecipeIngredientRow -> RecipeIngredientWithIngredient
-recipeIngredientWithNoRiIngredient recipeIngredient = RecipeIngredientWithIngredient {recipeIngredient, ingredient = Nothing}
-
-toRecipeRow :: RecipeRecipeIngredientJoinRow -> RecipeRow
-toRecipeRow row = RecipeRow {id = row.recipeId, createdAt = row.recipeCreatedAt, updatedAt = row.recipeUpdatedAt, name = row.recipeName, description = row.recipeDescription}
-
-toRecipeIngredientRow :: RecipeRecipeIngredientJoinRow -> Maybe RecipeIngredientRow
-toRecipeIngredientRow row
-  | Just rid <- row.recipeIngredientId,
-    Just ingredientId <- row.recipeIngredientIngredientId,
-    Just amount <- row.recipeIngredientAmount,
-    Just unit <- row.recipeIngredientUnit =
-      Just RecipeIngredientRow {id = rid, ingredientId = ingredientId, amount = amount, unit = unit, recipeId = row.recipeId}
-  | otherwise = Nothing
-
-nestRecipeRecipeIngredientIngredientRows :: [RecipeRecipeIngredientIngredientJoinRow] -> [RecipeWithIngredients]
-nestRecipeRecipeIngredientIngredientRows =
-  map recipeWithIngredientFromRecipeGroup . groupByKey (.recipeId)
-
-recipeWithIngredientFromRecipeGroup :: [RecipeRecipeIngredientIngredientJoinRow] -> RecipeWithIngredients
-recipeWithIngredientFromRecipeGroup rows@(firstRow : _) =
-  RecipeWithIngredients
-    { recipe = toRecipeRowFromIngredient firstRow,
-      ingredients = mapMaybe recipeIngredientWithIngredientFromGroup $ groupByKey (.recipeIngredientId) rows
-    }
-recipeWithIngredientFromRecipeGroup [] =
-  error "recipeWithIngredientFromRecipeGroup: empty group"
-
-recipeIngredientWithIngredientFromGroup :: [RecipeRecipeIngredientIngredientJoinRow] -> Maybe RecipeIngredientWithIngredient
-recipeIngredientWithIngredientFromGroup (firstRow : _)
-  | Just _ <- firstRow.recipeIngredientId =
-      Just
-        RecipeIngredientWithIngredient
-          { recipeIngredient = toRecipeIngredientRowFromIngredient firstRow,
-            ingredient = toIngredientRow firstRow
-          }
-  | otherwise = Nothing
-recipeIngredientWithIngredientFromGroup [] = Nothing
-
-toRecipeRowFromIngredient :: RecipeRecipeIngredientIngredientJoinRow -> RecipeRow
-toRecipeRowFromIngredient row = RecipeRow {id = row.recipeId, createdAt = row.recipeCreatedAt, updatedAt = row.recipeUpdatedAt, name = row.recipeName, description = row.recipeDescription}
-
-toRecipeIngredientRowFromIngredient :: RecipeRecipeIngredientIngredientJoinRow -> RecipeIngredientRow
-toRecipeIngredientRowFromIngredient row =
-  RecipeIngredientRow
-    { id = fromMaybe (error "toRecipeIngredientRowFromIngredient: missing id") row.recipeIngredientId,
-      ingredientId = fromMaybe (error "toRecipeIngredientRowFromIngredient: missing ingredientId") row.recipeIngredientIngredientId,
-      amount = fromMaybe (error "toRecipeIngredientRowFromIngredient: missing amount") row.recipeIngredientAmount,
-      unit = fromMaybe (error "toRecipeIngredientRowFromIngredient: missing unit") row.recipeIngredientUnit,
-      recipeId = row.recipeId
-    }
-
-toIngredientRow :: RecipeRecipeIngredientIngredientJoinRow -> Maybe IngredientRow
-toIngredientRow row
-  | Just iid <- row.ingredientId,
-    Just createdAt <- row.ingredientCreatedAt,
-    Just updatedAt <- row.ingredientUpdatedAt,
-    Just name <- row.ingredientName =
-      Just IngredientRow {id = iid, createdAt = createdAt, updatedAt = updatedAt, name = name}
-  | otherwise = Nothing
+loadRecipeInclude :: RecipeInclude -> [RecipeRow] -> Db [RecipeWithIngredients]
+loadRecipeInclude include roots = do
+  ingredientsMap <- case include.ingredients of
+    Nothing -> pure emptyGroups
+    Just nestedInclude -> do
+      rows <- findByIn @RecipeIngredientTable @RecipeIngredientRow RecipeIngredient.recipeIngredientRecipeId (map (.id) roots)
+      nested <- loadRecipeIngredientInclude nestedInclude rows
+      pure $ indexHasMany ((.recipeId) . (.recipeIngredient)) nested
+  pure
+    [
+      RecipeWithIngredients {
+        recipe = root,
+        ingredients = lookupGroups root.id ingredientsMap
+      }
+    | root <- roots
+    ]
 
 instance {-# OVERLAPPING #-} ExecuteInclude RecipeTable RecipeInclude RecipeWithIngredients where
-  executeInclude include modifier =
-    case include.ingredients of
-      Nothing -> do
-        roots <- findMany @RecipeTable @RecipeRow modifier
-        pure $ map (wrapRoot include) roots
-      Just RecipeIngredientInclude {ingredient = False} -> do
-        let chain = applyRootFilter buildRecipeRecipeIngredientJoin modifier
-        flatRows <- JoinChain.runJoinChain @RecipeRecipeIngredientJoinRow chain
-        pure $ nestRecipeRows flatRows
-      Just RecipeIngredientInclude {ingredient = True} -> do
-        let chain = applyRootFilter buildRecipeRecipeIngredientIngredientJoin modifier
-        flatRows <- JoinChain.runJoinChain @RecipeRecipeIngredientIngredientJoinRow chain
-        pure $ nestRecipeRecipeIngredientIngredientRows flatRows
+  executeInclude include modifier = do
+    roots <- findMany @RecipeTable @RecipeRow (prepareIncludeRootQuery @RecipeTable modifier)
+    loadRecipeInclude include roots
 

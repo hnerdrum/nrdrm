@@ -35,9 +35,9 @@ targetSpec =
                             recipeSchema
                           ]
 
-    it "derives 27 outputs across all targets" $ do
-      length (concatMap targetOutputs allTargets) `shouldBe` 27
-      length (allOutputs allTargets) `shouldBe` 27
+    it "derives 31 outputs across all targets" $ do
+      length (concatMap targetOutputs allTargets) `shouldBe` 31
+      length (allOutputs allTargets) `shouldBe` 31
 
     it "derives expected output paths" $ do
       let paths = sort (nub (map outputPath (allOutputs allTargets)))
@@ -60,7 +60,9 @@ targetSpec =
             "test/ORM/Codegen/golden/RecipeIngredient.hs.golden",
             "test/ORM/Codegen/golden/Section.hs.golden",
             "test/ORM/Codegen/golden/Shelf.hs.golden",
+            "test/ORM/Codegen/golden/ShelfGraphInclude.hs.golden",
             "test/ORM/Codegen/golden/ShelfInclude.hs.golden",
+            "test/ORM/Codegen/golden/Tag.hs.golden",
             "test/ORM/Codegen/golden/Unit.hs.golden",
             "test/ORM/Codegen/golden/Widget.hs.golden",
             "test/Schema/Book.hs",
@@ -68,7 +70,9 @@ targetSpec =
             "test/Schema/Section.hs",
             "test/Schema/Shelf.hs",
             "test/Schema/ShelfDeepInclude.hs",
+            "test/Schema/ShelfGraphInclude.hs",
             "test/Schema/ShelfInclude.hs",
+            "test/Schema/Tag.hs",
             "test/Schema/Widget.hs"
           ]
 

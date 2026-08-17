@@ -185,3 +185,33 @@ validateSpec =
                 ]
         validateSchema schema
           `shouldBe` [UnknownIncludeRelation "ShelfInclude" "Shelf" "shelfBooks"]
+
+      it "rejects duplicate relations at the same include level" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Shelf",
+                      modelTable = "test_shelf",
+                      modelFields = [pk (uuid "id"), uuid "name"],
+                      modelRelations =
+                        [ hasMany "shelfBooks" "Shelf" "Book" "id" "shelfId"
+                        ]
+                    },
+                  Model
+                    { modelName = "Book",
+                      modelTable = "test_book",
+                      modelFields = [pk (uuid "id"), column "shelf_id" (uuid "shelfId")],
+                      modelRelations = []
+                    }
+                ]
+                [ ModelInclude
+                    { includeName = "ShelfInclude",
+                      includeRootModel = "Shelf",
+                      includeTree =
+                        [ IncludeTree {includeRelation = "shelfBooks", includeChildren = []},
+                          IncludeTree {includeRelation = "shelfBooks", includeChildren = []}
+                        ]
+                    }
+                ]
+        validateSchema schema
+          `shouldBe` [DuplicateIncludeRelation "ShelfInclude" "Shelf" "shelfBooks"]

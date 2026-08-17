@@ -7,22 +7,15 @@ where
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import ORM.Codegen.Emit.FlatRow (emitJoinBuilder)
 import ORM.Codegen.Emit.Include
-  ( emitBuildJoinChain,
-    emitExecuteInclude,
+  ( emitExecuteInclude,
     emitIncludeADTs,
     emitIncludeModule,
     emitIncludesJoin,
     emitNestInclude,
     emitResultADTs,
   )
-import ORM.Codegen.Emit.Nest (emitNestHelpersForPath)
 import ORM.Codegen.IR (Schema (..))
-import ORM.Codegen.IncludePath
-  ( includeLongestJoinPath,
-    joinPathTake,
-  )
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import Test.Hspec
@@ -45,39 +38,10 @@ emitIncludeSpec =
       T.strip (emitIncludesJoin shelfSchema incl)
         `shouldBe` T.strip expectedIncludesJoin
 
-    it "emits buildShelfBookJoin" $ do
-      let incl = head (schemaIncludes shelfSchema)
-          path = joinPathTake 1 (includeLongestJoinPath shelfSchema incl)
-      T.strip (emitJoinBuilder shelfSchema path)
-        `shouldBe` T.strip expectedShelfBookJoin
-
-    it "emits buildShelfBookChapterJoin" $ do
-      let incl = head (schemaIncludes shelfSchema)
-          path = includeLongestJoinPath shelfSchema incl
-      T.strip (emitJoinBuilder shelfSchema path)
-        `shouldBe` T.strip expectedShelfBookChapterJoin
-
-    it "emits BuildJoinChain for ShelfInclude" $ do
-      let incl = head (schemaIncludes shelfSchema)
-      T.strip (emitBuildJoinChain shelfSchema incl)
-        `shouldBe` T.strip expectedBuildJoinChain
-
     it "emits NestInclude for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
       T.strip (emitNestInclude shelfSchema incl)
         `shouldBe` T.strip expectedNestInclude
-
-    it "emits shallow nest helpers for ShelfInclude" $ do
-      let incl = head (schemaIncludes shelfSchema)
-          path = joinPathTake 1 (includeLongestJoinPath shelfSchema incl)
-      T.strip (emitNestHelpersForPath shelfSchema incl path)
-        `shouldBe` T.strip expectedShallowNestHelpers
-
-    it "emits deep nest helpers for ShelfInclude" $ do
-      let incl = head (schemaIncludes shelfSchema)
-          path = includeLongestJoinPath shelfSchema incl
-      T.strip (emitNestHelpersForPath shelfSchema incl path)
-        `shouldBe` T.strip expectedDeepNestHelpers
 
     it "emits OVERLAPPING ExecuteInclude for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
@@ -95,6 +59,11 @@ emitIncludeSpec =
       let incl = head (schemaIncludes recipeSchema)
           actual = emitIncludeModule "ORM.Schema.RecipeInclude" recipeSchema incl
       T.strip actual `shouldBe` T.strip expected
+
+    it "emits sibling IncludesJoin for ShelfGraphInclude" $ do
+      let incl = schemaIncludes shelfSchema !! 1
+      T.strip (emitIncludesJoin shelfSchema incl)
+        `shouldBe` T.strip expectedGraphIncludesJoin
 
 expectedShelfIncludeADTs :: T.Text
 expectedShelfIncludeADTs =
@@ -133,35 +102,11 @@ expectedIncludesJoin =
       "  includesJoin ShelfInclude {books} = isJust books"
     ]
 
-expectedShelfBookJoin :: T.Text
-expectedShelfBookJoin =
+expectedGraphIncludesJoin :: T.Text
+expectedGraphIncludesJoin =
   T.unlines
-    [ "buildShelfBookJoin :: JoinChain.JoinChain ShelfTable",
-      "buildShelfBookJoin =",
-      "  JoinChain.selectColumns shelfBookColumns $",
-      "    JoinChain.buildJoinChainFromHasMany shelfBooks \"s\" \"b\""
-    ]
-
-expectedShelfBookChapterJoin :: T.Text
-expectedShelfBookChapterJoin =
-  T.unlines
-    [ "buildShelfBookChapterJoin :: JoinChain.JoinChain ShelfTable",
-      "buildShelfBookChapterJoin =",
-      "  JoinChain.selectColumns shelfBookChapterColumns $",
-      "    JoinChain.addHasManyJoin bookChapters \"b\" \"c\" buildShelfBookJoin"
-    ]
-
-expectedBuildJoinChain :: T.Text
-expectedBuildJoinChain =
-  T.unlines
-    [ "instance BuildJoinChain ShelfTable ShelfInclude where",
-      "  type JoinFlatRow ShelfInclude = ShelfBookJoinRow",
-      "  buildJoinChain ShelfInclude {books = Just BookInclude {chapters = False}} =",
-      "    buildShelfBookJoin",
-      "  buildJoinChain ShelfInclude {books = Just BookInclude {chapters = True}} =",
-      "    buildShelfBookChapterJoin",
-      "  buildJoinChain ShelfInclude {books = Nothing} =",
-      "    buildShelfBookJoin"
+    [ "instance IncludesJoin ShelfGraphInclude where",
+      "  includesJoin ShelfGraphInclude {books, tags} = isJust books || tags"
     ]
 
 expectedNestInclude :: T.Text
@@ -169,102 +114,14 @@ expectedNestInclude =
   T.unlines
     [ "instance NestInclude ShelfInclude ShelfWithBooks where",
       "  type RootRow ShelfInclude = ShelfRow",
-      "  nestRows _ = nestShelfRows",
       "  wrapRoot _ shelf = ShelfWithBooks {shelf, books = []}"
-    ]
-
-expectedShallowNestHelpers :: T.Text
-expectedShallowNestHelpers =
-  T.unlines
-    [ "nestShelfRows :: [ShelfBookJoinRow] -> [ShelfWithBooks]",
-      "nestShelfRows =",
-      "  map shelfWithBooksFromGroup . groupByKey (.shelfId)",
-      "",
-      "shelfWithBooksFromGroup :: [ShelfBookJoinRow] -> ShelfWithBooks",
-      "shelfWithBooksFromGroup rows@(firstRow : _) =",
-      "  ShelfWithBooks",
-      "    { shelf = toShelfRow firstRow,",
-      "      books = map bookWithNoChapters $ mapMaybe toBookRow rows",
-      "    }",
-      "shelfWithBooksFromGroup [] =",
-      "  error \"shelfWithBooksFromGroup: empty group\"",
-      "",
-      "bookWithNoChapters :: BookRow -> BookWithChapters",
-      "bookWithNoChapters book = BookWithChapters {book, chapters = []}",
-      "",
-      "toShelfRow :: ShelfBookJoinRow -> ShelfRow",
-      "toShelfRow row = ShelfRow {id = row.shelfId, name = row.shelfName}",
-      "",
-      "toBookRow :: ShelfBookJoinRow -> Maybe BookRow",
-      "toBookRow row",
-      "  | Just bid <- row.bookId,",
-      "    Just title <- row.bookTitle =",
-      "      Just BookRow {id = bid, title = title, shelfId = row.shelfId}",
-      "  | otherwise = Nothing"
-    ]
-
-expectedDeepNestHelpers :: T.Text
-expectedDeepNestHelpers =
-  T.unlines
-    [ "nestShelfBookChapterRows :: [ShelfBookChapterJoinRow] -> [ShelfWithBooks]",
-      "nestShelfBookChapterRows =",
-      "  map shelfWithChaptersFromShelfGroup . groupByKey (.shelfId)",
-      "",
-      "shelfWithChaptersFromShelfGroup :: [ShelfBookChapterJoinRow] -> ShelfWithBooks",
-      "shelfWithChaptersFromShelfGroup rows@(firstRow : _) =",
-      "  ShelfWithBooks",
-      "    { shelf = toShelfRowFromChapter firstRow,",
-      "      books = mapMaybe bookWithChaptersFromGroup $ groupByKey (.bookId) rows",
-      "    }",
-      "shelfWithChaptersFromShelfGroup [] =",
-      "  error \"shelfWithChaptersFromShelfGroup: empty group\"",
-      "",
-      "bookWithChaptersFromGroup :: [ShelfBookChapterJoinRow] -> Maybe BookWithChapters",
-      "bookWithChaptersFromGroup rows@(firstRow : _)",
-      "  | Just _ <- firstRow.bookId =",
-      "      Just",
-      "        BookWithChapters",
-      "          { book = toBookRowFromChapter firstRow,",
-      "            chapters = mapMaybe toChapterRow rows",
-      "          }",
-      "  | otherwise = Nothing",
-      "bookWithChaptersFromGroup [] = Nothing",
-      "",
-      "toShelfRowFromChapter :: ShelfBookChapterJoinRow -> ShelfRow",
-      "toShelfRowFromChapter row = ShelfRow {id = row.shelfId, name = row.shelfName}",
-      "",
-      "toBookRowFromChapter :: ShelfBookChapterJoinRow -> BookRow",
-      "toBookRowFromChapter row =",
-      "  BookRow",
-      "    { id = fromMaybe (error \"toBookRowFromChapter: missing id\") row.bookId,",
-      "      title = fromMaybe (error \"toBookRowFromChapter: missing title\") row.bookTitle,",
-      "      shelfId = row.shelfId",
-      "    }",
-      "",
-      "toChapterRow :: ShelfBookChapterJoinRow -> Maybe ChapterRow",
-      "toChapterRow row",
-      "  | Just cid <- row.chapterId,",
-      "    Just heading <- row.chapterHeading,",
-      "    Just bid <- row.bookId =",
-      "      Just ChapterRow {id = cid, heading = heading, bookRef = bid}",
-      "  | otherwise = Nothing"
     ]
 
 expectedExecuteInclude :: T.Text
 expectedExecuteInclude =
   T.unlines
     [ "instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfInclude ShelfWithBooks where",
-      "  executeInclude include modifier =",
-      "    case include.books of",
-      "      Nothing -> do",
-      "        roots <- findMany @ShelfTable @ShelfRow modifier",
-      "        pure $ map (wrapRoot include) roots",
-      "      Just BookInclude {chapters = False} -> do",
-      "        let chain = applyRootFilter buildShelfBookJoin modifier",
-      "        flatRows <- JoinChain.runJoinChain @ShelfBookJoinRow chain",
-      "        pure $ nestShelfRows flatRows",
-      "      Just BookInclude {chapters = True} -> do",
-      "        let chain = applyRootFilter buildShelfBookChapterJoin modifier",
-      "        flatRows <- JoinChain.runJoinChain @ShelfBookChapterJoinRow chain",
-      "        pure $ nestShelfBookChapterRows flatRows"
+      "  executeInclude include modifier = do",
+      "    roots <- findMany @ShelfTable @ShelfRow (prepareIncludeRootQuery @ShelfTable modifier)",
+      "    loadShelfInclude include roots"
     ]

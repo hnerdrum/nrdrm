@@ -52,6 +52,10 @@ includePathSpec =
       let incl = head (schemaIncludes shelfSchema)
       includeMaxDepth shelfSchema incl `shouldBe` 3
 
+    it "includeMaxDepth uses the deepest sibling branch" $ do
+      includeMaxDepth shelfSchema (schemaIncludes shelfSchema !! 1) `shouldBe` 3
+      includeMaxDepth siblingDepthSchema siblingDepthInclude `shouldBe` 3
+
 fourLevelPathSpec :: Spec
 fourLevelPathSpec =
   describe "ORM.Codegen.IncludePath four-level fixture" $ do
@@ -62,3 +66,66 @@ fourLevelPathSpec =
 
 shelfDeepInclude :: ModelInclude
 shelfDeepInclude = head (schemaIncludes shelfDeepSchema)
+
+-- First edge is a leaf; the deeper path is a sibling. First-child-only
+-- depth would report 2.
+siblingDepthSchema :: Schema
+siblingDepthSchema =
+  Schema
+    { schemaEnums = [],
+      schemaModels = [parentModel, leafModel, midModel, deepModel],
+      schemaIncludes = [siblingDepthInclude]
+    }
+
+parentModel :: Model
+parentModel =
+  Model
+    { modelName = "Parent",
+      modelTable = "parent",
+      modelFields = [pk (uuid "id")],
+      modelRelations =
+        [ hasMany "parentLeaves" "Parent" "Leaf" "id" "parentId",
+          hasMany "parentMids" "Parent" "Mid" "id" "parentId"
+        ]
+    }
+
+leafModel :: Model
+leafModel =
+  Model
+    { modelName = "Leaf",
+      modelTable = "leaf",
+      modelFields = [pk (uuid "id"), column "parent_id" (uuid "parentId")],
+      modelRelations = []
+    }
+
+midModel :: Model
+midModel =
+  Model
+    { modelName = "Mid",
+      modelTable = "mid",
+      modelFields = [pk (uuid "id"), column "parent_id" (uuid "parentId")],
+      modelRelations = [hasMany "midDeeps" "Mid" "Deep" "id" "midId"]
+    }
+
+deepModel :: Model
+deepModel =
+  Model
+    { modelName = "Deep",
+      modelTable = "deep",
+      modelFields = [pk (uuid "id"), column "mid_id" (uuid "midId")],
+      modelRelations = []
+    }
+
+siblingDepthInclude :: ModelInclude
+siblingDepthInclude =
+  ModelInclude
+    { includeName = "ParentInclude",
+      includeRootModel = "Parent",
+      includeTree =
+        [ IncludeTree {includeRelation = "parentLeaves", includeChildren = []},
+          IncludeTree
+            { includeRelation = "parentMids",
+              includeChildren = [IncludeTree {includeRelation = "midDeeps", includeChildren = []}]
+            }
+        ]
+    }
