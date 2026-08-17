@@ -51,6 +51,7 @@ data JoinChain root = JoinChain
     jcSelect :: [Text],
     jcWhere :: [Text],
     jcParams :: [Action],
+    jcOrderBy :: [Text],
     jcLimit :: Maybe Int
   }
   deriving (Show)
@@ -68,6 +69,7 @@ startJoinChain alias =
       jcSelect = [],
       jcWhere = [],
       jcParams = [],
+      jcOrderBy = [alias <> "." <> fieldColumn (primaryKey @root)],
       jcLimit = Nothing
     }
 
@@ -100,7 +102,9 @@ addHasManyJoin HasMany {joinType, localKey, foreignKey} leftAlias childAlias cha
                    jtOnLeft = leftAlias <> "." <> fieldColumn localKey,
                    jtOnRight = childAlias <> "." <> fieldColumn foreignKey
                  }
-             ]
+             ],
+      jcOrderBy =
+        jcOrderBy chain ++ [childAlias <> "." <> fieldColumn (primaryKey @child)]
     }
 
 addBelongsToJoin ::
@@ -122,7 +126,9 @@ addBelongsToJoin BelongsTo {joinType, foreignKey, references} childAlias parentA
                    jtOnLeft = childAlias <> "." <> fieldColumn foreignKey,
                    jtOnRight = parentAlias <> "." <> fieldColumn references
                  }
-             ]
+             ],
+      jcOrderBy =
+        jcOrderBy chain ++ [parentAlias <> "." <> fieldColumn (primaryKey @parent)]
     }
 
 selectColumns ::
@@ -190,12 +196,18 @@ buildJoinQuery jc =
       joinClauses = map buildJoinClause (jcJoins jc)
       fromClause = " FROM " <> rootRef <> " " <> Text.intercalate " " joinClauses
       whereClause = buildWhereClause (jcWhere jc)
+      orderClause = buildOrderClause (jcOrderBy jc)
       limitClause =
         case jcLimit jc of
           Nothing -> ""
           Just n -> " LIMIT " <> Text.pack (show n)
-      queryText = "SELECT " <> selectClause <> fromClause <> whereClause <> limitClause
+      queryText = "SELECT " <> selectClause <> fromClause <> whereClause <> orderClause <> limitClause
    in (Query (TE.encodeUtf8 queryText), jcParams jc)
+
+buildOrderClause :: [Text] -> Text
+buildOrderClause [] = ""
+buildOrderClause cols =
+  " ORDER BY " <> Text.intercalate ", " (map (<> " ASC") cols)
 
 runJoinChain ::
   forall result root.

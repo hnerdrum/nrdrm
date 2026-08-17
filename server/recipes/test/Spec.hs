@@ -9,6 +9,7 @@ import ORM.Codegen.JoinAliasSpec (joinAliasSpec)
 import ORM.Codegen.TargetSpec (targetSpec)
 import ORM.Codegen.ValidateSpec (validateSpec)
 import ORM.ErrorsSpec (errorsSpec)
+import ORM.GroupSpec (groupSpec)
 import ORM.IncludeSpec (includeSpec)
 import ORM.JoinSpec (joinSpec)
 import ORM.OperationsSpec (operationsSpec)
@@ -28,4 +29,5 @@ main = hspec $ do
   emitClientSpec
   targetSpec
   errorsSpec
+  groupSpec
   withTestDb $ operationsSpec >> joinSpec >> includeSpec >> rawSpec
