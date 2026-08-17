@@ -28,9 +28,8 @@ import ORM.Codegen.Emit.Include (emitIncludeModule)
 import ORM.Codegen.Emit.Schema (emitEnumModule, emitModelModule)
 import ORM.Codegen.IR
   ( EnumSpec (..),
-    Model (..),
+    Model,
     ModelInclude (..),
-    RelationSpec (..),
     Schema (..),
     enumImport,
     enumName,

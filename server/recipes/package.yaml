@@ -76,6 +76,11 @@ library:
     - ORM
     - ORM.Client.Ingredient
     - ORM.Client.Recipe
+    - ORM.Schema.Ingredient
+    - ORM.Schema.Recipe
+    - ORM.Schema.RecipeInclude
+    - ORM.Schema.RecipeIngredient
+    - ORM.Schema.Unit
     - ORM.Codegen.Emit.Client
     - ORM.Codegen.Emit.FlatRow
     - ORM.Codegen.Emit.Include

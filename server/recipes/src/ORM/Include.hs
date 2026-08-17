@@ -18,7 +18,9 @@ module ORM.Include
   )
 where
 
+import Control.Exception (throw)
 import Data.Kind (Type)
+import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Database.PostgreSQL.Simple.FromRow (FromRow)
@@ -29,7 +31,16 @@ import ORM.Errors (ORMError (..), requireFound)
 import ORM.JoinChain (JoinChain, rootAlias, whereJoin)
 import qualified ORM.JoinChain as JoinChain
 import qualified ORM.Operations as Ops
-import ORM.Query (QueryBuilder, queryLimit, queryWhereConditions, queryWhereParams, selectAll, whereEq)
+import ORM.Query
+  ( QueryBuilder,
+    queryLimit,
+    queryOffset,
+    queryOrderBy,
+    queryWhereConditions,
+    queryWhereParams,
+    selectAll,
+    whereEq,
+  )
 
 class IncludesJoin include where
   includesJoin :: include -> Bool
@@ -78,36 +89,23 @@ findUnique ::
   forall root include result.
   ( Entity root,
     ToField (PrimaryKeyType root),
-    BuildJoinChain root include,
-    NestInclude include result,
-    FromRow (JoinFlatRow include),
-    FromRow (RootRow include)
+    ExecuteInclude root include result
   ) =>
   include ->
   PrimaryKeyType root ->
   Db (Maybe result)
-findUnique include pk
-  | includesJoin include = do
-      let chain =
-            JoinChain.limitJoin 1 $
-              applyRootFilter (buildJoinChain include) (whereEq (primaryKey @root) pk)
-      flatRows <- JoinChain.runJoinChain @(JoinFlatRow include) chain
-      pure $ case nestRows include flatRows of
-        [] -> Nothing
-        (row : _) -> Just row
-  | otherwise = do
-      mRoot <- Ops.findUnique @root @(RootRow include) pk
-      pure $ fmap (wrapRoot include) mRoot
+findUnique include pk = do
+  results <- findMany include (whereEq (primaryKey @root) pk)
+  pure $ case results of
+    [] -> Nothing
+    (row : _) -> Just row
 
 findUniqueOrFail ::
   forall root include result.
   ( Entity root,
     ToField (PrimaryKeyType root),
     Show (PrimaryKeyType root),
-    BuildJoinChain root include,
-    NestInclude include result,
-    FromRow (JoinFlatRow include),
-    FromRow (RootRow include)
+    ExecuteInclude root include result
   ) =>
   include ->
   PrimaryKeyType root ->
@@ -127,12 +125,24 @@ applyRootFilter ::
   JoinChain root
 applyRootFilter chain modifier =
   let qb = modifier (selectAll @root)
-      alias = rootAlias chain
-      prefixedWhere = map (prefixWhereCondition alias) (queryWhereConditions qb)
-      filtered = foldl applyWhere chain (zip prefixedWhere (queryWhereParams qb))
-   in maybe id JoinChain.limitJoin (queryLimit qb) filtered
+   in case includePagingError qb of
+        Just err -> throw err
+        Nothing ->
+          let alias = rootAlias chain
+              prefixedWhere = map (prefixWhereCondition alias) (queryWhereConditions qb)
+           in foldl applyWhere chain (zip prefixedWhere (queryWhereParams qb))
   where
     applyWhere c (condition, param) = whereJoin condition [param] c
+
+includePagingError :: QueryBuilder table -> Maybe ORMError
+includePagingError qb
+  | isJust (queryLimit qb)
+      || isJust (queryOffset qb)
+      || isJust (queryOrderBy qb) =
+      Just $
+        UnsupportedIncludeModifier
+          "limit, offset, and orderBy are not supported on include queries"
+  | otherwise = Nothing
 
 prefixWhereCondition :: Text -> Text -> Text
 prefixWhereCondition alias condition = alias <> "." <> condition

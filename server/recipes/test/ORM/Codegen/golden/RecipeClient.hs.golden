@@ -40,7 +40,7 @@ import Data.UUID (UUID)
 import qualified Data.UUID.V4 as V4
 import ORM.PG (toField)
 import ORM.Core (fieldColumn)
-import ORM.Db (Db, liftIO)
+import ORM.Db (Db, liftIO, transaction)
 import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError)
 import qualified ORM.Include as Include
@@ -145,7 +145,7 @@ create ::
   WithIngredients ->
   RecipeWriteCreate ->
   Db (Either ORMError RecipeWithIngredients)
-create include input = do
+create include input = transaction $ do
   rootId <- liftIO $ maybe V4.nextRandom pure input.root.id
   let rootInput =
         RecipeCreate { id = Just rootId, createdAt = input.root.createdAt, updatedAt = input.root.updatedAt, name = input.root.name, description = input.root.description }
@@ -164,7 +164,7 @@ update ::
   UUID ->
   RecipeWriteUpdate ->
   Db (Either ORMError RecipeWithIngredients)
-update include rootId input = do
+update include rootId input = transaction $ do
   updateResult <-
     Update.update @RecipeTable @RecipeRow rootId input.root
   case updateResult of

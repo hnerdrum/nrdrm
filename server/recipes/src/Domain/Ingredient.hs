@@ -118,3 +118,4 @@ fromIngredientError err =
     MultipleRecordsFound ingredientId -> AppError MultipleEntitiesError "Found multiple ingredients with matching ID" (object ["ingredientId" .= ingredientId])
     UniqueViolation message -> AppError ConflictError message (object [])
     DatabaseError message -> AppError InternalError message (object [])
+    UnsupportedIncludeModifier message -> AppError InternalError message (object [])

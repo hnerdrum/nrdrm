@@ -11,7 +11,7 @@ module ORM.Codegen.JoinAlias
 where
 
 import Data.Char (isUpper, toLower)
-import Data.List (nub)
+import Data.List (find, nub)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.IR

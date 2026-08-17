@@ -5,6 +5,7 @@ module ORM.Db
     closePool,
     runDb,
     withTransaction,
+    transaction,
     withConn,
     liftIO,
   )
@@ -62,3 +63,7 @@ withConn (DbPool pool) = withResource pool
 withTransaction :: DbPool -> Db a -> IO a
 withTransaction (DbPool pool) (Db action) =
   withResource pool $ \conn -> PG.withTransaction conn (action conn)
+
+-- | Run a 'Db' action in a transaction on the current connection.
+transaction :: Db a -> Db a
+transaction (Db action) = Db $ \conn -> PG.withTransaction conn (action conn)
