@@ -43,6 +43,7 @@ joinSpec =
       _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
       rows <- runDb pool (JoinChain.runJoinChain @ShelfBookJoinRow shelfBookJoin)
       length rows `shouldBe` 2
+      map (.bookId) rows `shouldBe` sort (map (.bookId) rows)
       sort (map (.bookTitle) rows) `shouldBe` sort [Just "Dune", Just "Neuromancer"]
       map (.shelfId) rows `shouldBe` [shelf.id, shelf.id]
 
@@ -119,4 +120,5 @@ joinSpec =
               (JoinChain.addHasManyJoin Book.bookChapters "b" "c" shelfBookJoin)
       rows <- runDb pool (JoinChain.runJoinChain @ShelfBookChapterJoinRow shelfBookChapterJoin)
       length rows `shouldBe` 2
+      map (.chapterId) rows `shouldBe` sort (map (.chapterId) rows)
       sort (map (.chapterHeading) rows) `shouldBe` sort [Just "Arrakis", Just "Caladan"]

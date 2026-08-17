@@ -6,6 +6,9 @@
 module ORM.Query
   ( Query,
     QueryBuilder,
+    WherePred (..),
+    queryWherePreds,
+    queryWhereClauses,
     queryWhereConditions,
     queryWhereParams,
     queryLimit,
@@ -42,12 +45,17 @@ import ORM.Db (Db (..))
 
 data QueryBuilder table = QueryBuilder
   { qbTable :: Text,
-    qbWhere :: [Text],
-    qbParams :: [Action],
+    qbWhere :: [WherePred],
     qbOrderBy :: Maybe (Text, OrderDirection),
     qbLimit :: Maybe Int,
     qbOffset :: Maybe Int
   }
+
+-- | A WHERE predicate. Column equalities can be alias-qualified for joins;
+-- raw SQL cannot, and is rejected on include queries.
+data WherePred
+  = WhereColumnEq Text Action
+  | WhereRaw Text [Action]
 
 data OrderDirection = Asc | Desc
 
@@ -56,7 +64,6 @@ selectAll =
   QueryBuilder
     { qbTable = tableName @table,
       qbWhere = [],
-      qbParams = [],
       qbOrderBy = Nothing,
       qbLimit = Nothing,
       qbOffset = Nothing
@@ -67,16 +74,11 @@ select = selectAll @table
 
 where_ :: Text -> [Action] -> QueryBuilder table -> QueryBuilder table
 where_ condition params qb =
-  qb
-    { qbWhere = qbWhere qb ++ [condition],
-      qbParams = qbParams qb ++ params
-    }
+  qb {qbWhere = qbWhere qb ++ [WhereRaw condition params]}
 
 whereEq :: forall table a. (ToField a) => Field table a -> a -> QueryBuilder table -> QueryBuilder table
-whereEq field value =
-  where_
-    (fieldColumn field <> " = ?")
-    [toField value]
+whereEq field value qb =
+  qb {qbWhere = qbWhere qb ++ [WhereColumnEq (fieldColumn field) (toField value)]}
 
 orderBy :: Field table a -> OrderDirection -> QueryBuilder table -> QueryBuilder table
 orderBy field dir qb =
@@ -88,11 +90,26 @@ limit n qb = qb {qbLimit = Just n}
 offset :: Int -> QueryBuilder table -> QueryBuilder table
 offset n qb = qb {qbOffset = Just n}
 
+queryWherePreds :: QueryBuilder table -> [WherePred]
+queryWherePreds = qbWhere
+
+queryWhereClauses :: QueryBuilder table -> [(Text, [Action])]
+queryWhereClauses qb =
+  [(wherePredSql wp, wherePredParams wp) | wp <- qbWhere qb]
+
 queryWhereConditions :: QueryBuilder table -> [Text]
-queryWhereConditions = qbWhere
+queryWhereConditions = map fst . queryWhereClauses
 
 queryWhereParams :: QueryBuilder table -> [Action]
-queryWhereParams = qbParams
+queryWhereParams = concatMap snd . queryWhereClauses
+
+wherePredSql :: WherePred -> Text
+wherePredSql (WhereColumnEq col _) = col <> " = ?"
+wherePredSql (WhereRaw sql _) = sql
+
+wherePredParams :: WherePred -> [Action]
+wherePredParams (WhereColumnEq _ value) = [value]
+wherePredParams (WhereRaw _ params) = params
 
 queryLimit :: QueryBuilder table -> Maybe Int
 queryLimit = qbLimit
@@ -119,17 +136,19 @@ applyQueryModifiers mWhere mOrder mLimit mOffset =
 buildQuery :: QueryBuilder table -> (Query, [Action])
 buildQuery qb =
   let baseQuery = "SELECT * FROM " <> qbTable qb
-      whereClause = buildWhereClause (qbWhere qb)
+      clauses = queryWhereClauses qb
+      whereClause = buildWhereClause (map fst clauses)
       orderClause = buildOrderClause (qbOrderBy qb)
       limitClause = buildLimitClause (qbLimit qb)
       offsetClause = buildOffsetClause (qbOffset qb)
       finalQuery = baseQuery <> whereClause <> orderClause <> limitClause <> offsetClause
-   in (Query (TE.encodeUtf8 finalQuery), qbParams qb)
+   in (Query (TE.encodeUtf8 finalQuery), concatMap snd clauses)
 
 buildCountQuery :: QueryBuilder table -> (Query, [Action])
 buildCountQuery qb =
-  let finalQuery = "SELECT COUNT(*) FROM " <> qbTable qb <> buildWhereClause (qbWhere qb)
-   in (Query (TE.encodeUtf8 finalQuery), qbParams qb)
+  let clauses = queryWhereClauses qb
+      finalQuery = "SELECT COUNT(*) FROM " <> qbTable qb <> buildWhereClause (map fst clauses)
+   in (Query (TE.encodeUtf8 finalQuery), concatMap snd clauses)
 
 buildWhereClause :: [Text] -> Text
 buildWhereClause [] = ""

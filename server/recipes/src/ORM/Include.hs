@@ -24,7 +24,7 @@ import Data.Maybe (isJust)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Database.PostgreSQL.Simple.FromRow (FromRow)
-import Database.PostgreSQL.Simple.ToField (ToField)
+import Database.PostgreSQL.Simple.ToField (Action, ToField)
 import ORM.Core (Entity (..), PrimaryKeyType)
 import ORM.Db (Db (..))
 import ORM.Errors (ORMError (..), requireFound)
@@ -33,11 +33,11 @@ import qualified ORM.JoinChain as JoinChain
 import qualified ORM.Operations as Ops
 import ORM.Query
   ( QueryBuilder,
+    WherePred (..),
     queryLimit,
     queryOffset,
     queryOrderBy,
-    queryWhereConditions,
-    queryWhereParams,
+    queryWherePreds,
     selectAll,
     whereEq,
   )
@@ -128,11 +128,20 @@ applyRootFilter chain modifier =
    in case includePagingError qb of
         Just err -> throw err
         Nothing ->
-          let alias = rootAlias chain
-              prefixedWhere = map (prefixWhereCondition alias) (queryWhereConditions qb)
-           in foldl applyWhere chain (zip prefixedWhere (queryWhereParams qb))
+          foldl (applyPred (rootAlias chain)) chain (queryWherePreds qb)
   where
-    applyWhere c (condition, param) = whereJoin condition [param] c
+    applyPred alias c wp =
+      case qualifyIncludeWhere alias wp of
+        Left err -> throw err
+        Right (sql, params) -> whereJoin sql params c
+
+qualifyIncludeWhere :: Text -> WherePred -> Either ORMError (Text, [Action])
+qualifyIncludeWhere alias (WhereColumnEq col value) =
+  Right (alias <> "." <> col <> " = ?", [value])
+qualifyIncludeWhere _ (WhereRaw _ _) =
+  Left $
+    UnsupportedIncludeModifier
+      "raw WHERE is not supported on include queries; use whereEq"
 
 includePagingError :: QueryBuilder table -> Maybe ORMError
 includePagingError qb
@@ -143,6 +152,3 @@ includePagingError qb
         UnsupportedIncludeModifier
           "limit, offset, and orderBy are not supported on include queries"
   | otherwise = Nothing
-
-prefixWhereCondition :: Text -> Text -> Text
-prefixWhereCondition alias condition = alias <> "." <> condition

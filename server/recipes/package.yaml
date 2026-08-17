@@ -173,6 +173,7 @@ tests:
       - ORM.OperationsSpec
       - ORM.RawSpec
       - ORM.ErrorsSpec
+      - ORM.GroupSpec
       - ORM.JoinSpec
       - ORM.IncludeSpec
       - ORM.Codegen.ValidateSpec

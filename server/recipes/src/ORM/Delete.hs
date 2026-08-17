@@ -23,7 +23,7 @@ import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..))
 import ORM.Db (Db (..))
-import ORM.Query (QueryBuilder, buildWhereClause, queryWhereConditions, queryWhereParams, selectAll)
+import ORM.Query (QueryBuilder, buildWhereClause, queryWhereClauses, selectAll)
 
 data DeleteBuilder table = DeleteBuilder
   { dbTable :: Text,
@@ -65,9 +65,9 @@ deleteMany modifier =
 fromQueryWhere :: forall table. (Entity table) => QueryBuilder table -> DeleteBuilder table
 fromQueryWhere qb =
   foldl
-    (\builder (condition, param) -> whereDelete condition [param] builder)
+    (\builder (condition, params) -> whereDelete condition params builder)
     (emptyDelete @table)
-    (zip (queryWhereConditions qb) (queryWhereParams qb))
+    (queryWhereClauses qb)
 
 deleteReturning ::
   forall table result.

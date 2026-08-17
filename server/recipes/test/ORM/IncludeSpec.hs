@@ -9,10 +9,11 @@ where
 import Data.List (sort)
 import Data.Text (Text)
 import Data.UUID (UUID, nil)
+import Database.PostgreSQL.Simple.ToField (toField)
 import ORM (ORMError (..), runDb)
 import ORM.Include (findMany, findUnique)
 import qualified ORM.Operations as Ops
-import ORM.Query (OrderDirection (Asc), limit, offset, orderBy, whereEq)
+import ORM.Query (OrderDirection (Asc), limit, offset, orderBy, whereEq, where_)
 import qualified ORM.ShelfFixtures as ShelfFixtures
 import Schema.Book (BookRow (..))
 import Schema.Chapter (ChapterRow (..))
@@ -58,6 +59,8 @@ includeSpec =
       results <- runDb pool (findMany @Shelf.ShelfTable includeBooks id)
       length results `shouldBe` 2
       fictionResult <- lookupShelf fiction.id results
+      let bookIds = map ((.id) . (.book)) fictionResult.books
+      bookIds `shouldBe` sort bookIds
       sort (map ((.title) . (.book)) fictionResult.books) `shouldBe` ["Dune", "Neuromancer"]
 
     it "findMany includes a shelf with no books as empty list" $ \TestEnv {envPool = pool} -> do
@@ -74,6 +77,12 @@ includeSpec =
       results <- runDb pool (Ops.findMany @Shelf.ShelfTable @Shelf.ShelfRow id)
       length results `shouldBe` 2
       sort (map (.name) results) `shouldBe` ["alpha", "beta"]
+
+    it "findMany returns included roots in primary-key order" $ \TestEnv {envPool = pool} -> do
+      firstShelf <- ShelfFixtures.insertShelf pool "first"
+      secondShelf <- ShelfFixtures.insertShelf pool "second"
+      results <- runDb pool (findMany @Shelf.ShelfTable includeBooks id)
+      map ((.id) . (.shelf)) results `shouldBe` sort [firstShelf.id, secondShelf.id]
 
     it "findMany applies root filter before nesting" $ \TestEnv {envPool = pool} -> do
       fiction <- ShelfFixtures.insertShelf pool "fiction"
@@ -95,6 +104,8 @@ includeSpec =
       result.shelf.name `shouldBe` "fiction"
       [bookWithChapters] <- pure result.books
       (.title) bookWithChapters.book `shouldBe` "Dune"
+      let chapterIds = map (.id) bookWithChapters.chapters
+      chapterIds `shouldBe` sort chapterIds
       sort (map (.heading) bookWithChapters.chapters) `shouldBe` ["Arrakis", "Caladan"]
 
     it "findMany includes a book with no chapters as empty list" $ \TestEnv {envPool = pool} -> do
@@ -126,6 +137,8 @@ includeSpec =
       _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
       _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
       result <- runDb pool (findUnique @Shelf.ShelfTable includeBooks shelf.id)
+      let bookIds = maybe [] (map ((.id) . (.book)) . (.books)) result
+      bookIds `shouldBe` sort bookIds
       fmap (sort . map ((.title) . (.book)) . (.books)) result
         `shouldBe` Just ["Dune", "Neuromancer"]
 
@@ -151,6 +164,14 @@ includeSpec =
       runDb pool (findMany @Shelf.ShelfTable includeBooks (orderBy shelfName Asc))
         `shouldThrow` isUnsupportedIncludeModifier
 
+    it "findMany with include rejects raw WHERE" $ \TestEnv {envPool = pool} -> do
+      runDb
+        pool
+        ( findMany @Shelf.ShelfTable includeBooks $
+            where_ "name = ?" [toField ("fiction" :: Text)]
+        )
+        `shouldThrow` isUnsupportedIncludeModifier
+
     it "findMany nests sections under chapters at four levels deep" $ \TestEnv {envPool = pool} -> do
       shelf <- ShelfFixtures.insertShelf pool "fiction"
       book <- ShelfFixtures.insertBook pool shelf.id "Dune"
@@ -161,6 +182,8 @@ includeSpec =
       [result] <- pure results
       [bookWithChapters] <- pure result.books
       [chapterWithSections] <- pure bookWithChapters.chapters
+      let sectionIds = map (.id) chapterWithSections.sections
+      sectionIds `shouldBe` sort sectionIds
       sort (map (.label) chapterWithSections.sections) `shouldBe` ["Desert", "Sietch"]
 
 lookupShelf :: UUID -> [ShelfWithBooks] -> IO ShelfWithBooks
