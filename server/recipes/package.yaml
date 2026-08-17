@@ -114,6 +114,7 @@ library:
     - ORM.SelectIn
     - ORM.Sql
     - ORM.Update
+    - ORM.Where
   other-modules:
     - ORM.Codegen.EmitCommon
     - ORM.Codegen.Lookup
@@ -180,6 +181,7 @@ tests:
       - ORM.GroupSpec
       - ORM.JoinSpec
       - ORM.IncludeSpec
+      - ORM.WhereSpec
       - ORM.Codegen.ValidateSpec
       - ORM.Codegen.JoinAliasSpec
       - ORM.Codegen.IncludePathSpec

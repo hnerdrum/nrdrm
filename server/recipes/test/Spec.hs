@@ -14,6 +14,7 @@ import ORM.IncludeSpec (includeSpec)
 import ORM.JoinSpec (joinSpec)
 import ORM.OperationsSpec (operationsSpec)
 import ORM.RawSpec (rawSpec)
+import ORM.WhereSpec (whereSpec)
 import Support.TestDb (withTestDb)
 import Test.Hspec
 
@@ -30,4 +31,5 @@ main = hspec $ do
   targetSpec
   errorsSpec
   groupSpec
+  whereSpec
   withTestDb $ operationsSpec >> joinSpec >> includeSpec >> rawSpec

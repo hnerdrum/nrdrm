@@ -24,8 +24,9 @@ import ORM.Core (Entity (..), PrimaryKeyType)
 import ORM.Db (Db (..))
 import ORM.Errors (ORMError (..), requireFound)
 import qualified ORM.Operations as Ops
-import ORM.Query (QueryBuilder, whereEq)
+import ORM.Query (QueryBuilder, matching)
 import ORM.SelectIn (prepareIncludeRootQuery)
+import ORM.Where (eq)
 
 class IncludesJoin include where
   includesJoin :: include -> Bool
@@ -70,7 +71,7 @@ findUnique ::
   PrimaryKeyType root ->
   Db (Maybe result)
 findUnique include pk = do
-  results <- findMany include (whereEq (primaryKey @root) pk)
+  results <- findMany include (matching (eq (primaryKey @root) pk))
   pure $ case results of
     [] -> Nothing
     (row : _) -> Just row

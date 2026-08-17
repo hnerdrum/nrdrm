@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
 
 module ORM.IncludeSpec
@@ -10,12 +9,12 @@ import Data.List (sort)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.UUID (UUID, nil)
-import Database.PostgreSQL.Simple.ToField (toField)
-import ORM (ORMError (..), runDb)
+import ORM (runDb)
 import ORM.Include (findMany, findUnique)
 import qualified ORM.Operations as Ops
-import ORM.Query (OrderDirection (Asc), limit, offset, orderBy, whereEq, where_)
+import ORM.Query (OrderDirection (Asc), limit, matching, offset, orderBy)
 import qualified ORM.ShelfFixtures as ShelfFixtures
+import ORM.Where (eq)
 import Schema.Book (BookRow (..))
 import Schema.Chapter (ChapterRow (..))
 import Schema.Section (SectionRow (..))
@@ -36,7 +35,7 @@ import Schema.ShelfInclude
 import qualified Schema.ShelfInclude as ShelfInclude
 import Schema.Tag (TagRow (..))
 import Support.TestDb (TestEnv (..))
-import Test.Hspec (SpecWith, describe, it, shouldBe, shouldThrow)
+import Test.Hspec (SpecWith, describe, it, shouldBe)
 
 includeBooks :: ShelfInclude
 includeBooks = ShelfInclude {books = Just (ShelfInclude.BookInclude {chapters = False})}
@@ -103,7 +102,7 @@ includeSpec =
       _ <- ShelfFixtures.insertShelf pool "nonfiction"
       _ <- ShelfFixtures.insertBook pool fiction.id "Dune"
       results <-
-        runDb pool (findMany @Shelf.ShelfTable includeBooks (whereEq shelfName "fiction"))
+        runDb pool (findMany @Shelf.ShelfTable includeBooks (matching (eq shelfName "fiction")))
       length results `shouldBe` 1
       (head results).shelf.name `shouldBe` "fiction"
       map ((.title) . (.book)) (head results).books `shouldBe` ["Dune"]
@@ -191,14 +190,6 @@ includeSpec =
         runDb pool (findMany @Shelf.ShelfTable includeBooks (orderBy shelfName Asc))
       map ((.name) . (.shelf)) results `shouldBe` ["alpha", "zeta"]
 
-    it "findMany with include rejects raw WHERE" $ \TestEnv {envPool = pool} -> do
-      runDb
-        pool
-        ( findMany @Shelf.ShelfTable includeBooks $
-            where_ "name = ?" [toField ("fiction" :: Text)]
-        )
-        `shouldThrow` isUnsupportedIncludeModifier
-
     it "findMany loads sibling hasMany collections independently" $ \TestEnv {envPool = pool} -> do
       shelf <- ShelfFixtures.insertShelf pool "fiction"
       _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
@@ -235,8 +226,3 @@ lookupBook title result =
   case filter ((== title) . (.title) . (.book)) result.books of
     [book] -> pure book
     _ -> fail "expected exactly one book in results"
-
-isUnsupportedIncludeModifier :: ORMError -> Bool
-isUnsupportedIncludeModifier = \case
-  UnsupportedIncludeModifier _ -> True
-  _ -> False

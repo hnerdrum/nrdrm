@@ -26,6 +26,7 @@ import qualified ORM.Delete as Delete
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers)
+import ORM.Where (Where)
 import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientTable, IngredientUpdate (..))
 import qualified ORM.Update as Update
 
@@ -38,7 +39,7 @@ update = Update.update @IngredientTable @IngredientRow
 
 
 data IngredientQuery = IngredientQuery
-  { where_ :: Maybe (QueryBuilder IngredientTable -> QueryBuilder IngredientTable)
+  { where_ :: Maybe (Where IngredientTable)
   , orderBy_ :: Maybe (QueryBuilder IngredientTable -> QueryBuilder IngredientTable)
   , limit_ :: Maybe Int
   , offset_ :: Maybe Int
@@ -71,6 +72,6 @@ delete :: UUID -> Db Int
 delete = Ops.delete @IngredientTable
 
 
-deleteMany :: (QueryBuilder IngredientTable -> QueryBuilder IngredientTable) -> Db (Either ORMError Int)
+deleteMany :: Where IngredientTable -> Db (Either ORMError Int)
 deleteMany = Delete.deleteMany @IngredientTable
 

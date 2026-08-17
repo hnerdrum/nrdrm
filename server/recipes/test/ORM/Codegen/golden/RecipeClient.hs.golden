@@ -50,6 +50,7 @@ import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (.
 import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientRow (..), RecipeIngredientTable, recipeIngredientRecipeId)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers)
+import ORM.Where (Where)
 import qualified ORM.Update as Update
 import ORM.Schema.Ingredient (IngredientRow (..))
 import ORM.Schema.Unit (Unit (..))
@@ -89,7 +90,7 @@ noInclude :: NoInclude
 noInclude = NoInclude RecipeInclude {ingredients = Nothing}
 
 data RecipeQuery preset = RecipeQuery
-  { where_ :: Maybe (QueryBuilder RecipeTable -> QueryBuilder RecipeTable)
+  { where_ :: Maybe (Where RecipeTable)
   , orderBy_ :: Maybe (QueryBuilder RecipeTable -> QueryBuilder RecipeTable)
   , limit_ :: Maybe Int
   , offset_ :: Maybe Int
@@ -184,5 +185,5 @@ update include rootId input = transaction $ do
 delete :: UUID -> Db Int
 delete = Ops.delete @RecipeTable
 
-deleteMany :: (QueryBuilder RecipeTable -> QueryBuilder RecipeTable) -> Db (Either ORMError Int)
+deleteMany :: Where RecipeTable -> Db (Either ORMError Int)
 deleteMany = Delete.deleteMany @RecipeTable

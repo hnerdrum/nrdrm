@@ -14,9 +14,20 @@ module ORM
     DriverErrorKind (..),
     selectAll,
     select,
-    where_,
-    whereEq,
-    whereIn,
+    Where,
+    matching,
+    eq,
+    neq,
+    gt,
+    gte,
+    lt,
+    lte,
+    in_,
+    contains,
+    isNull,
+    and_,
+    or_,
+    not_,
     orderBy,
     limit,
     applyQueryModifiers,
@@ -82,3 +93,4 @@ import ORM.Query
 import ORM.Relation
 import ORM.Sql (catchDb, executeRaw, param, queryRaw)
 import ORM.Update
+import ORM.Where

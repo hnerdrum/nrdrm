@@ -6,19 +6,13 @@
 module ORM.Query
   ( Query,
     QueryBuilder,
-    WherePred (..),
-    queryWherePreds,
     queryWhereClauses,
-    queryWhereConditions,
-    queryWhereParams,
     queryLimit,
     queryOffset,
     queryOrderBy,
     select,
     selectAll,
-    where_,
-    whereEq,
-    whereIn,
+    matching,
     orderBy,
     limit,
     offset,
@@ -39,26 +33,20 @@ import qualified Data.Text.Encoding as TE
 import Database.PostgreSQL.Simple (Only (..))
 import qualified Database.PostgreSQL.Simple as PGSimple
 import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
-import Database.PostgreSQL.Simple.ToField (Action, ToField, toField)
-import Database.PostgreSQL.Simple.Types (In (..), Query (..))
+import Database.PostgreSQL.Simple.ToField (Action)
+import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..))
 import ORM.Db (Db (..))
 import ORM.Sql (quoteIdent)
+import ORM.Where (Where, compileWhere)
 
 data QueryBuilder table = QueryBuilder
   { qbTable :: Text,
-    qbWhere :: [WherePred],
+    qbWhere :: [Where table],
     qbOrderBy :: Maybe (Text, OrderDirection),
     qbLimit :: Maybe Int,
     qbOffset :: Maybe Int
   }
-
--- | A WHERE predicate. Column equalities can be alias-qualified for joins;
--- raw SQL cannot, and is rejected on include queries.
-data WherePred
-  = WhereColumnEq Text Action
-  | WhereColumnIn Text Action
-  | WhereRaw Text [Action]
 
 data OrderDirection = Asc | Desc
 
@@ -75,17 +63,9 @@ selectAll =
 select :: forall table. (Entity table) => QueryBuilder table
 select = selectAll @table
 
-where_ :: Text -> [Action] -> QueryBuilder table -> QueryBuilder table
-where_ condition params qb =
-  qb {qbWhere = qbWhere qb ++ [WhereRaw condition params]}
-
-whereEq :: forall table a. (ToField a) => Field table a -> a -> QueryBuilder table -> QueryBuilder table
-whereEq field value qb =
-  qb {qbWhere = qbWhere qb ++ [WhereColumnEq (fieldColumn field) (toField value)]}
-
-whereIn :: forall table a. (ToField a) => Field table a -> [a] -> QueryBuilder table -> QueryBuilder table
-whereIn field values qb =
-  qb {qbWhere = qbWhere qb ++ [WhereColumnIn (fieldColumn field) (toField (In values))]}
+matching :: Where table -> QueryBuilder table -> QueryBuilder table
+matching clause qb =
+  qb {qbWhere = qbWhere qb ++ [clause]}
 
 orderBy :: Field table a -> OrderDirection -> QueryBuilder table -> QueryBuilder table
 orderBy field dir qb =
@@ -97,28 +77,15 @@ limit n qb = qb {qbLimit = Just n}
 offset :: Int -> QueryBuilder table -> QueryBuilder table
 offset n qb = qb {qbOffset = Just n}
 
-queryWherePreds :: QueryBuilder table -> [WherePred]
-queryWherePreds = qbWhere
-
 queryWhereClauses :: QueryBuilder table -> [(Text, [Action])]
 queryWhereClauses qb =
-  [(wherePredSql wp, wherePredParams wp) | wp <- qbWhere qb]
-
-queryWhereConditions :: QueryBuilder table -> [Text]
-queryWhereConditions = map fst . queryWhereClauses
-
-queryWhereParams :: QueryBuilder table -> [Action]
-queryWhereParams = concatMap snd . queryWhereClauses
-
-wherePredSql :: WherePred -> Text
-wherePredSql (WhereColumnEq col _) = quoteIdent col <> " = ?"
-wherePredSql (WhereColumnIn col _) = quoteIdent col <> " IN ?"
-wherePredSql (WhereRaw sql _) = sql
-
-wherePredParams :: WherePred -> [Action]
-wherePredParams (WhereColumnEq _ value) = [value]
-wherePredParams (WhereColumnIn _ value) = [value]
-wherePredParams (WhereRaw _ params) = params
+  case qbWhere qb of
+    [] -> []
+    preds ->
+      let compiled = map compileWhere preds
+          sql = T.intercalate " AND " ["(" <> s <> ")" | (s, _) <- compiled]
+          params = concatMap snd compiled
+       in [(sql, params)]
 
 queryLimit :: QueryBuilder table -> Maybe Int
 queryLimit = qbLimit
@@ -130,14 +97,14 @@ queryOrderBy :: QueryBuilder table -> Maybe (Text, OrderDirection)
 queryOrderBy = qbOrderBy
 
 applyQueryModifiers ::
-  Maybe (QueryBuilder table -> QueryBuilder table) ->
+  Maybe (Where table) ->
   Maybe (QueryBuilder table -> QueryBuilder table) ->
   Maybe Int ->
   Maybe Int ->
   QueryBuilder table ->
   QueryBuilder table
 applyQueryModifiers mWhere mOrder mLimit mOffset =
-  fromMaybe id mWhere
+  maybe id matching mWhere
     . fromMaybe id mOrder
     . maybe id limit mLimit
     . maybe id offset mOffset
