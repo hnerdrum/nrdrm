@@ -1,5 +1,7 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module ORM.Client.Ingredient
   ( create,
@@ -11,6 +13,12 @@ module ORM.Client.Ingredient
     deleteMany,
     IngredientCreate (..),
     IngredientRow (..),
+    IngredientSelect (..),
+    IngredientPicked (..),
+    ingredientSelect,
+    OmitSelect (..),
+    Picked (..),
+    ResolveSelect,
     IngredientUpdate (..),
     IngredientTable,
     IngredientQuery (..),
@@ -25,9 +33,10 @@ import ORM.Errors (ORMError)
 import qualified ORM.Delete as Delete
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
-import ORM.Query (QueryBuilder, applyQueryModifiers)
+import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)
+import ORM.Select (OmitSelect (..), Picked (..))
 import ORM.Where (Where)
-import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientTable, IngredientUpdate (..))
+import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientSelect (..), IngredientPicked (..), ingredientSelect, ingredientSelectColumns, parseIngredientPicked, IngredientTable, IngredientUpdate (..))
 import qualified ORM.Update as Update
 
 create :: IngredientCreate -> Db (Either ORMError IngredientRow)
@@ -38,25 +47,40 @@ update :: UUID -> IngredientUpdate -> Db (Either ORMError IngredientRow)
 update = Update.update @IngredientTable @IngredientRow
 
 
-data IngredientQuery = IngredientQuery
-  { where_ :: Maybe (Where IngredientTable)
+data IngredientQuery select = IngredientQuery
+  { select_ :: select
+  , where_ :: Maybe (Where IngredientTable)
   , orderBy_ :: Maybe (QueryBuilder IngredientTable -> QueryBuilder IngredientTable)
   , limit_ :: Maybe Int
   , offset_ :: Maybe Int
   }
 
 
-emptyQuery :: IngredientQuery
+emptyQuery :: IngredientQuery OmitSelect
 emptyQuery =
-  IngredientQuery {where_ = Nothing, orderBy_ = Nothing, limit_ = Nothing, offset_ = Nothing}
+  IngredientQuery {select_ = OmitSelect, where_ = Nothing, orderBy_ = Nothing, limit_ = Nothing, offset_ = Nothing}
 
 
-findMany :: IngredientQuery -> Db [IngredientRow]
-findMany q =
-  Ops.findMany @IngredientTable @IngredientRow (applyQuery q)
+type family ResolveSelect select
+type instance ResolveSelect OmitSelect = IngredientRow
+type instance ResolveSelect IngredientSelect = IngredientPicked
 
-applyQuery :: IngredientQuery -> QueryBuilder IngredientTable -> QueryBuilder IngredientTable
-applyQuery IngredientQuery {..} =
+
+class FindManyIngredient select where
+  findMany :: IngredientQuery select -> Db [ResolveSelect select]
+
+instance FindManyIngredient OmitSelect where
+  findMany q =
+    Ops.findMany @IngredientTable @IngredientRow (applyQuery q)
+
+instance FindManyIngredient IngredientSelect where
+  findMany q@IngredientQuery {select_} =
+    Ops.findManyWith
+      (parseIngredientPicked select_)
+      (selectColumns (ingredientSelectColumns select_) . applyQuery q)
+
+applyQuery :: IngredientQuery select -> QueryBuilder IngredientTable -> QueryBuilder IngredientTable
+applyQuery IngredientQuery {where_, orderBy_, limit_, offset_} =
   applyQueryModifiers where_ orderBy_ limit_ offset_
 
 

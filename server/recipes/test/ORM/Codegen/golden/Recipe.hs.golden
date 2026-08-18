@@ -7,6 +7,12 @@
 module ORM.Schema.Recipe
   ( RecipeTable (..),
     RecipeRow (..),
+    RecipeSelect (..),
+    RecipePicked (..),
+    recipeSelect,
+    recipeSelectColumns,
+    parseRecipePicked,
+    toRecipePicked,
     RecipeCreate (..),
     RecipeUpdate (..),
     recipeId,
@@ -21,8 +27,9 @@ where
 import Data.Text (Text)
 import Data.Time (UTCTime)
 import Data.UUID (UUID)
-import ORM.PG (FromRow (..), field)
+import ORM.PG (FromRow (..), RowParser, field)
 import ORM.Core
+import ORM.Select (Picked (..), picked)
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe, setNullable)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe, setFieldNullable)
 import ORM.Relation (HasMany (..), JoinType (..))
@@ -35,6 +42,7 @@ type instance PrimaryKeyType RecipeTable = UUID
 instance Entity RecipeTable where
   tableName = "recipe"
   primaryKey = recipeId
+  tableColumns = ["id", "created_at", "updated_at", "name", "description"]
 
 instance Insertable RecipeTable where
   type CreateInput RecipeTable = RecipeCreate
@@ -89,6 +97,59 @@ data RecipeUpdate = RecipeUpdate
 
 instance FromRow RecipeRow where
   fromRow = RecipeRow <$> field <*> field <*> field <*> field <*> field
+
+
+data RecipeSelect = RecipeSelect
+  { id :: Bool,
+    createdAt :: Bool,
+    updatedAt :: Bool,
+    name :: Bool,
+    description :: Bool
+  }
+  deriving (Show, Eq)
+data RecipePicked = RecipePicked
+  { id :: UUID,
+    createdAt :: Picked UTCTime,
+    updatedAt :: Picked UTCTime,
+    name :: Picked Text,
+    description :: Picked (Maybe Text)
+  }
+  deriving (Show, Eq)
+recipeSelect :: RecipeSelect
+recipeSelect =
+  RecipeSelect
+    { id = False,
+      createdAt = False,
+      updatedAt = False,
+      name = False,
+      description = False
+    }
+recipeSelectColumns :: RecipeSelect -> [Text]
+recipeSelectColumns select_ =
+  fieldColumn recipeId
+    : concat
+      [ [fieldColumn recipeCreatedAt | select_.createdAt]
+      , [fieldColumn recipeUpdatedAt | select_.updatedAt]
+      , [fieldColumn recipeName | select_.name]
+      , [fieldColumn recipeDescription | select_.description]
+      ]
+parseRecipePicked :: RecipeSelect -> RowParser RecipePicked
+parseRecipePicked select_ = do
+  idVal <- field
+  createdAtVal <- if select_.createdAt then Picked <$> field else pure Skipped
+  updatedAtVal <- if select_.updatedAt then Picked <$> field else pure Skipped
+  nameVal <- if select_.name then Picked <$> field else pure Skipped
+  descriptionVal <- if select_.description then Picked <$> field else pure Skipped
+  pure RecipePicked { id = idVal, createdAt = createdAtVal, updatedAt = updatedAtVal, name = nameVal, description = descriptionVal }
+toRecipePicked :: RecipeSelect -> RecipeRow -> RecipePicked
+toRecipePicked select_ row =
+  RecipePicked
+    { id = row.id,
+      createdAt = picked select_.createdAt row.createdAt,
+      updatedAt = picked select_.updatedAt row.updatedAt,
+      name = picked select_.name row.name,
+      description = picked select_.description row.description
+    }
 
 
 recipeId :: Field RecipeTable UUID

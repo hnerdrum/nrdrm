@@ -74,7 +74,8 @@ siblingDepthSchema =
   Schema
     { schemaEnums = [],
       schemaModels = [parentModel, leafModel, midModel, deepModel],
-      schemaIncludes = [siblingDepthInclude]
+      schemaIncludes = [siblingDepthInclude],
+      schemaUniques = []
     }
 
 parentModel :: Model

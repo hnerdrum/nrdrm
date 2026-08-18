@@ -7,6 +7,12 @@
 module Schema.Widget
   ( WidgetTable (..),
     WidgetRow (..),
+    WidgetSelect (..),
+    WidgetPicked (..),
+    widgetSelect,
+    widgetSelectColumns,
+    parseWidgetPicked,
+    toWidgetPicked,
     WidgetCreate (..),
     WidgetUpdate (..),
     widgetId,
@@ -20,8 +26,9 @@ where
 import Data.Text (Text)
 import Data.Time (UTCTime)
 import Data.UUID (UUID)
-import ORM.PG (FromRow (..), field)
+import ORM.PG (FromRow (..), RowParser, field)
 import ORM.Core
+import ORM.Select (Picked (..), picked)
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe, setNullable)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe, setFieldNullable)
 
@@ -32,6 +39,7 @@ type instance PrimaryKeyType WidgetTable = UUID
 instance Entity WidgetTable where
   tableName = "test_widget"
   primaryKey = widgetId
+  tableColumns = ["id", "created_at", "updated_at", "name", "description"]
 
 instance Insertable WidgetTable where
   type CreateInput WidgetTable = WidgetCreate
@@ -86,6 +94,59 @@ data WidgetUpdate = WidgetUpdate
 
 instance FromRow WidgetRow where
   fromRow = WidgetRow <$> field <*> field <*> field <*> field <*> field
+
+
+data WidgetSelect = WidgetSelect
+  { id :: Bool,
+    createdAt :: Bool,
+    updatedAt :: Bool,
+    name :: Bool,
+    description :: Bool
+  }
+  deriving (Show, Eq)
+data WidgetPicked = WidgetPicked
+  { id :: UUID,
+    createdAt :: Picked UTCTime,
+    updatedAt :: Picked UTCTime,
+    name :: Picked Text,
+    description :: Picked (Maybe Text)
+  }
+  deriving (Show, Eq)
+widgetSelect :: WidgetSelect
+widgetSelect =
+  WidgetSelect
+    { id = False,
+      createdAt = False,
+      updatedAt = False,
+      name = False,
+      description = False
+    }
+widgetSelectColumns :: WidgetSelect -> [Text]
+widgetSelectColumns select_ =
+  fieldColumn widgetId
+    : concat
+      [ [fieldColumn widgetCreatedAt | select_.createdAt]
+      , [fieldColumn widgetUpdatedAt | select_.updatedAt]
+      , [fieldColumn widgetName | select_.name]
+      , [fieldColumn widgetDescription | select_.description]
+      ]
+parseWidgetPicked :: WidgetSelect -> RowParser WidgetPicked
+parseWidgetPicked select_ = do
+  idVal <- field
+  createdAtVal <- if select_.createdAt then Picked <$> field else pure Skipped
+  updatedAtVal <- if select_.updatedAt then Picked <$> field else pure Skipped
+  nameVal <- if select_.name then Picked <$> field else pure Skipped
+  descriptionVal <- if select_.description then Picked <$> field else pure Skipped
+  pure WidgetPicked { id = idVal, createdAt = createdAtVal, updatedAt = updatedAtVal, name = nameVal, description = descriptionVal }
+toWidgetPicked :: WidgetSelect -> WidgetRow -> WidgetPicked
+toWidgetPicked select_ row =
+  WidgetPicked
+    { id = row.id,
+      createdAt = picked select_.createdAt row.createdAt,
+      updatedAt = picked select_.updatedAt row.updatedAt,
+      name = picked select_.name row.name,
+      description = picked select_.description row.description
+    }
 
 
 widgetId :: Field WidgetTable UUID

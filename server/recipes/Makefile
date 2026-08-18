@@ -1,4 +1,4 @@
-.PHONY: help test test-fast test-db-up test-db-down test-db-logs orm-gen orm-gen-check
+.PHONY: help test test-fast test-db-up test-db-down test-db-logs orm-gen orm-gen-check orm-schema-check
 
 TEST_DATABASE_URL ?= postgres://nrdrm:nrdrm@localhost:5435/recipes_test
 COMPOSE := docker compose -f docker-compose.test.yml
@@ -17,6 +17,9 @@ orm-gen: ## Regenerate ORM schema, include, and client modules from specs
 orm-gen-check: ## Fail if generated ORM files differ from specs
 	$(STACK) build recipes:orm-codegen
 	$(STACK) exec orm-codegen -- --check
+
+orm-schema-check: test-db-up
+	TEST_DATABASE_URL=$(TEST_DATABASE_URL) $(STACK) exec orm-codegen -- --check-schema
 
 test-db-up:
 	$(COMPOSE) up -d --wait

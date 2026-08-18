@@ -12,7 +12,8 @@ recipeSchema =
   Schema
     { schemaEnums = [unitEnum],
       schemaModels = [recipeModel, ingredientModel, recipeIngredientModel],
-      schemaIncludes = [recipeInclude]
+      schemaIncludes = [recipeInclude],
+      schemaUniques = [unique_ "RecipeIngredient" ["recipeId", "ingredientId"]]
     }
 
 unitEnum :: EnumSpec

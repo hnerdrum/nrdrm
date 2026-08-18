@@ -2,15 +2,19 @@
 
 module Main (main) where
 
+import Control.Applicative ((<|>))
 import Data.Text (Text, pack)
 import qualified Data.Text.IO as TIO
+import ORM.Codegen.Drift (checkSchema, formatDriftError)
 import ORM.Codegen.IR (Schema (..))
+import ORM.Codegen.Introspect (introspectCatalog)
 import ORM.Codegen.RecipeTarget (prodTarget)
 import ORM.Codegen.Run (GenOutput (..), allOutputs, checkOutputs, schemasForTargets, writeOutputs)
-import ORM.Codegen.Target (CodegenTarget, testTarget)
+import ORM.Codegen.Target (CodegenTarget, targetSchemas, testTarget)
 import ORM.Codegen.Validate (ValidationError (..), validateSchema)
+import ORM.Db (closePool, connect, withConn)
 import System.Directory (getCurrentDirectory)
-import System.Environment (getArgs)
+import System.Environment (getArgs, lookupEnv)
 import System.Exit (exitFailure, exitSuccess)
 
 main :: IO ()
@@ -20,6 +24,9 @@ main = do
   let targets = [testTarget, prodTarget]
   case args of
     ("--check" : _) -> runCheck root targets
+    ("--check-schema" : _) -> runCheckSchema
+    ("--check-migrations" : _) -> runCheckSchema
+    ("check-migrations" : _) -> runCheckSchema
     ("--list" : _) -> runList targets
     _ -> runWrite root targets
 
@@ -38,6 +45,31 @@ runCheck root targets = do
     paths -> do
       TIO.putStrLn "Generated ORM files are out of date. Run `make orm-gen`."
       mapM_ (TIO.putStrLn . ("  " <>)) (pack <$> paths)
+      exitFailure
+
+runCheckSchema :: IO ()
+runCheckSchema = do
+  let schemas = targetSchemas [prodTarget]
+  validateOrExit schemas
+  url <- schemaDatabaseUrl
+  pool <- connect url
+  catalog <- withConn pool introspectCatalog
+  closePool pool
+  case concatMap (`checkSchema` catalog) schemas of
+    [] -> exitSuccess
+    errs -> do
+      TIO.putStrLn "IR does not match the database. Haskell IR is the source of truth."
+      mapM_ (TIO.putStrLn . ("  " <>) . formatDriftError) errs
+      exitFailure
+
+schemaDatabaseUrl :: IO String
+schemaDatabaseUrl = do
+  mTest <- lookupEnv "TEST_DATABASE_URL"
+  mDb <- lookupEnv "DATABASE_URL"
+  case mTest <|> mDb of
+    Just url -> pure url
+    Nothing -> do
+      TIO.putStrLn "Set TEST_DATABASE_URL or DATABASE_URL to check IR against Postgres."
       exitFailure
 
 runList :: [CodegenTarget] -> IO ()

@@ -30,6 +30,9 @@ data ValidationError
   | MaxIncludeDepthExceeded Text Int Int
   | ReplaceChildrenNotHasMany Text
   | DuplicateIncludeRelation Text Text Text
+  | UnknownUniqueModel Text
+  | UnknownUniqueField Text Text
+  | EmptyUniqueConstraint Text
   deriving (Show, Eq)
 
 validateSchema :: Schema -> [ValidationError]
@@ -41,7 +44,8 @@ validateSchema schema =
       concatMap validateEnum (schemaEnums schema),
       concatMap (validateModel schema) (schemaModels schema),
       concatMap (validateRelation schema) (concatMap modelRelations (schemaModels schema)),
-      concatMap (validateInclude schema) (schemaIncludes schema)
+      concatMap (validateInclude schema) (schemaIncludes schema),
+      concatMap (validateUnique schema) (schemaUniques schema)
     ]
 
 duplicateModelNames :: Schema -> [ValidationError]
@@ -152,6 +156,20 @@ findModel schema name =
 findRelation :: Model -> Text -> Maybe RelationSpec
 findRelation model name =
   find ((== name) . relName) (modelRelations model)
+
+validateUnique :: Schema -> UniqueConstraint -> [ValidationError]
+validateUnique schema UniqueConstraint {uniqueModel, uniqueFields} =
+  case findModel schema uniqueModel of
+    Nothing ->
+      [UnknownUniqueModel uniqueModel]
+    Just model
+      | null uniqueFields ->
+          [EmptyUniqueConstraint uniqueModel]
+      | otherwise ->
+          [ UnknownUniqueField uniqueModel wanted
+            | wanted <- uniqueFields,
+              not (any ((== wanted) . fieldName) (modelFields model))
+          ]
 
 requireField :: Text -> Text -> Text -> Model -> [ValidationError]
 requireField relName modelName wantedField model =

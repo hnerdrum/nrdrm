@@ -12,6 +12,7 @@ module ORM.Query
     queryOrderBy,
     select,
     selectAll,
+    selectColumns,
     matching,
     orderBy,
     limit,
@@ -20,6 +21,7 @@ module ORM.Query
     OrderDirection (..),
     buildWhereClause,
     runQuery,
+    runQueryWith,
     runQueryOne,
     runCountQuery,
   )
@@ -32,7 +34,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Database.PostgreSQL.Simple (Only (..))
 import qualified Database.PostgreSQL.Simple as PGSimple
-import Database.PostgreSQL.Simple.FromRow (FromRow, fromRow)
+import Database.PostgreSQL.Simple.FromRow (FromRow, RowParser, fromRow)
 import Database.PostgreSQL.Simple.ToField (Action)
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..), Field (..))
@@ -42,6 +44,7 @@ import ORM.Where (Where, compileWhere)
 
 data QueryBuilder table = QueryBuilder
   { qbTable :: Text,
+    qbColumns :: [Text],
     qbWhere :: [Where table],
     qbOrderBy :: Maybe (Text, OrderDirection),
     qbLimit :: Maybe Int,
@@ -54,6 +57,7 @@ selectAll :: forall table. (Entity table) => QueryBuilder table
 selectAll =
   QueryBuilder
     { qbTable = tableName @table,
+      qbColumns = tableColumns @table,
       qbWhere = [],
       qbOrderBy = Nothing,
       qbLimit = Nothing,
@@ -62,6 +66,9 @@ selectAll =
 
 select :: forall table. (Entity table) => QueryBuilder table
 select = selectAll @table
+
+selectColumns :: [Text] -> QueryBuilder table -> QueryBuilder table
+selectColumns cols qb = qb {qbColumns = cols}
 
 matching :: Where table -> QueryBuilder table -> QueryBuilder table
 matching clause qb =
@@ -111,7 +118,7 @@ applyQueryModifiers mWhere mOrder mLimit mOffset =
 
 buildQuery :: QueryBuilder table -> (Query, [Action])
 buildQuery qb =
-  let baseQuery = "SELECT * FROM " <> quoteIdent (qbTable qb)
+  let baseQuery = "SELECT " <> buildSelectList (qbColumns qb) <> " FROM " <> quoteIdent (qbTable qb)
       clauses = queryWhereClauses qb
       whereClause = buildWhereClause (map fst clauses)
       orderClause = buildOrderClause (qbOrderBy qb)
@@ -119,6 +126,9 @@ buildQuery qb =
       offsetClause = buildOffsetClause (qbOffset qb)
       finalQuery = baseQuery <> whereClause <> orderClause <> limitClause <> offsetClause
    in (Query (TE.encodeUtf8 finalQuery), concatMap snd clauses)
+
+buildSelectList :: [Text] -> Text
+buildSelectList cols = T.intercalate ", " (map quoteIdent cols)
 
 buildCountQuery :: QueryBuilder table -> (Query, [Action])
 buildCountQuery qb =
@@ -146,10 +156,13 @@ buildOffsetClause Nothing = ""
 buildOffsetClause (Just n) = " OFFSET " <> T.pack (show n)
 
 runQuery :: (FromRow result) => QueryBuilder table -> Db [result]
-runQuery qb =
+runQuery = runQueryWith fromRow
+
+runQueryWith :: RowParser result -> QueryBuilder table -> Db [result]
+runQueryWith parser qb =
   Db $ \conn -> do
     let (query, params) = buildQuery qb
-    PGSimple.queryWith fromRow conn query params
+    PGSimple.queryWith parser conn query params
 
 runQueryOne :: (FromRow result) => QueryBuilder table -> Db (Maybe result)
 runQueryOne qb = do

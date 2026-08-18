@@ -98,6 +98,8 @@ library:
     - ORM.Codegen.Spec.Widget
     - ORM.Codegen.Target
     - ORM.Codegen.Validate
+    - ORM.Codegen.Drift
+    - ORM.Codegen.Introspect
     - ORM.Column
     - ORM.Core
     - ORM.Db
@@ -111,6 +113,7 @@ library:
     - ORM.PG
     - ORM.Query
     - ORM.Relation
+    - ORM.Select
     - ORM.SelectIn
     - ORM.Sql
     - ORM.Update
@@ -182,6 +185,7 @@ tests:
       - ORM.JoinSpec
       - ORM.IncludeSpec
       - ORM.WhereSpec
+      - ORM.SelectSpec
       - ORM.Codegen.ValidateSpec
       - ORM.Codegen.JoinAliasSpec
       - ORM.Codegen.IncludePathSpec
@@ -190,6 +194,7 @@ tests:
       - ORM.Codegen.EmitIncludeSpec
       - ORM.Codegen.EmitClientSpec
       - ORM.Codegen.TargetSpec
+      - ORM.Codegen.DriftSpec
       - ORM.WidgetFixtures
       - ORM.ShelfFixtures
     ghc-options:

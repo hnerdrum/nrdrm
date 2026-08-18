@@ -7,6 +7,12 @@
 module Schema.Shelf
   ( ShelfTable (..),
     ShelfRow (..),
+    ShelfSelect (..),
+    ShelfPicked (..),
+    shelfSelect,
+    shelfSelectColumns,
+    parseShelfPicked,
+    toShelfPicked,
     ShelfCreate (..),
     ShelfUpdate (..),
     shelfId,
@@ -18,8 +24,9 @@ where
 
 import Data.Text (Text)
 import Data.UUID (UUID)
-import ORM.PG (FromRow (..), field)
+import ORM.PG (FromRow (..), RowParser, field)
 import ORM.Core
+import ORM.Select (Picked (..), picked)
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 import ORM.Relation (HasMany (..), JoinType (..))
@@ -33,6 +40,7 @@ type instance PrimaryKeyType ShelfTable = UUID
 instance Entity ShelfTable where
   tableName = "test_shelf"
   primaryKey = shelfId
+  tableColumns = ["id", "name"]
 
 instance Insertable ShelfTable where
   type CreateInput ShelfTable = ShelfCreate
@@ -72,6 +80,41 @@ data ShelfUpdate = ShelfUpdate
 
 instance FromRow ShelfRow where
   fromRow = ShelfRow <$> field <*> field
+
+
+data ShelfSelect = ShelfSelect
+  { id :: Bool,
+    name :: Bool
+  }
+  deriving (Show, Eq)
+data ShelfPicked = ShelfPicked
+  { id :: UUID,
+    name :: Picked Text
+  }
+  deriving (Show, Eq)
+shelfSelect :: ShelfSelect
+shelfSelect =
+  ShelfSelect
+    { id = False,
+      name = False
+    }
+shelfSelectColumns :: ShelfSelect -> [Text]
+shelfSelectColumns select_ =
+  fieldColumn shelfId
+    : concat
+      [ [fieldColumn shelfName | select_.name]
+      ]
+parseShelfPicked :: ShelfSelect -> RowParser ShelfPicked
+parseShelfPicked select_ = do
+  idVal <- field
+  nameVal <- if select_.name then Picked <$> field else pure Skipped
+  pure ShelfPicked { id = idVal, name = nameVal }
+toShelfPicked :: ShelfSelect -> ShelfRow -> ShelfPicked
+toShelfPicked select_ row =
+  ShelfPicked
+    { id = row.id,
+      name = picked select_.name row.name
+    }
 
 
 shelfId :: Field ShelfTable UUID

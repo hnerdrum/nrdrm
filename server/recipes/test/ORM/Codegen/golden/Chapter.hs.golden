@@ -7,6 +7,12 @@
 module Schema.Chapter
   ( ChapterTable (..),
     ChapterRow (..),
+    ChapterSelect (..),
+    ChapterPicked (..),
+    chapterSelect,
+    chapterSelectColumns,
+    parseChapterPicked,
+    toChapterPicked,
     ChapterCreate (..),
     ChapterUpdate (..),
     chapterId,
@@ -18,8 +24,9 @@ where
 
 import Data.Text (Text)
 import Data.UUID (UUID)
-import ORM.PG (FromRow (..), field)
+import ORM.PG (FromRow (..), RowParser, field)
 import ORM.Core
+import ORM.Select (Picked (..), picked)
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 import ORM.Relation (HasMany (..), JoinType (..))
@@ -32,6 +39,7 @@ type instance PrimaryKeyType ChapterTable = UUID
 instance Entity ChapterTable where
   tableName = "test_chapter"
   primaryKey = chapterId
+  tableColumns = ["id", "book_id", "heading"]
 
 instance Insertable ChapterTable where
   type CreateInput ChapterTable = ChapterCreate
@@ -76,6 +84,47 @@ data ChapterUpdate = ChapterUpdate
 
 instance FromRow ChapterRow where
   fromRow = ChapterRow <$> field <*> field <*> field
+
+
+data ChapterSelect = ChapterSelect
+  { id :: Bool,
+    bookRef :: Bool,
+    heading :: Bool
+  }
+  deriving (Show, Eq)
+data ChapterPicked = ChapterPicked
+  { id :: UUID,
+    bookRef :: Picked UUID,
+    heading :: Picked Text
+  }
+  deriving (Show, Eq)
+chapterSelect :: ChapterSelect
+chapterSelect =
+  ChapterSelect
+    { id = False,
+      bookRef = False,
+      heading = False
+    }
+chapterSelectColumns :: ChapterSelect -> [Text]
+chapterSelectColumns select_ =
+  fieldColumn chapterId
+    : concat
+      [ [fieldColumn chapterBookRef | select_.bookRef]
+      , [fieldColumn chapterHeading | select_.heading]
+      ]
+parseChapterPicked :: ChapterSelect -> RowParser ChapterPicked
+parseChapterPicked select_ = do
+  idVal <- field
+  bookRefVal <- if select_.bookRef then Picked <$> field else pure Skipped
+  headingVal <- if select_.heading then Picked <$> field else pure Skipped
+  pure ChapterPicked { id = idVal, bookRef = bookRefVal, heading = headingVal }
+toChapterPicked :: ChapterSelect -> ChapterRow -> ChapterPicked
+toChapterPicked select_ row =
+  ChapterPicked
+    { id = row.id,
+      bookRef = picked select_.bookRef row.bookRef,
+      heading = picked select_.heading row.heading
+    }
 
 
 chapterId :: Field ChapterTable UUID

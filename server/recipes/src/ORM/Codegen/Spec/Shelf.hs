@@ -12,7 +12,8 @@ shelfSchema =
   Schema
     { schemaEnums = [],
       schemaModels = [shelfModel, bookModel, chapterModel, sectionModel, tagModel],
-      schemaIncludes = [shelfInclude, shelfGraphInclude]
+      schemaIncludes = [shelfInclude, shelfGraphInclude],
+      schemaUniques = []
     }
 
 shelfModel :: Model

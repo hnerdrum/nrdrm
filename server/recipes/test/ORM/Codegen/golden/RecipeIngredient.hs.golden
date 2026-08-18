@@ -7,6 +7,12 @@
 module ORM.Schema.RecipeIngredient
   ( RecipeIngredientTable (..),
     RecipeIngredientRow (..),
+    RecipeIngredientSelect (..),
+    RecipeIngredientPicked (..),
+    recipeIngredientSelect,
+    recipeIngredientSelectColumns,
+    parseRecipeIngredientPicked,
+    toRecipeIngredientPicked,
     RecipeIngredientCreate (..),
     RecipeIngredientUpdate (..),
     recipeIngredientId,
@@ -18,9 +24,11 @@ module ORM.Schema.RecipeIngredient
   )
 where
 
+import Data.Text (Text)
 import Data.UUID (UUID)
-import ORM.PG (FromRow (..), field)
+import ORM.PG (FromRow (..), RowParser, field)
 import ORM.Core
+import ORM.Select (Picked (..), picked)
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 import ORM.Relation (BelongsTo (..), JoinType (..))
@@ -35,6 +43,7 @@ type instance PrimaryKeyType RecipeIngredientTable = UUID
 instance Entity RecipeIngredientTable where
   tableName = "recipe_ingredient"
   primaryKey = recipeIngredientId
+  tableColumns = ["id", "recipe_id", "ingredient_id", "amount", "unit"]
 
 instance Insertable RecipeIngredientTable where
   type CreateInput RecipeIngredientTable = RecipeIngredientCreate
@@ -89,6 +98,59 @@ data RecipeIngredientUpdate = RecipeIngredientUpdate
 
 instance FromRow RecipeIngredientRow where
   fromRow = RecipeIngredientRow <$> field <*> field <*> field <*> field <*> field
+
+
+data RecipeIngredientSelect = RecipeIngredientSelect
+  { id :: Bool,
+    recipeId :: Bool,
+    ingredientId :: Bool,
+    amount :: Bool,
+    unit :: Bool
+  }
+  deriving (Show, Eq)
+data RecipeIngredientPicked = RecipeIngredientPicked
+  { id :: UUID,
+    recipeId :: Picked UUID,
+    ingredientId :: Picked UUID,
+    amount :: Picked Int,
+    unit :: Picked Unit
+  }
+  deriving (Show, Eq)
+recipeIngredientSelect :: RecipeIngredientSelect
+recipeIngredientSelect =
+  RecipeIngredientSelect
+    { id = False,
+      recipeId = False,
+      ingredientId = False,
+      amount = False,
+      unit = False
+    }
+recipeIngredientSelectColumns :: RecipeIngredientSelect -> [Text]
+recipeIngredientSelectColumns select_ =
+  fieldColumn recipeIngredientId
+    : concat
+      [ [fieldColumn recipeIngredientRecipeId | select_.recipeId]
+      , [fieldColumn recipeIngredientIngredientId | select_.ingredientId]
+      , [fieldColumn recipeIngredientAmount | select_.amount]
+      , [fieldColumn recipeIngredientUnit | select_.unit]
+      ]
+parseRecipeIngredientPicked :: RecipeIngredientSelect -> RowParser RecipeIngredientPicked
+parseRecipeIngredientPicked select_ = do
+  idVal <- field
+  recipeIdVal <- if select_.recipeId then Picked <$> field else pure Skipped
+  ingredientIdVal <- if select_.ingredientId then Picked <$> field else pure Skipped
+  amountVal <- if select_.amount then Picked <$> field else pure Skipped
+  unitVal <- if select_.unit then Picked <$> field else pure Skipped
+  pure RecipeIngredientPicked { id = idVal, recipeId = recipeIdVal, ingredientId = ingredientIdVal, amount = amountVal, unit = unitVal }
+toRecipeIngredientPicked :: RecipeIngredientSelect -> RecipeIngredientRow -> RecipeIngredientPicked
+toRecipeIngredientPicked select_ row =
+  RecipeIngredientPicked
+    { id = row.id,
+      recipeId = picked select_.recipeId row.recipeId,
+      ingredientId = picked select_.ingredientId row.ingredientId,
+      amount = picked select_.amount row.amount,
+      unit = picked select_.unit row.unit
+    }
 
 
 recipeIngredientId :: Field RecipeIngredientTable UUID
