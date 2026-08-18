@@ -16,9 +16,15 @@ import ORM.Codegen.EmitCommon
   ( createTypeName,
     fieldBinder,
     hsType,
+    parsePickedName,
+    pickedTypeName,
     primaryKeyField,
     rowTypeName,
+    selectColumnsFnName,
+    selectDefaultName,
+    selectTypeName,
     tableTypeName,
+    toPickedName,
     updateTypeName,
   )
 import ORM.Codegen.IR
@@ -43,6 +49,7 @@ emitModelModule moduleName schema model =
           "instance Entity " <> tableName_ <> " where",
           "  tableName = \"" <> modelTable model <> "\"",
           "  primaryKey = " <> fieldBinder model pkField,
+          "  tableColumns = [" <> T.intercalate ", " (map colLit (modelFields model)) <> "]",
           "",
           emitInsertable model,
           "",
@@ -55,6 +62,8 @@ emitModelModule moduleName schema model =
           emitUpdate model,
           "",
           emitFromRow model,
+          "",
+          emitSelectTypes model,
           ""
         ],
         concatMap (emitFieldDecl model) (modelFields model),
@@ -74,6 +83,12 @@ emitExports model =
     items =
       [ tableTypeName model <> " (..)",
         rowTypeName model <> " (..)",
+        selectTypeName model <> " (..)",
+        pickedTypeName model <> " (..)",
+        selectDefaultName model,
+        selectColumnsFnName model,
+        parsePickedName model,
+        toPickedName model,
         createTypeName model <> " (..)",
         updateTypeName model <> " (..)"
       ]
@@ -96,11 +111,12 @@ imports moduleName schema model =
   T.intercalate "\n" $
     filter
       (not . T.null)
-      [ if needsText model then "import Data.Text (Text)" else "",
+      [ "import Data.Text (Text)",
         if needsTime model then "import Data.Time (UTCTime)" else "",
         if needsUuid model then "import Data.UUID (UUID)" else "",
-        "import ORM.PG (FromRow (..), field)",
+        "import ORM.PG (FromRow (..), RowParser, field)",
         "import ORM.Core",
+        "import ORM.Select (Picked (..), picked)",
         insertImport model,
         updateImport model,
         relationImport model
@@ -269,12 +285,6 @@ relationImport model =
 needsTime :: Model -> Bool
 needsTime = any ((== TyTimestamptz) . fieldType) . modelFields
 
-needsText :: Model -> Bool
-needsText = any (isTextType . fieldType) . modelFields
-  where
-    isTextType TyText = True
-    isTextType _ = False
-
 needsUuid :: Model -> Bool
 needsUuid = any (isUuidType . fieldType) . modelFields
   where
@@ -373,6 +383,117 @@ emitFromRow model =
         [ "instance FromRow " <> rowTypeName model <> " where",
           "  fromRow = " <> rowTypeName model <> " <$> " <> fields
         ]
+
+colLit :: FieldSpec -> Text
+colLit f = "\"" <> fieldColumn f <> "\""
+
+pickedFieldHsType :: FieldSpec -> Text
+pickedFieldHsType f
+  | fieldIsPrimaryKey f = rowHsType f
+  | fieldNullable f = "Picked (" <> rowHsType f <> ")"
+  | otherwise = "Picked " <> rowHsType f
+
+emitSelectTypes :: Model -> Text
+emitSelectTypes model =
+  T.intercalate "\n" (map T.strip sections) <> "\n"
+  where
+    sections =
+      [ emitSelectRecord model,
+        emitPickedRecord model,
+        emitSelectDefault model,
+        emitSelectColumnsFn model,
+        emitParsePicked model,
+        emitToPicked model
+      ]
+
+emitSelectRecord :: Model -> Text
+emitSelectRecord model =
+  T.unlines
+    [ "data " <> selectTypeName model <> " = " <> selectTypeName model,
+      "  { " <> T.intercalate ",\n    " (map selectField (modelFields model)),
+      "  }",
+      "  deriving (Show, Eq)"
+    ]
+  where
+    selectField f = fieldName f <> " :: Bool"
+
+emitPickedRecord :: Model -> Text
+emitPickedRecord model =
+  T.unlines
+    [ "data " <> pickedTypeName model <> " = " <> pickedTypeName model,
+      "  { " <> T.intercalate ",\n    " (map pickedField (modelFields model)),
+      "  }",
+      "  deriving (Show, Eq)"
+    ]
+  where
+    pickedField f = fieldName f <> " :: " <> pickedFieldHsType f
+
+emitSelectDefault :: Model -> Text
+emitSelectDefault model =
+  T.unlines
+    [ selectDefaultName model <> " :: " <> selectTypeName model,
+      selectDefaultName model <> " =",
+      "  " <> selectTypeName model,
+      "    { " <> T.intercalate ",\n      " (map falseField (modelFields model)),
+      "    }"
+    ]
+  where
+    falseField f = fieldName f <> " = False"
+
+emitSelectColumnsFn :: Model -> Text
+emitSelectColumnsFn model =
+  T.unlines
+    [ selectColumnsFnName model <> " :: " <> selectTypeName model <> " -> [Text]",
+      selectColumnsFnName model <> " select_ =",
+      "  fieldColumn " <> fieldBinder model pkSpec,
+      "    : concat",
+      "      [ " <> T.intercalate "\n      , " (map colGuard others),
+      "      ]"
+    ]
+  where
+    pkSpec = primaryKeyField model
+    others = filter (not . fieldIsPrimaryKey) (modelFields model)
+    colGuard f =
+      "[fieldColumn " <> fieldBinder model f <> " | select_." <> fieldName f <> "]"
+
+emitParsePicked :: Model -> Text
+emitParsePicked model =
+  T.unlines $
+    [ parsePickedName model <> " :: " <> selectTypeName model <> " -> RowParser " <> pickedTypeName model,
+      parsePickedName model <> " select_ = do",
+      "  " <> pkName <> "Val <- field"
+    ]
+      ++ map parseLine others
+      ++ [ "  pure "
+             <> pickedTypeName model
+             <> " { "
+             <> T.intercalate ", " assignFields
+             <> " }"
+         ]
+  where
+    pkSpec = primaryKeyField model
+    pkName = fieldName pkSpec
+    others = filter (not . fieldIsPrimaryKey) (modelFields model)
+    parseLine f =
+      "  " <> fieldName f <> "Val <- if select_." <> fieldName f <> " then Picked <$> field else pure Skipped"
+    assignFields =
+      (pkName <> " = " <> pkName <> "Val")
+        : [fieldName f <> " = " <> fieldName f <> "Val" | f <- others]
+
+emitToPicked :: Model -> Text
+emitToPicked model =
+  T.unlines
+    [ toPickedName model <> " :: " <> selectTypeName model <> " -> " <> rowTypeName model <> " -> " <> pickedTypeName model,
+      toPickedName model <> " select_ row =",
+      "  " <> pickedTypeName model,
+      "    { " <> T.intercalate ",\n      " assignFields,
+      "    }"
+    ]
+  where
+    assignFields = map assign (modelFields model)
+    assign f
+      | fieldIsPrimaryKey f = fieldName f <> " = row." <> fieldName f
+      | otherwise = fieldName f <> " = picked select_." <> fieldName f <> " row." <> fieldName f
 
 emitFieldDecl :: Model -> FieldSpec -> [Text]
 emitFieldDecl model f =

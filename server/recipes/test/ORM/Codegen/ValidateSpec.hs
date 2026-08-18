@@ -13,7 +13,7 @@ import Test.Hspec
 
 emptySchema :: [Model] -> [ModelInclude] -> Schema
 emptySchema models includes =
-  Schema {schemaEnums = [], schemaModels = models, schemaIncludes = includes}
+  Schema {schemaEnums = [], schemaModels = models, schemaIncludes = includes, schemaUniques = []}
 
 validateSpec :: Spec
 validateSpec =
@@ -81,7 +81,8 @@ validateSpec =
                           modelRelations = []
                         }
                     ],
-                  schemaIncludes = []
+                  schemaIncludes = [],
+                  schemaUniques = []
                 }
         validateSchema schema
           `shouldBe` [EnumHasNoVariants "Unit"]
@@ -98,7 +99,8 @@ validateSpec =
                           modelRelations = []
                         }
                     ],
-                  schemaIncludes = []
+                  schemaIncludes = [],
+                  schemaUniques = []
                 }
         validateSchema schema
           `shouldBe` [DuplicateEnumVariant "Unit" "G"]
@@ -215,3 +217,33 @@ validateSpec =
                 ]
         validateSchema schema
           `shouldBe` [DuplicateIncludeRelation "ShelfInclude" "Shelf" "shelfBooks"]
+
+      it "rejects a unique constraint on an unknown model" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Widget",
+                      modelTable = "widget",
+                      modelFields = [pk (uuid "id")],
+                      modelRelations = []
+                    }
+                ]
+                []
+            drifted = schema {schemaUniques = [unique_ "Nope" ["id"]]}
+        validateSchema drifted
+          `shouldBe` [UnknownUniqueModel "Nope"]
+
+      it "rejects a unique constraint that references an unknown field" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Widget",
+                      modelTable = "widget",
+                      modelFields = [pk (uuid "id")],
+                      modelRelations = []
+                    }
+                ]
+                []
+            drifted = schema {schemaUniques = [unique_ "Widget" ["name"]]}
+        validateSchema drifted
+          `shouldBe` [UnknownUniqueField "Widget" "name"]

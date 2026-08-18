@@ -13,7 +13,8 @@ widgetSchema =
   Schema
     { schemaEnums = [],
       schemaModels = [widgetModel],
-      schemaIncludes = []
+      schemaIncludes = [],
+      schemaUniques = []
     }
 
 widgetModel :: Model

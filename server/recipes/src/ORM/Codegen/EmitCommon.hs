@@ -9,6 +9,12 @@ module ORM.Codegen.EmitCommon
     updateTypeName,
     tableTypeName,
     rowTypeName,
+    selectTypeName,
+    pickedTypeName,
+    selectDefaultName,
+    selectColumnsFnName,
+    parsePickedName,
+    toPickedName,
     resultTypeName,
   )
 where
@@ -57,6 +63,24 @@ tableTypeName model = modelName model <> "Table"
 
 rowTypeName :: Model -> Text
 rowTypeName model = modelName model <> "Row"
+
+selectTypeName :: Model -> Text
+selectTypeName model = modelName model <> "Select"
+
+pickedTypeName :: Model -> Text
+pickedTypeName model = modelName model <> "Picked"
+
+selectDefaultName :: Model -> Text
+selectDefaultName model = lowerFirst (modelName model) <> "Select"
+
+selectColumnsFnName :: Model -> Text
+selectColumnsFnName model = lowerFirst (modelName model) <> "SelectColumns"
+
+parsePickedName :: Model -> Text
+parsePickedName model = "parse" <> modelName model <> "Picked"
+
+toPickedName :: Model -> Text
+toPickedName model = "to" <> modelName model <> "Picked"
 
 resultTypeName :: Schema -> Model -> [IncludeTree] -> Text
 resultTypeName _schema model edges =

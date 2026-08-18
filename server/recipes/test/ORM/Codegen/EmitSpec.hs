@@ -107,7 +107,8 @@ widgetSchema =
   Schema
     { schemaEnums = [],
       schemaModels = [widgetModel],
-      schemaIncludes = []
+      schemaIncludes = [],
+      schemaUniques = []
     }
 
 shelfModel :: Model

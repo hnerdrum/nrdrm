@@ -11,6 +11,7 @@ module ORM.Codegen.IR
     JoinKind (..),
     ModelInclude (..),
     IncludeTree (..),
+    UniqueConstraint (..),
     field,
     uuid,
     text,
@@ -29,6 +30,7 @@ module ORM.Codegen.IR
     hasMany,
     belongsTo,
     replaceChildren,
+    unique_,
   )
 where
 
@@ -37,7 +39,14 @@ import Data.Text (Text)
 data Schema = Schema
   { schemaEnums :: [EnumSpec],
     schemaModels :: [Model],
-    schemaIncludes :: [ModelInclude]
+    schemaIncludes :: [ModelInclude],
+    schemaUniques :: [UniqueConstraint]
+  }
+  deriving (Show, Eq)
+
+data UniqueConstraint = UniqueConstraint
+  { uniqueModel :: Text,
+    uniqueFields :: [Text]
   }
   deriving (Show, Eq)
 
@@ -201,3 +210,6 @@ belongsTo name fromModel toModel foreignFld referencedFld =
 
 replaceChildren :: RelationSpec -> RelationSpec
 replaceChildren rel = rel {relReplaceChildren = True}
+
+unique_ :: Text -> [Text] -> UniqueConstraint
+unique_ model fields = UniqueConstraint {uniqueModel = model, uniqueFields = fields}

@@ -1,5 +1,6 @@
 module Main (main) where
 
+import ORM.Codegen.DriftSpec (driftDbSpec, driftSpec)
 import ORM.Codegen.EmitClientSpec (emitClientSpec)
 import ORM.Codegen.EmitFlatRowSpec (emitFlatRowSpec)
 import ORM.Codegen.EmitIncludeSpec (emitIncludeSpec)
@@ -14,6 +15,7 @@ import ORM.IncludeSpec (includeSpec)
 import ORM.JoinSpec (joinSpec)
 import ORM.OperationsSpec (operationsSpec)
 import ORM.RawSpec (rawSpec)
+import ORM.SelectSpec (selectSpec)
 import ORM.WhereSpec (whereSpec)
 import Support.TestDb (withTestDb)
 import Test.Hspec
@@ -29,7 +31,8 @@ main = hspec $ do
   emitIncludeSpec
   emitClientSpec
   targetSpec
+  driftSpec
   errorsSpec
   groupSpec
   whereSpec
-  withTestDb $ operationsSpec >> joinSpec >> includeSpec >> rawSpec
+  withTestDb $ operationsSpec >> joinSpec >> includeSpec >> rawSpec >> driftDbSpec >> selectSpec

@@ -5,6 +5,7 @@
 
 module ORM.Operations
   ( findMany,
+    findManyWith,
     findUnique,
     findUniqueOrFail,
     findFirst,
@@ -16,7 +17,7 @@ module ORM.Operations
 where
 
 import qualified Data.Text as Text
-import Database.PostgreSQL.Simple.FromRow (FromRow)
+import Database.PostgreSQL.Simple.FromRow (FromRow, RowParser)
 import Database.PostgreSQL.Simple.ToField (ToField)
 import ORM.Core (Entity (..), PrimaryKeyType)
 import ORM.Db (Db (..))
@@ -28,6 +29,7 @@ import ORM.Query
     runCountQuery,
     runQuery,
     runQueryOne,
+    runQueryWith,
     selectAll,
   )
 import ORM.Where (compileWhere, eq)
@@ -38,6 +40,14 @@ findMany ::
   (QueryBuilder table -> QueryBuilder table) ->
   Db [result]
 findMany modifier = runQuery (modifier (selectAll @table))
+
+findManyWith ::
+  forall table result.
+  (Entity table) =>
+  RowParser result ->
+  (QueryBuilder table -> QueryBuilder table) ->
+  Db [result]
+findManyWith parser modifier = runQueryWith parser (modifier (selectAll @table))
 
 findUnique ::
   forall table result.

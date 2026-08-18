@@ -14,6 +14,10 @@ module ORM
     DriverErrorKind (..),
     selectAll,
     select,
+    selectColumns,
+    OmitSelect (..),
+    Picked (..),
+    picked,
     Where,
     matching,
     eq,
@@ -91,6 +95,7 @@ import ORM.Insert
 import ORM.Operations
 import ORM.Query
 import ORM.Relation
+import ORM.Select
 import ORM.Sql (catchDb, executeRaw, param, queryRaw)
 import ORM.Update
 import ORM.Where

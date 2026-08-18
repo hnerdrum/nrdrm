@@ -28,6 +28,7 @@ data Field table a = Field
 class Entity table where
   tableName :: Text
   primaryKey :: Field table (PrimaryKeyType table)
+  tableColumns :: [Text]
 
 type family PrimaryKeyType table
 

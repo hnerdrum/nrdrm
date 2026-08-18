@@ -16,6 +16,7 @@ import Control.Exception (IOException, SomeException, catch, displayException, t
 import Control.Monad (filterM, void)
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
+import Database.Migrations (runDbMigrations)
 import qualified Database.PostgreSQL.Simple as PG
 import Database.PostgreSQL.Simple.Types (Query (..))
 import ORM.Core (Entity (..))
@@ -61,6 +62,7 @@ setupTestEnv = do
   databaseUrl <- testDatabaseUrl
   result <- try @SomeException $ do
     runTestMigrations databaseUrl
+    runDbMigrations databaseUrl
     connect databaseUrl
   case result of
     Left err -> fail (connectionErrorMessage databaseUrl err)

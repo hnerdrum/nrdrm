@@ -7,6 +7,12 @@
 module ORM.Schema.Ingredient
   ( IngredientTable (..),
     IngredientRow (..),
+    IngredientSelect (..),
+    IngredientPicked (..),
+    ingredientSelect,
+    ingredientSelectColumns,
+    parseIngredientPicked,
+    toIngredientPicked,
     IngredientCreate (..),
     IngredientUpdate (..),
     ingredientId,
@@ -19,8 +25,9 @@ where
 import Data.Text (Text)
 import Data.Time (UTCTime)
 import Data.UUID (UUID)
-import ORM.PG (FromRow (..), field)
+import ORM.PG (FromRow (..), RowParser, field)
 import ORM.Core
+import ORM.Select (Picked (..), picked)
 import ORM.Insert (Insertable (..), emptyInsert, set, setMaybe)
 import ORM.Update (Updatable (..), emptyUpdate, setFieldMaybe)
 
@@ -31,6 +38,7 @@ type instance PrimaryKeyType IngredientTable = UUID
 instance Entity IngredientTable where
   tableName = "ingredient"
   primaryKey = ingredientId
+  tableColumns = ["id", "created_at", "updated_at", "name"]
 
 instance Insertable IngredientTable where
   type CreateInput IngredientTable = IngredientCreate
@@ -80,6 +88,53 @@ data IngredientUpdate = IngredientUpdate
 
 instance FromRow IngredientRow where
   fromRow = IngredientRow <$> field <*> field <*> field <*> field
+
+
+data IngredientSelect = IngredientSelect
+  { id :: Bool,
+    createdAt :: Bool,
+    updatedAt :: Bool,
+    name :: Bool
+  }
+  deriving (Show, Eq)
+data IngredientPicked = IngredientPicked
+  { id :: UUID,
+    createdAt :: Picked UTCTime,
+    updatedAt :: Picked UTCTime,
+    name :: Picked Text
+  }
+  deriving (Show, Eq)
+ingredientSelect :: IngredientSelect
+ingredientSelect =
+  IngredientSelect
+    { id = False,
+      createdAt = False,
+      updatedAt = False,
+      name = False
+    }
+ingredientSelectColumns :: IngredientSelect -> [Text]
+ingredientSelectColumns select_ =
+  fieldColumn ingredientId
+    : concat
+      [ [fieldColumn ingredientCreatedAt | select_.createdAt]
+      , [fieldColumn ingredientUpdatedAt | select_.updatedAt]
+      , [fieldColumn ingredientName | select_.name]
+      ]
+parseIngredientPicked :: IngredientSelect -> RowParser IngredientPicked
+parseIngredientPicked select_ = do
+  idVal <- field
+  createdAtVal <- if select_.createdAt then Picked <$> field else pure Skipped
+  updatedAtVal <- if select_.updatedAt then Picked <$> field else pure Skipped
+  nameVal <- if select_.name then Picked <$> field else pure Skipped
+  pure IngredientPicked { id = idVal, createdAt = createdAtVal, updatedAt = updatedAtVal, name = nameVal }
+toIngredientPicked :: IngredientSelect -> IngredientRow -> IngredientPicked
+toIngredientPicked select_ row =
+  IngredientPicked
+    { id = row.id,
+      createdAt = picked select_.createdAt row.createdAt,
+      updatedAt = picked select_.updatedAt row.updatedAt,
+      name = picked select_.name row.name
+    }
 
 
 ingredientId :: Field IngredientTable UUID

@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
@@ -26,6 +27,12 @@ module ORM.Client.Recipe
     RecipeQuery (..),
     RecipeCreate (..),
     RecipeRow (..),
+    RecipeSelect (..),
+    RecipePicked (..),
+    recipeSelect,
+    OmitSelect (..),
+    Picked (..),
+    RecipeWithIngredientsPicked (..),
     RecipeUpdate (..),
     RecipeWithIngredients (..),
     RecipeIngredientWithIngredient (..),
@@ -45,11 +52,12 @@ import qualified ORM.Delete as Delete
 import ORM.Errors (ORMError)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
-import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow (..), RecipeTable, RecipeUpdate (..))
+import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow (..), RecipeSelect (..), RecipePicked (..), recipeSelect, recipeSelectColumns, parseRecipePicked, toRecipePicked, RecipeTable, RecipeUpdate (..))
 import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients)
 import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientRow (..), RecipeIngredientTable, recipeIngredientRecipeId)
 import qualified ORM.Operations as Ops
-import ORM.Query (QueryBuilder, applyQueryModifiers)
+import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)
+import ORM.Select (OmitSelect (..), Picked (..))
 import ORM.Where (Where)
 import qualified ORM.Update as Update
 import ORM.Schema.Ingredient (IngredientRow (..))
@@ -89,15 +97,31 @@ withIngredients =
 noInclude :: NoInclude
 noInclude = NoInclude RecipeInclude {ingredients = Nothing}
 
-data RecipeQuery preset = RecipeQuery
-  { where_ :: Maybe (Where RecipeTable)
+data RecipeWithIngredientsPicked = RecipeWithIngredientsPicked
+  { recipe :: RecipePicked,
+    ingredients :: [RecipeIngredientWithIngredient]
+  }
+  deriving (Show, Eq)
+
+toRecipeWithIngredientsPicked :: RecipeSelect -> RecipeWithIngredients -> RecipeWithIngredientsPicked
+toRecipeWithIngredientsPicked select_ RecipeWithIngredients {recipe, ingredients} =
+  RecipeWithIngredientsPicked
+    { recipe = toRecipePicked select_ recipe
+    , ingredients = ingredients
+    }
+
+data RecipeQuery preset select = RecipeQuery
+  { select_ :: select
+  , where_ :: Maybe (Where RecipeTable)
   , orderBy_ :: Maybe (QueryBuilder RecipeTable -> QueryBuilder RecipeTable)
   , limit_ :: Maybe Int
   , offset_ :: Maybe Int
   }
 
-type instance ResolveInclude (RecipeQuery WithIngredients) = RecipeWithIngredients
-type instance ResolveInclude (RecipeQuery NoInclude) = RecipeRow
+type instance ResolveInclude (RecipeQuery WithIngredients OmitSelect) = RecipeWithIngredients
+type instance ResolveInclude (RecipeQuery NoInclude OmitSelect) = RecipeRow
+type instance ResolveInclude (RecipeQuery WithIngredients RecipeSelect) = RecipeWithIngredientsPicked
+type instance ResolveInclude (RecipeQuery NoInclude RecipeSelect) = RecipePicked
 
 class FindManyRecipe preset where
   findMany :: preset -> Db [ResolveInclude preset]
@@ -110,13 +134,24 @@ instance FindManyRecipe NoInclude where
   findMany _ =
     Ops.findMany @RecipeTable @RecipeRow Prelude.id
 
-instance FindManyRecipe (RecipeQuery WithIngredients) where
-  findMany RecipeQuery {..} =
+instance FindManyRecipe (RecipeQuery WithIngredients OmitSelect) where
+  findMany RecipeQuery {where_, orderBy_, limit_, offset_} =
     Include.findMany @RecipeTable (unwrapWithIngredients withIngredients) (applyQueryModifiers where_ orderBy_ limit_ offset_)
 
-instance FindManyRecipe (RecipeQuery NoInclude) where
-  findMany RecipeQuery {..} =
+instance FindManyRecipe (RecipeQuery NoInclude OmitSelect) where
+  findMany RecipeQuery {where_, orderBy_, limit_, offset_} =
     Ops.findMany @RecipeTable @RecipeRow (applyQueryModifiers where_ orderBy_ limit_ offset_)
+
+instance FindManyRecipe (RecipeQuery WithIngredients RecipeSelect) where
+  findMany RecipeQuery {select_, where_, orderBy_, limit_, offset_} = do
+    rows <- Include.findMany @RecipeTable (unwrapWithIngredients withIngredients) (applyQueryModifiers where_ orderBy_ limit_ offset_)
+    pure $ map (toRecipeWithIngredientsPicked select_) rows
+
+instance FindManyRecipe (RecipeQuery NoInclude RecipeSelect) where
+  findMany RecipeQuery {select_, where_, orderBy_, limit_, offset_} =
+    Ops.findManyWith
+      (parseRecipePicked select_)
+      (selectColumns (recipeSelectColumns select_) . applyQueryModifiers where_ orderBy_ limit_ offset_)
 
 class FindUniqueRecipe preset where
   findUnique :: preset -> UUID -> Db (Maybe (ResolveInclude preset))

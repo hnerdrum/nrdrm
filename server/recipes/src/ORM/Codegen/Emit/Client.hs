@@ -15,20 +15,28 @@ import ORM.Codegen.EmitCommon
     fieldBinder,
     hsType,
     includeFieldName,
+    parsePickedName,
+    pickedTypeName,
     resultTypeName,
     rowTypeName,
+    selectColumnsFnName,
+    selectDefaultName,
+    selectTypeName,
     tableTypeName,
+    toPickedName,
     updateTypeName,
   )
 import ORM.Codegen.IR
 import ORM.Codegen.Lookup (lookupField, lookupModel, lookupRelation)
-import ORM.Codegen.TextUtil (upperFirst)
+import ORM.Codegen.TextUtil (lowerFirst, upperFirst)
 
 emitSimpleClientModule :: Text -> Model -> Text
 emitSimpleClientModule moduleName model =
   T.unlines
-    [ "{-# LANGUAGE RecordWildCards #-}",
+    [ "{-# LANGUAGE FlexibleInstances #-}",
+      "{-# LANGUAGE RecordWildCards #-}",
       "{-# LANGUAGE TypeApplications #-}",
+      "{-# LANGUAGE TypeFamilies #-}",
       "",
       "module " <> moduleName,
       emitSimpleExports model,
@@ -40,7 +48,8 @@ emitSimpleClientModule moduleName model =
       "import qualified ORM.Delete as Delete",
       "import qualified ORM.Insert as Insert",
       "import qualified ORM.Operations as Ops",
-      "import ORM.Query (QueryBuilder, applyQueryModifiers)",
+      "import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)",
+      "import ORM.Select (OmitSelect (..), Picked (..))",
       "import ORM.Where (Where)",
       "import "
         <> schemaModule moduleName model
@@ -49,6 +58,16 @@ emitSimpleClientModule moduleName model =
         <> " (..), "
         <> rowTypeName model
         <> " (..), "
+        <> selectTypeName model
+        <> " (..), "
+        <> pickedTypeName model
+        <> " (..), "
+        <> selectDefaultName model
+        <> ", "
+        <> selectColumnsFnName model
+        <> ", "
+        <> parsePickedName model
+        <> ", "
         <> tableTypeName model
         <> ", "
         <> updateTypeName model
@@ -62,6 +81,8 @@ emitSimpleClientModule moduleName model =
       emitQueryType model,
       "",
       emitEmptyQueryFn model,
+      "",
+      emitResolveSelect model,
       "",
       emitFindManyFn model,
       "",
@@ -80,6 +101,7 @@ emitIncludeReadClientModule moduleName schema incl =
     ( [ "{-# LANGUAGE FlexibleContexts #-}",
         "{-# LANGUAGE FlexibleInstances #-}",
         "{-# LANGUAGE MultiParamTypeClasses #-}",
+        "{-# LANGUAGE NamedFieldPuns #-}",
         "{-# LANGUAGE RecordWildCards #-}",
         "{-# LANGUAGE TypeApplications #-}",
         "{-# LANGUAGE TypeFamilies #-}",
@@ -100,6 +122,7 @@ emitWriteClientModule moduleName schema incl =
         "{-# LANGUAGE FlexibleContexts #-}",
         "{-# LANGUAGE FlexibleInstances #-}",
         "{-# LANGUAGE MultiParamTypeClasses #-}",
+        "{-# LANGUAGE NamedFieldPuns #-}",
         "{-# LANGUAGE OverloadedRecordDot #-}",
         "{-# LANGUAGE RecordWildCards #-}",
         "{-# LANGUAGE TypeApplications #-}",
@@ -143,6 +166,18 @@ emitWriteClientModule moduleName schema incl =
                <> " (..), "
                <> rowTypeName root
                <> " (..), "
+               <> selectTypeName root
+               <> " (..), "
+               <> pickedTypeName root
+               <> " (..), "
+               <> selectDefaultName root
+               <> ", "
+               <> selectColumnsFnName root
+               <> ", "
+               <> parsePickedName root
+               <> ", "
+               <> toPickedName root
+               <> ", "
                <> tableTypeName root
                <> ", "
                <> updateTypeName root
@@ -160,7 +195,8 @@ emitWriteClientModule moduleName schema incl =
                <> wipeField
                <> ")",
              "import qualified ORM.Operations as Ops",
-             "import ORM.Query (QueryBuilder, applyQueryModifiers)",
+             "import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)",
+             "import ORM.Select (OmitSelect (..), Picked (..))",
              "import ORM.Where (Where)",
              "import qualified ORM.Update as Update"
            ]
@@ -372,6 +408,12 @@ emitSimpleExports model =
       "    deleteMany,",
       "    " <> createTypeName model <> " (..),",
       "    " <> rowTypeName model <> " (..),",
+      "    " <> selectTypeName model <> " (..),",
+      "    " <> pickedTypeName model <> " (..),",
+      "    " <> selectDefaultName model <> ",",
+      "    OmitSelect (..),",
+      "    Picked (..),",
+      "    ResolveSelect,",
       "    " <> updateTypeName model <> " (..),",
       "    " <> tableTypeName model <> ",",
       "    " <> queryTypeName model <> " (..),",
@@ -388,13 +430,20 @@ exportLinesFromItems items =
 
 includeReadExportItems :: Schema -> ModelInclude -> [Text]
 includeReadExportItems schema incl =
-  includeReadFunctionExportItems
-    ++ includeReadPresetExportItems schema incl
-    ++ [ presetTypeName schema incl <> " (..),",
-         "NoInclude (..),",
-         "ResolveInclude,",
-         queryTypeName (lookupModel schema (includeRootModel incl)) <> " (..)"
-       ]
+  let root = lookupModel schema (includeRootModel incl)
+   in includeReadFunctionExportItems
+        ++ includeReadPresetExportItems schema incl
+        ++ [ presetTypeName schema incl <> " (..),",
+             "NoInclude (..),",
+             "ResolveInclude,",
+             queryTypeName root <> " (..),",
+             "OmitSelect (..),",
+             "Picked (..),",
+             selectTypeName root <> " (..),",
+             pickedTypeName root <> " (..),",
+             selectDefaultName root <> ",",
+             pickedIncludeTypeName root incl <> " (..)"
+           ]
 
 includeReadFunctionExportItems :: [Text]
 includeReadFunctionExportItems =
@@ -414,6 +463,12 @@ writeClientTypeReexportItems schema root incl =
   nubExportItems $
     [ createTypeName root <> " (..),",
       rowTypeName root <> " (..),",
+      selectTypeName root <> " (..),",
+      pickedTypeName root <> " (..),",
+      selectDefaultName root <> ",",
+      "OmitSelect (..),",
+      "Picked (..),",
+      pickedIncludeTypeName root incl <> " (..),",
       updateTypeName root <> " (..),",
       includeResultName root incl <> " (..),"
     ]
@@ -450,7 +505,8 @@ includeReadImportLines moduleName schema incl =
     "import ORM.Errors (ORMError)",
     "import qualified ORM.Include as Include",
     "import qualified ORM.Operations as Ops",
-    "import ORM.Query (QueryBuilder, applyQueryModifiers)",
+    "import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)",
+    "import ORM.Select (OmitSelect (..), Picked (..))",
     "import ORM.Where (Where)",
     "import "
       <> schemaModule moduleName root
@@ -458,6 +514,18 @@ includeReadImportLines moduleName schema incl =
       <> tableTypeName root
       <> ", "
       <> rowTypeName root
+      <> ", "
+      <> selectTypeName root
+      <> " (..), "
+      <> pickedTypeName root
+      <> " (..), "
+      <> selectDefaultName root
+      <> ", "
+      <> selectColumnsFnName root
+      <> ", "
+      <> parsePickedName root
+      <> ", "
+      <> toPickedName root
       <> ")",
     includeModuleImportLine moduleName schema incl
   ]
@@ -532,6 +600,7 @@ emitIncludeReadDefinitions schema incl =
   let root = lookupModel schema (includeRootModel incl)
    in [ emitFullIncludePreset schema incl,
         emitNoIncludePreset schema incl,
+        emitPickedIncludeType schema root incl,
         emitIncludeQueryType root incl,
         emitIncludeQueryResolveInstances schema root incl,
         emitIncludeFindManyClass root incl,
@@ -540,15 +609,67 @@ emitIncludeReadDefinitions schema incl =
         emitIncludeFindUniqueOrFail schema root incl
       ]
 
+emitPickedIncludeType :: Schema -> Model -> ModelInclude -> Text
+emitPickedIncludeType schema model incl =
+  let pickedName = pickedIncludeTypeName model incl
+      nested = includeResultName model incl
+      rootVar = lowerFirst (modelName model)
+      relFields = map (pickedIncludeRelField schema model) (includeTree incl)
+      copyFields = map (includeRelName schema model) (includeTree incl)
+   in T.unlines
+        [ "data " <> pickedName <> " = " <> pickedName,
+          "  { " <> T.intercalate ",\n    " ((rootVar <> " :: " <> pickedTypeName model) : relFields),
+          "  }",
+          "  deriving (Show, Eq)",
+          "",
+          toPickedIncludeFnName model incl <> " :: " <> selectTypeName model <> " -> " <> nested <> " -> " <> pickedName,
+          toPickedIncludeFnName model incl <> " select_ " <> nested <> " {" <> T.intercalate ", " (rootVar : copyFields) <> "} =",
+          "  " <> pickedName,
+          "    { " <> rootVar <> " = " <> toPickedName model <> " select_ " <> rootVar,
+          if null copyFields
+            then "    }"
+            else "    , " <> T.intercalate "\n    , " (map (\f -> f <> " = " <> f) copyFields) <> "\n    }"
+        ]
+
+includeRelName :: Schema -> Model -> IncludeTree -> Text
+includeRelName _schema parent edge =
+  includeFieldName parent (lookupRelation parent (includeRelation edge))
+
+pickedIncludeRelField :: Schema -> Model -> IncludeTree -> Text
+pickedIncludeRelField schema parent edge =
+  name <> " :: " <> ty
+  where
+    rel = lookupRelation parent (includeRelation edge)
+    child = lookupModel schema (relToModel rel)
+    name = includeFieldName parent rel
+    kids = includeChildren edge
+    ty
+      | not (null kids) =
+          "[" <> resultTypeName schema child kids <> "]"
+      | RelHasMany <- relKind rel =
+          "[" <> modelName child <> "Row]"
+      | otherwise =
+          "Maybe " <> modelName child <> "Row"
+
+pickedIncludeTypeName :: Model -> ModelInclude -> Text
+pickedIncludeTypeName model incl = includeResultName model incl <> "Picked"
+
+toPickedIncludeFnName :: Model -> ModelInclude -> Text
+toPickedIncludeFnName model incl = "to" <> includeResultName model incl <> "Picked"
+
 emitIncludeQueryResolveInstances :: Schema -> Model -> ModelInclude -> Text
 emitIncludeQueryResolveInstances schema model incl =
   let withPreset = presetTypeName schema incl
       nested = includeResultName model incl
+      nestedPicked = pickedIncludeTypeName model incl
       row = rowTypeName model
+      picked = pickedTypeName model
       query = queryTypeName model
    in T.unlines
-        [ "type instance ResolveInclude (" <> query <> " " <> withPreset <> ") = " <> nested,
-          "type instance ResolveInclude (" <> query <> " NoInclude) = " <> row
+        [ "type instance ResolveInclude (" <> query <> " " <> withPreset <> " OmitSelect) = " <> nested,
+          "type instance ResolveInclude (" <> query <> " NoInclude OmitSelect) = " <> row,
+          "type instance ResolveInclude (" <> query <> " " <> withPreset <> " " <> selectTypeName model <> ") = " <> nestedPicked,
+          "type instance ResolveInclude (" <> query <> " NoInclude " <> selectTypeName model <> ") = " <> picked
         ]
 
 intercalateSections :: [Text] -> Text
@@ -572,28 +693,46 @@ emitUpdateFn model =
 emitFindManyFn :: Model -> Text
 emitFindManyFn model =
   T.unlines
-    [ "findMany :: " <> queryTypeName model <> " -> Db [" <> rowTypeName model <> "]",
-      "findMany q =",
-      "  Ops.findMany @" <> tableTypeName model <> " @" <> rowTypeName model <> " (applyQuery q)",
+    [ "class FindMany" <> modelName model <> " select where",
+      "  findMany :: " <> queryTypeName model <> " select -> Db [ResolveSelect select]",
       "",
-      "applyQuery :: " <> queryTypeName model <> " -> QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model,
-      "applyQuery " <> queryTypeName model <> " {..} =",
+      "instance FindMany" <> modelName model <> " OmitSelect where",
+      "  findMany q =",
+      "    Ops.findMany @" <> tableTypeName model <> " @" <> rowTypeName model <> " (applyQuery q)",
+      "",
+      "instance FindMany" <> modelName model <> " " <> selectTypeName model <> " where",
+      "  findMany q@" <> queryTypeName model <> " {select_} =",
+      "    Ops.findManyWith",
+      "      (" <> parsePickedName model <> " select_)",
+      "      (selectColumns (" <> selectColumnsFnName model <> " select_) . applyQuery q)",
+      "",
+      "applyQuery :: " <> queryTypeName model <> " select -> QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model,
+      "applyQuery " <> queryTypeName model <> " {where_, orderBy_, limit_, offset_} =",
       "  applyQueryModifiers where_ orderBy_ limit_ offset_"
+    ]
+
+emitResolveSelect :: Model -> Text
+emitResolveSelect model =
+  T.unlines
+    [ "type family ResolveSelect select",
+      "type instance ResolveSelect OmitSelect = " <> rowTypeName model,
+      "type instance ResolveSelect " <> selectTypeName model <> " = " <> pickedTypeName model
     ]
 
 emitEmptyQueryFn :: Model -> Text
 emitEmptyQueryFn model =
   T.unlines
-    [ "emptyQuery :: " <> queryTypeName model,
+    [ "emptyQuery :: " <> queryTypeName model <> " OmitSelect",
       "emptyQuery =",
-      "  " <> queryTypeName model <> " {where_ = Nothing, orderBy_ = Nothing, limit_ = Nothing, offset_ = Nothing}"
+      "  " <> queryTypeName model <> " {select_ = OmitSelect, where_ = Nothing, orderBy_ = Nothing, limit_ = Nothing, offset_ = Nothing}"
     ]
 
 emitQueryType :: Model -> Text
 emitQueryType model =
   T.unlines
-    [ "data " <> queryTypeName model <> " = " <> queryTypeName model,
-      "  { where_ :: Maybe (Where " <> tableTypeName model <> ")",
+    [ "data " <> queryTypeName model <> " select = " <> queryTypeName model,
+      "  { select_ :: select",
+      "  , where_ :: Maybe (Where " <> tableTypeName model <> ")",
       "  , orderBy_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
       "  , limit_ :: Maybe Int",
       "  , offset_ :: Maybe Int",
@@ -647,8 +786,9 @@ emitNoIncludePreset schema incl =
 emitIncludeQueryType :: Model -> ModelInclude -> Text
 emitIncludeQueryType model _incl =
   T.unlines
-    [ "data " <> queryTypeName model <> " preset = " <> queryTypeName model,
-      "  { where_ :: Maybe (Where " <> tableTypeName model <> ")",
+    [ "data " <> queryTypeName model <> " preset select = " <> queryTypeName model,
+      "  { select_ :: select",
+      "  , where_ :: Maybe (Where " <> tableTypeName model <> ")",
       "  , orderBy_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
       "  , limit_ :: Maybe Int",
       "  , offset_ :: Maybe Int",
@@ -670,6 +810,10 @@ emitIncludeFindManyInstances schema model incl =
       unwrapFn = "unwrap" <> withPreset
       presetVal = fullPresetName schema incl
       query = queryTypeName model
+      selectTy = selectTypeName model
+      parseFn = parsePickedName model
+      colsFn = selectColumnsFnName model
+      toPickedIncl = toPickedIncludeFnName model incl
    in T.unlines
         [ "instance FindMany" <> modelName model <> " " <> withPreset <> " where",
           "  findMany preset =",
@@ -679,13 +823,24 @@ emitIncludeFindManyInstances schema model incl =
           "  findMany _ =",
           "    Ops.findMany @" <> table <> " @" <> row <> " Prelude.id",
           "",
-          "instance FindMany" <> modelName model <> " (" <> query <> " " <> withPreset <> ") where",
-          "  findMany " <> query <> " {..} =",
+          "instance FindMany" <> modelName model <> " (" <> query <> " " <> withPreset <> " OmitSelect) where",
+          "  findMany " <> query <> " {where_, orderBy_, limit_, offset_} =",
           "    Include.findMany @" <> table <> " (" <> unwrapFn <> " " <> presetVal <> ") (applyQueryModifiers where_ orderBy_ limit_ offset_)",
           "",
-          "instance FindMany" <> modelName model <> " (" <> query <> " NoInclude) where",
-          "  findMany " <> query <> " {..} =",
-          "    Ops.findMany @" <> table <> " @" <> row <> " (applyQueryModifiers where_ orderBy_ limit_ offset_)"
+          "instance FindMany" <> modelName model <> " (" <> query <> " NoInclude OmitSelect) where",
+          "  findMany " <> query <> " {where_, orderBy_, limit_, offset_} =",
+          "    Ops.findMany @" <> table <> " @" <> row <> " (applyQueryModifiers where_ orderBy_ limit_ offset_)",
+          "",
+          "instance FindMany" <> modelName model <> " (" <> query <> " " <> withPreset <> " " <> selectTy <> ") where",
+          "  findMany " <> query <> " {select_, where_, orderBy_, limit_, offset_} = do",
+          "    rows <- Include.findMany @" <> table <> " (" <> unwrapFn <> " " <> presetVal <> ") (applyQueryModifiers where_ orderBy_ limit_ offset_)",
+          "    pure $ map (" <> toPickedIncl <> " select_) rows",
+          "",
+          "instance FindMany" <> modelName model <> " (" <> query <> " NoInclude " <> selectTy <> ") where",
+          "  findMany " <> query <> " {select_, where_, orderBy_, limit_, offset_} =",
+          "    Ops.findManyWith",
+          "      (" <> parseFn <> " select_)",
+          "      (selectColumns (" <> colsFn <> " select_) . applyQueryModifiers where_ orderBy_ limit_ offset_)"
         ]
 
 emitIncludeFindUniqueClass :: Model -> Text
@@ -761,7 +916,7 @@ includeResultName :: Model -> ModelInclude -> Text
 includeResultName model incl =
   resultTypeName stubSchema model (includeTree incl)
   where
-    stubSchema = Schema {schemaEnums = [], schemaModels = [model], schemaIncludes = [incl]}
+    stubSchema = Schema {schemaEnums = [], schemaModels = [model], schemaIncludes = [incl], schemaUniques = []}
 
 fullIncludeValue :: Schema -> ModelInclude -> Text
 fullIncludeValue schema incl =
