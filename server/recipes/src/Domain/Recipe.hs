@@ -155,7 +155,7 @@ toRecipeWriteCreate input =
             name = input.name,
             description = Value input.description
           },
-      ingredients = map toRecipeIngredientNestedCreate input.ingredients
+      ingredients = Recipe.Set (map toRecipeIngredientNestedCreate input.ingredients)
     }
 
 toRecipeWriteUpdate :: UpdateRecipeInput -> Recipe.RecipeWriteUpdate
@@ -168,7 +168,7 @@ toRecipeWriteUpdate input =
             updatedAt = Nothing,
             description = maybe Omit Value input.description
           },
-      ingredients = fmap (mapMaybe toRecipeIngredientNestedUpdate) input.ingredients
+      ingredients = fmap (Recipe.Set . mapMaybe toRecipeIngredientNestedUpdate) input.ingredients
     }
 
 toRecipeIngredientNestedCreate :: CreateRecipeIngredientInput -> Recipe.RecipeIngredientNestedCreate
