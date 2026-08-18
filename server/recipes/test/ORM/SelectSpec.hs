@@ -127,12 +127,13 @@ selectSpec = do
                         description = Value "fresh"
                       },
                   ingredients =
-                    [ Recipe.RecipeIngredientNestedCreate
-                        { ingredientId = ingredient.id,
-                          amount = 100,
-                          unit = G
-                        }
-                    ]
+                    Recipe.Set
+                      [ Recipe.RecipeIngredientNestedCreate
+                          { ingredientId = ingredient.id,
+                            amount = 100,
+                            unit = G
+                          }
+                      ]
                 }
           )
           >>= assertRight

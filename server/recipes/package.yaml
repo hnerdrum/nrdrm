@@ -186,6 +186,7 @@ tests:
       - ORM.IncludeSpec
       - ORM.WhereSpec
       - ORM.SelectSpec
+      - ORM.NestedWriteSpec
       - ORM.Codegen.ValidateSpec
       - ORM.Codegen.JoinAliasSpec
       - ORM.Codegen.IncludePathSpec

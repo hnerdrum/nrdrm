@@ -2,6 +2,7 @@ module ORM.Codegen.Lookup
   ( lookupModel,
     lookupField,
     lookupRelation,
+    lookupUniques,
   )
 where
 
@@ -40,3 +41,7 @@ lookupRelation model name =
           <> T.unpack name
           <> " on "
           <> T.unpack (modelName model)
+
+lookupUniques :: Schema -> Text -> [UniqueConstraint]
+lookupUniques schema name =
+  filter ((== name) . uniqueModel) (schemaUniques schema)

@@ -11,7 +11,10 @@ module ORM.Insert
     insertBuilder,
     insertReturning,
     executeInsert,
+    tryExecuteInsert,
     emptyInsert,
+    onConflictDoNothing,
+    onConflictDoUpdate,
     set,
     setNull,
     setMaybe,
@@ -40,8 +43,14 @@ class (Entity table) => Insertable table where
 data InsertBuilder table = InsertBuilder
   { ibTable :: Text,
     ibColumns :: [Text],
-    ibValues :: [Action]
+    ibValues :: [Action],
+    ibConflict :: OnConflict
   }
+
+data OnConflict
+  = NoConflict
+  | DoNothing [Text]
+  | DoUpdate [Text] [Text]
 
 insert ::
   forall table result.
@@ -76,13 +85,23 @@ insertReturning builder = Db (`runInsertReturning` builder)
 executeInsert :: InsertBuilder table -> Db ()
 executeInsert builder = Db (`runExecuteInsert` builder)
 
+tryExecuteInsert :: InsertBuilder table -> Db (Either ORMError ())
+tryExecuteInsert builder = Db $ \conn -> catchSql (runExecuteInsert conn builder)
+
 emptyInsert :: forall table. (Entity table) => InsertBuilder table
 emptyInsert =
   InsertBuilder
     { ibTable = tableName @table,
       ibColumns = [],
-      ibValues = []
+      ibValues = [],
+      ibConflict = NoConflict
     }
+
+onConflictDoNothing :: [Text] -> InsertBuilder table -> InsertBuilder table
+onConflictDoNothing cols builder = builder {ibConflict = DoNothing cols}
+
+onConflictDoUpdate :: [Text] -> [Text] -> InsertBuilder table -> InsertBuilder table
+onConflictDoUpdate cols setCols builder = builder {ibConflict = DoUpdate cols setCols}
 
 set :: forall table a. (ToField a) => Field table a -> a -> InsertBuilder table -> InsertBuilder table
 set field value builder =
@@ -162,5 +181,16 @@ insertQueryParts builder suffix =
           <> ") VALUES ("
           <> placeholders
           <> ")"
+          <> conflictClause (ibConflict builder)
           <> suffix
    in (queryText, allValues)
+
+conflictClause :: OnConflict -> Text
+conflictClause NoConflict = ""
+conflictClause (DoNothing cols) =
+  " ON CONFLICT (" <> Text.intercalate ", " (map quoteIdent cols) <> ") DO NOTHING"
+conflictClause (DoUpdate cols setCols) =
+  " ON CONFLICT ("
+    <> Text.intercalate ", " (map quoteIdent cols)
+    <> ") DO UPDATE SET "
+    <> Text.intercalate ", " [quoteIdent col <> " = EXCLUDED." <> quoteIdent col | col <- setCols]

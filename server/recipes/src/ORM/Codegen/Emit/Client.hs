@@ -17,6 +17,7 @@ import ORM.Codegen.EmitCommon
     includeFieldName,
     parsePickedName,
     pickedTypeName,
+    primaryKeyField,
     resultTypeName,
     rowTypeName,
     selectColumnsFnName,
@@ -27,7 +28,7 @@ import ORM.Codegen.EmitCommon
     updateTypeName,
   )
 import ORM.Codegen.IR
-import ORM.Codegen.Lookup (lookupField, lookupModel, lookupRelation)
+import ORM.Codegen.Lookup (lookupField, lookupModel, lookupRelation, lookupUniques)
 import ORM.Codegen.TextUtil (lowerFirst, upperFirst)
 
 emitSimpleClientModule :: Text -> Model -> Text
@@ -123,6 +124,7 @@ emitWriteClientModule moduleName schema incl =
         "{-# LANGUAGE FlexibleInstances #-}",
         "{-# LANGUAGE MultiParamTypeClasses #-}",
         "{-# LANGUAGE NamedFieldPuns #-}",
+        "{-# LANGUAGE NoFieldSelectors #-}",
         "{-# LANGUAGE OverloadedRecordDot #-}",
         "{-# LANGUAGE RecordWildCards #-}",
         "{-# LANGUAGE TypeApplications #-}",
@@ -138,7 +140,10 @@ emitWriteClientModule moduleName schema incl =
                    "deleteMany,",
                    writeCreateTypeName root <> " (..),",
                    writeUpdateTypeName root <> " (..),",
-                   nestedCreateTypeName child <> " (..),"
+                   nestedCreateTypeName child <> " (..),",
+                   nestedWriteTypeName root rel <> " (..),",
+                   nestedOpsTypeName child <> " (..),",
+                   emptyNestedOpsName child <> ","
                  ]
               ++ includeReadPresetExportItems schema incl
               ++ [ presetTypeName schema incl <> " (..),",
@@ -149,8 +154,7 @@ emitWriteClientModule moduleName schema incl =
               ++ writeClientTypeReexportItems schema root incl
           )
         ++ ["where", ""]
-        ++ [ "import Control.Monad (forM_)",
-             "import Data.UUID (UUID)",
+        ++ [ "import Data.UUID (UUID)",
              "import qualified Data.UUID.V4 as V4",
              "import ORM.PG (toField)",
              "import ORM.Core (fieldColumn)",
@@ -190,14 +194,18 @@ emitWriteClientModule moduleName schema incl =
                <> " (..), "
                <> rowTypeName child
                <> " (..), "
+               <> updateTypeName child
+               <> " (..), "
                <> tableTypeName child
                <> ", "
-               <> wipeField
+               <> fieldBinder child (primaryKeyField child)
+               <> ", "
+               <> fieldBinder child (lookupField child (relForeignField rel))
                <> ")",
              "import qualified ORM.Operations as Ops",
              "import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)",
              "import ORM.Select (OmitSelect (..), Picked (..))",
-             "import ORM.Where (Where)",
+             "import ORM.Where (Where, and_, eq, in_)",
              "import qualified ORM.Update as Update"
            ]
         ++ writeClientRelatedRowImportLines moduleName schema root child incl
@@ -206,12 +214,14 @@ emitWriteClientModule moduleName schema incl =
     <> "\n"
     <> intercalateSections
       ( [ emitWriteCreateType root child rel,
-          emitWriteUpdateType root child rel,
-          emitNestedToChildCreate child rel
+          emitWriteUpdateType root rel,
+          emitNestedToChildCreate child rel,
+          emitNestedToChildUpdate child rel,
+          emitNestedWriteHelpers schema root child rel
         ]
           ++ emitIncludeReadDefinitions schema incl
-          ++ [ emitWriteCreate schema root incl child rel,
-               emitWriteUpdate schema root incl child rel wipeField,
+          ++ [ emitWriteCreate schema root incl rel,
+               emitWriteUpdate schema root incl rel,
                emitDeleteFn root,
                emitDeleteManyFn root
              ]
@@ -219,26 +229,55 @@ emitWriteClientModule moduleName schema incl =
   where
     root = lookupModel schema (includeRootModel incl)
     (rel, child) = replaceChildRelation schema root incl
-    wipeField = fieldBinder child (lookupField child (relForeignField rel))
 
 emitWriteCreateType :: Model -> Model -> RelationSpec -> Text
 emitWriteCreateType root child rel =
   T.unlines
-    [ "data " <> writeCreateTypeName root <> " = " <> writeCreateTypeName root,
-      "  { root :: " <> createTypeName root,
-      "  , " <> childrenFieldName root rel <> " :: [" <> nestedCreateTypeName child <> "]",
-      "  }",
+    [ emitNestedCreateType child rel,
+      emitNestedOpsType child,
+      "data " <> nestedWriteTypeName root rel <> " = Set [" <> nestedCreateTypeName child <> "] | Ops " <> nestedOpsTypeName child,
       "  deriving (Show, Eq)",
       "",
-      emitNestedCreateType child rel
+      emptyNestedOpsName child <> " :: " <> nestedOpsTypeName child,
+      emptyNestedOpsName child <> " =",
+      "  " <> nestedOpsTypeName child,
+      "    { create = []",
+      "    , createMany = []",
+      "    , connect = []",
+      "    , disconnect = []",
+      "    , delete = []",
+      "    , update = []",
+      "    , upsert = []",
+      "    }",
+      "",
+      "data " <> writeCreateTypeName root <> " = " <> writeCreateTypeName root,
+      "  { root :: " <> createTypeName root,
+      "  , " <> childrenFieldName root rel <> " :: " <> nestedWriteTypeName root rel,
+      "  }",
+      "  deriving (Show, Eq)"
     ]
 
-emitWriteUpdateType :: Model -> Model -> RelationSpec -> Text
-emitWriteUpdateType root child rel =
+emitWriteUpdateType :: Model -> RelationSpec -> Text
+emitWriteUpdateType root rel =
   T.unlines
     [ "data " <> writeUpdateTypeName root <> " = " <> writeUpdateTypeName root,
       "  { root :: " <> updateTypeName root,
-      "  , " <> childrenFieldName root rel <> " :: Maybe [" <> nestedCreateTypeName child <> "]",
+      "  , " <> childrenFieldName root rel <> " :: Maybe " <> nestedWriteTypeName root rel,
+      "  }",
+      "  deriving (Show, Eq)"
+    ]
+
+emitNestedOpsType :: Model -> Text
+emitNestedOpsType child =
+  T.unlines
+    [ "data " <> nestedOpsTypeName child <> " = " <> nestedOpsTypeName child,
+      "  { create :: [" <> nestedCreateTypeName child <> "]",
+      "  , createMany :: [" <> nestedCreateTypeName child <> "]",
+      "  , connect :: [UUID]",
+      "  , disconnect :: [UUID]",
+      "  , delete :: [UUID]",
+      "  , update :: [(UUID, " <> nestedCreateTypeName child <> ")]",
+      "  , upsert :: [" <> nestedCreateTypeName child <> "]",
       "  }",
       "  deriving (Show, Eq)"
     ]
@@ -275,13 +314,191 @@ emitNestedToChildCreate child rel =
          ]
       ++ ["      " <> relForeignField rel <> " = parentId", "    }"]
 
-emitWriteCreate :: Schema -> Model -> ModelInclude -> Model -> RelationSpec -> Text
-emitWriteCreate schema root incl child rel =
+emitNestedToChildUpdate :: Model -> RelationSpec -> Text
+emitNestedToChildUpdate child rel =
+  T.unlines
+    [ "to" <> updateTypeName child <> " :: " <> nestedCreateTypeName child <> " -> " <> updateTypeName child,
+      "to" <> updateTypeName child <> " nested =",
+      "  " <> updateTypeName child,
+      "    { " <> T.intercalate ",\n      " updateFields,
+      "    }"
+    ]
+  where
+    updateFields =
+      [ if fieldName f == relForeignField rel
+          then fieldName f <> " = Nothing"
+          else fieldName f <> " = Just nested." <> fieldName f
+        | f <- modelFields child,
+          not (fieldIsPrimaryKey f)
+      ]
+
+emitNestedWriteHelpers :: Schema -> Model -> Model -> RelationSpec -> Text
+emitNestedWriteHelpers schema root child rel =
+  T.unlines
+    [ "sequenceNested :: [Db (Either ORMError ())] -> Db (Either ORMError ())",
+      "sequenceNested [] = pure (Right ())",
+      "sequenceNested (action : rest) = do",
+      "  result <- action",
+      "  case result of",
+      "    Left err -> pure (Left err)",
+      "    Right () -> sequenceNested rest",
+      "",
+      applyWrite <> " :: UUID -> " <> writeTy <> " -> Db (Either ORMError ())",
+      applyWrite <> " parentId write =",
+      "  case write of",
+      "    Set items -> do",
+      "      _ <-",
+      "        Delete.deleteWhere $",
+      "          Delete.whereDelete (fieldColumn " <> fkBinder <> " <> \" = ?\") [toField parentId] (Delete.emptyDelete @" <> childTable <> ")",
+      "      insertNestedCreates parentId items",
+      "    Ops ops -> " <> applyOps <> " parentId ops",
+      "",
+      "insertNestedCreates :: UUID -> [" <> nestedCreateTypeName child <> "] -> Db (Either ORMError ())",
+      "insertNestedCreates parentId = go",
+      "  where",
+      "    go [] = pure (Right ())",
+      "    go (nested : rest) = do",
+      "      result <- Insert.insert @" <> childTable <> " @" <> childRow <> " (" <> toCreate <> " parentId nested)",
+      "      case result of",
+      "        Left err -> pure (Left err)",
+      "        Right _ -> go rest",
+      "",
+      applyOps <> " :: UUID -> " <> nestedOpsTypeName child <> " -> Db (Either ORMError ())",
+      applyOps <> " parentId ops =",
+      "  sequenceNested",
+      "    [ deleteNested parentId ops.delete",
+      "    , deleteNested parentId ops.disconnect",
+      "    , updateNested parentId ops.update",
+      "    , upsertNested parentId ops.upsert",
+      "    , insertNestedCreates parentId ops.create",
+      "    , insertNestedCreateMany parentId ops.createMany",
+      "    , connectNested parentId ops.connect",
+      "    ]",
+      "",
+      "deleteNested :: UUID -> [UUID] -> Db (Either ORMError ())",
+      "deleteNested _ [] = pure (Right ())",
+      "deleteNested parentId ids = do",
+      "  result <- Delete.deleteMany @" <> childTable <> " (in_ " <> pkBinder <> " ids `and_` eq " <> fkBinder <> " parentId)",
+      "  pure $ case result of",
+      "    Left err -> Left err",
+      "    Right _ -> Right ()",
+      "",
+      "updateNested :: UUID -> [(UUID, " <> nestedCreateTypeName child <> ")] -> Db (Either ORMError ())",
+      "updateNested parentId = go",
+      "  where",
+      "    go [] = pure (Right ())",
+      "    go ((childId, nested) : rest) = do",
+      "      result <-",
+      "        Update.updateBuilder @" <> childTable <> " @" <> childRow <> " $",
+      "          Update.whereUpdate (fieldColumn " <> pkBinder <> " <> \" = ?\") [toField childId] $",
+      "            Update.whereUpdate (fieldColumn " <> fkBinder <> " <> \" = ?\") [toField parentId] $",
+      "              Update.toUpdateBuilder @" <> childTable <> " (" <> toUpdate <> " nested)",
+      "      case result of",
+      "        Left err -> pure (Left err)",
+      "        Right _ -> go rest",
+      "",
+      emitUpsertFn schema child rel,
+      emitCreateManyFn schema child rel,
+      "connectNested :: UUID -> [UUID] -> Db (Either ORMError ())",
+      "connectNested parentId = go",
+      "  where",
+      "    go [] = pure (Right ())",
+      "    go (childId : rest) = do",
+      "      result <-",
+      "        Update.updateBuilder @" <> childTable <> " @" <> childRow <> " $",
+      "          Update.setField " <> fkBinder <> " parentId $",
+      "            Update.whereUpdate (fieldColumn " <> pkBinder <> " <> \" = ?\") [toField childId] $",
+      "              Update.emptyUpdate @" <> childTable,
+      "      case result of",
+      "        Left err -> pure (Left err)",
+      "        Right _ -> go rest"
+    ]
+  where
+    writeTy = nestedWriteTypeName root rel
+    applyWrite = applyWriteFnName root rel
+    applyOps = applyOpsFnName child
+    childTable = tableTypeName child
+    childRow = rowTypeName child
+    pkBinder = fieldBinder child (primaryKeyField child)
+    fkBinder = fieldBinder child (lookupField child (relForeignField rel))
+    toCreate = "to" <> createTypeName child
+    toUpdate = "to" <> updateTypeName child
+
+emitUpsertFn :: Schema -> Model -> RelationSpec -> Text
+emitUpsertFn schema child _rel =
+  T.unlines
+    [ "upsertNested :: UUID -> [" <> nestedCreateTypeName child <> "] -> Db (Either ORMError ())",
+      "upsertNested parentId = go",
+      "  where",
+      "    go [] = pure (Right ())",
+      "    go (nested : rest) = do",
+      "      result <-",
+      "        Insert.insertBuilder @" <> tableTypeName child <> " @" <> rowTypeName child <> " $",
+      conflictLine,
+      "          Insert.toInsertBuilder @" <> tableTypeName child <> " (to" <> createTypeName child <> " parentId nested)",
+      "      case result of",
+      "        Left err -> pure (Left err)",
+      "        Right _ -> go rest"
+    ]
+  where
+    conflictLine = case uniqueCols schema child of
+      [] -> "          Prelude.id $"
+      cols ->
+        case upsertSetCols schema child of
+          [] -> "          Insert.onConflictDoNothing " <> listLit cols <> " $"
+          setCols ->
+            "          Insert.onConflictDoUpdate " <> listLit cols <> " " <> listLit setCols <> " $"
+
+emitCreateManyFn :: Schema -> Model -> RelationSpec -> Text
+emitCreateManyFn schema child _rel =
+  T.unlines
+    [ "insertNestedCreateMany :: UUID -> [" <> nestedCreateTypeName child <> "] -> Db (Either ORMError ())",
+      "insertNestedCreateMany parentId = go",
+      "  where",
+      "    go [] = pure (Right ())",
+      "    go (nested : rest) = do",
+      "      result <-",
+      "        Insert.tryExecuteInsert $",
+      conflictLine,
+      "          Insert.toInsertBuilder @" <> tableTypeName child <> " (to" <> createTypeName child <> " parentId nested)",
+      "      case result of",
+      "        Left err -> pure (Left err)",
+      "        Right () -> go rest"
+    ]
+  where
+    conflictLine = case uniqueCols schema child of
+      [] -> "          Prelude.id $"
+      cols ->
+        "          Insert.onConflictDoNothing " <> listLit cols <> " $"
+
+uniqueCols :: Schema -> Model -> [Text]
+uniqueCols schema child =
+  case lookupUniques schema (modelName child) of
+    (constraint : _) -> map (fieldColumn . lookupField child) (uniqueFields constraint)
+    [] -> []
+
+upsertSetCols :: Schema -> Model -> [Text]
+upsertSetCols schema child =
+  case lookupUniques schema (modelName child) of
+    (constraint : _) ->
+      [ fieldColumn f
+        | f <- modelFields child,
+          not (fieldIsPrimaryKey f),
+          fieldName f `notElem` uniqueFields constraint
+      ]
+    [] -> []
+
+listLit :: [Text] -> Text
+listLit cols =
+  "[" <> T.intercalate ", " ["\"" <> col <> "\"" | col <- cols] <> "]"
+
+emitWriteCreate :: Schema -> Model -> ModelInclude -> RelationSpec -> Text
+emitWriteCreate schema root incl rel =
   let childrenField = childrenFieldName root rel
-      toChild = "to" <> createTypeName child
       resultName = includeResultName root incl
       withPreset = presetTypeName schema incl
       unwrapFn = "unwrap" <> withPreset
+      applyWrite = applyWriteFnName root rel
       createBody =
         [ "  rootId <- liftIO $ maybe V4.nextRandom pure input.root.id",
           "  let rootInput =",
@@ -291,10 +508,10 @@ emitWriteCreate schema root incl child rel =
           "  case rootResult of",
           "    Left err -> pure (Left err)",
           "    Right _ -> do",
-          "      forM_ input." <> childrenField <> " $ \\nested ->",
-          "        Insert.executeInsert $",
-          "          Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
-          "      Include.findUniqueOrFail @" <> tableTypeName root <> " (" <> unwrapFn <> " include) rootId"
+          "      nestedResult <- " <> applyWrite <> " rootId input." <> childrenField,
+          "      case nestedResult of",
+          "        Left err -> pure (Left err)",
+          "        Right () -> Include.findUniqueOrFail @" <> tableTypeName root <> " (" <> unwrapFn <> " include) rootId"
         ]
    in T.unlines $
         [ "create ::",
@@ -305,29 +522,25 @@ emitWriteCreate schema root incl child rel =
         ]
           ++ createBody
 
-emitWriteUpdate :: Schema -> Model -> ModelInclude -> Model -> RelationSpec -> Text -> Text
-emitWriteUpdate schema root incl child rel wipeField =
+emitWriteUpdate :: Schema -> Model -> ModelInclude -> RelationSpec -> Text
+emitWriteUpdate schema root incl rel =
   let childrenField = childrenFieldName root rel
-      toChild = "to" <> createTypeName child
       resultName = includeResultName root incl
       withPreset = presetTypeName schema incl
       unwrapFn = "unwrap" <> withPreset
+      applyWrite = applyWriteFnName root rel
       updateBody =
         [ "  updateResult <-",
           "    Update.update @" <> tableTypeName root <> " @" <> rowTypeName root <> " rootId input.root",
           "  case updateResult of",
           "    Left err -> pure (Left err)",
           "    Right _ -> do",
-          "      case input." <> childrenField <> " of",
-          "        Nothing -> pure ()",
-          "        Just nestedItems -> do",
-          "          _ <-",
-          "            Delete.deleteWhere $",
-          "              Delete.whereDelete (fieldColumn " <> wipeField <> " <> \" = ?\") [toField rootId] (Delete.emptyDelete @" <> tableTypeName child <> ")",
-          "          forM_ nestedItems $ \\nested ->",
-          "            Insert.executeInsert $",
-          "              Insert.toInsertBuilder @" <> tableTypeName child <> " (" <> toChild <> " rootId nested)",
-          "      Include.findUniqueOrFail @" <> tableTypeName root <> " (" <> unwrapFn <> " include) rootId"
+          "      nestedResult <- case input." <> childrenField <> " of",
+          "        Nothing -> pure (Right ())",
+          "        Just write -> " <> applyWrite <> " rootId write",
+          "      case nestedResult of",
+          "        Left err -> pure (Left err)",
+          "        Right () -> Include.findUniqueOrFail @" <> tableTypeName root <> " (" <> unwrapFn <> " include) rootId"
         ]
    in T.unlines $
         [ "update ::",
@@ -347,6 +560,21 @@ writeUpdateTypeName model = modelName model <> "WriteUpdate"
 
 nestedCreateTypeName :: Model -> Text
 nestedCreateTypeName model = modelName model <> "NestedCreate"
+
+nestedWriteTypeName :: Model -> RelationSpec -> Text
+nestedWriteTypeName root rel = upperFirst (childrenFieldName root rel) <> "Write"
+
+nestedOpsTypeName :: Model -> Text
+nestedOpsTypeName child = modelName child <> "NestedOps"
+
+emptyNestedOpsName :: Model -> Text
+emptyNestedOpsName child = "empty" <> nestedOpsTypeName child
+
+applyWriteFnName :: Model -> RelationSpec -> Text
+applyWriteFnName root rel = "apply" <> nestedWriteTypeName root rel
+
+applyOpsFnName :: Model -> Text
+applyOpsFnName child = "apply" <> nestedOpsTypeName child
 
 childrenFieldName :: Model -> RelationSpec -> Text
 childrenFieldName = includeFieldName
