@@ -1,0 +1,57 @@
+name: orm-codegen
+version: 0.1.0.0
+github: "hnerdrum/nrdrm"
+license: BSD3
+author: "Henrik Nerdrum"
+maintainer: "henrik.nerdrum@gmail.com"
+copyright: "2023 Henrik Nerdrum"
+
+dependencies:
+  - base >= 4.7 && < 5
+  - containers
+  - directory
+  - filepath
+  - orm
+  - postgresql-simple
+  - text
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wmissing-export-lists
+  - -Wmissing-home-modules
+  - -Wpartial-fields
+  - -Wredundant-constraints
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - ORM.Codegen.CLI
+    - ORM.Codegen.Drift
+    - ORM.Codegen.Emit.Client
+    - ORM.Codegen.Emit.FlatRow
+    - ORM.Codegen.Emit.Include
+    - ORM.Codegen.Emit.Nest
+    - ORM.Codegen.Emit.Schema
+    - ORM.Codegen.Emit.SelectIn
+    - ORM.Codegen.IncludePath
+    - ORM.Codegen.IR
+    - ORM.Codegen.Introspect
+    - ORM.Codegen.JoinAlias
+    - ORM.Codegen.Run
+    - ORM.Codegen.Spec.Shelf
+    - ORM.Codegen.Spec.ShelfDeep
+    - ORM.Codegen.Spec.Widget
+    - ORM.Codegen.Target
+    - ORM.Codegen.Validate
+  other-modules:
+    - ORM.Codegen.EmitCommon
+    - ORM.Codegen.Lookup
+    - ORM.Codegen.TextUtil
+  default-extensions:
+    - NamedFieldPuns
+    - OverloadedRecordDot
+    - OverloadedStrings
