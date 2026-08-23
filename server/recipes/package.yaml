@@ -40,6 +40,7 @@ dependencies:
   - either
   - directory
   - filepath
+  - orm
 
 ghc-options:
   - -Wall
@@ -73,7 +74,6 @@ library:
     - Domain.Unit
     - Lib
     - Logger
-    - ORM
     - ORM.Client.Ingredient
     - ORM.Client.Recipe
     - ORM.Schema.Ingredient
@@ -81,47 +81,6 @@ library:
     - ORM.Schema.RecipeInclude
     - ORM.Schema.RecipeIngredient
     - ORM.Schema.Unit
-    - ORM.Codegen.Emit.Client
-    - ORM.Codegen.Emit.FlatRow
-    - ORM.Codegen.Emit.Include
-    - ORM.Codegen.Emit.Nest
-    - ORM.Codegen.Emit.Schema
-    - ORM.Codegen.Emit.SelectIn
-    - ORM.Codegen.IncludePath
-    - ORM.Codegen.IR
-    - ORM.Codegen.JoinAlias
-    - ORM.Codegen.RecipeTarget
-    - ORM.Codegen.Run
-    - ORM.Codegen.Spec.Recipe
-    - ORM.Codegen.Spec.Shelf
-    - ORM.Codegen.Spec.ShelfDeep
-    - ORM.Codegen.Spec.Widget
-    - ORM.Codegen.Target
-    - ORM.Codegen.Validate
-    - ORM.Codegen.Drift
-    - ORM.Codegen.Introspect
-    - ORM.Column
-    - ORM.Core
-    - ORM.Db
-    - ORM.Delete
-    - ORM.Errors
-    - ORM.Group
-    - ORM.Include
-    - ORM.Insert
-    - ORM.JoinChain
-    - ORM.Operations
-    - ORM.PG
-    - ORM.Query
-    - ORM.Relation
-    - ORM.Select
-    - ORM.SelectIn
-    - ORM.Sql
-    - ORM.Update
-    - ORM.Where
-  other-modules:
-    - ORM.Codegen.EmitCommon
-    - ORM.Codegen.Lookup
-    - ORM.Codegen.TextUtil
   default-extensions:
     - DataKinds
     - DuplicateRecordFields
@@ -136,12 +95,15 @@ library:
 executables:
   orm-codegen:
     main: Main.hs
-    source-dirs: tools/orm-codegen
+    source-dirs:
+      - tools/orm-codegen
+      - schema
     ghc-options:
       - -Wall
     dependencies:
       - base
-      - recipes
+      - orm
+      - orm-codegen
       - text
   server-exe:
     main: Main.hs
@@ -157,7 +119,9 @@ executables:
 tests:
   recipes-test:
     main: Spec.hs
-    source-dirs: test
+    source-dirs:
+      - test
+      - schema
     default-extensions:
       - DuplicateRecordFields
       - NamedFieldPuns
@@ -166,6 +130,8 @@ tests:
       - TypeApplications
       - TypeFamilies
     other-modules:
+      - ORM.Codegen.RecipeTarget
+      - ORM.Codegen.Spec.Recipe
       - Schema.Widget
       - Schema.Shelf
       - Schema.Book
@@ -205,6 +171,8 @@ tests:
     dependencies:
       - base
       - directory
+      - orm
+      - orm-codegen
       - recipes
       - hspec
       - hspec-wai

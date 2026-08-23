@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - "server/recipes/**"
+      - "server/orm/**"
+      - "server/orm-codegen/**"
       - ".github/workflows/deploy-recipes.yml"
     branches:
       - main
@@ -13,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: server/recipes
+        working-directory: server
 
     steps:
       - uses: actions/checkout@v4
@@ -27,7 +29,7 @@ jobs:
         env:
           CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
           GIT_SHA: ${{ github.sha }}
-        run: docker build -t $CONTAINER_REGISTRY/nrdrm-recipes:$GIT_SHA .
+        run: docker build -f recipes/Dockerfile -t $CONTAINER_REGISTRY/nrdrm-recipes:$GIT_SHA .
       - name: Push the Docker Image
         env:
           CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}

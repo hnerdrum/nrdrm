@@ -2,16 +2,12 @@ FROM haskell:9.2.8 AS build
 
 WORKDIR /usr/src/app
 
-COPY stack.yaml stack.yaml.lock ./
-COPY *.cabal ./
-COPY package.yaml ./
+COPY orm/ orm/
+COPY orm-codegen/ orm-codegen/
+COPY recipes/ recipes/
 
-# Install dependencies separately (will be cached if dependencies don't change)
-RUN stack setup --install-ghc && stack build --only-dependencies
-
-COPY . .
-
-RUN stack build --copy-bins
+WORKDIR /usr/src/app/recipes
+RUN stack setup --install-ghc && stack build --copy-bins
 
 # Runtime stage
 FROM debian:bullseye-slim
@@ -31,7 +27,7 @@ RUN apt-get update && \
 # /root/.local/bin/* is the default directory where Stack places compiled binaries
 COPY --from=build /root/.local/bin/* /usr/local/bin/
 
-COPY --from=build /usr/src/app/migrations /app/migrations
+COPY --from=build /usr/src/app/recipes/migrations /app/migrations
 
 EXPOSE 8000
 
