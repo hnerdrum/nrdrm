@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeApplications #-}
@@ -22,21 +23,22 @@ module ORM.Client.Ingredient
     IngredientUpdate (..),
     IngredientTable,
     IngredientQuery (..),
-    emptyQuery
+    emptyQuery,
+    ingredientId
   )
 
 where
 
 import Data.UUID (UUID)
 import ORM.Db (Db)
-import ORM.Errors (ORMError)
+import ORM.Errors (ORMError (..), requireFound)
 import qualified ORM.Delete as Delete
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)
 import ORM.Select (OmitSelect (..), Picked (..))
 import ORM.Where (Where)
-import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientSelect (..), IngredientPicked (..), ingredientSelect, ingredientSelectColumns, parseIngredientPicked, IngredientTable, IngredientUpdate (..))
+import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientSelect (..), IngredientPicked (..), ingredientSelect, ingredientSelectColumns, parseIngredientPicked, IngredientTable, IngredientUpdate (..), ingredientId)
 import qualified ORM.Update as Update
 
 create :: IngredientCreate -> Db (Either ORMError IngredientRow)
@@ -68,28 +70,38 @@ type instance ResolveSelect IngredientSelect = IngredientPicked
 
 class FindManyIngredient select where
   findMany :: IngredientQuery select -> Db [ResolveSelect select]
+  findUnique :: IngredientQuery select -> Db (Maybe (ResolveSelect select))
+  findUniqueOrFail :: IngredientQuery select -> Db (Either ORMError (ResolveSelect select))
 
 instance FindManyIngredient OmitSelect where
   findMany q =
     Ops.findMany @IngredientTable @IngredientRow (applyQuery q)
+  findUnique q =
+    Ops.findFirst @IngredientTable @IngredientRow (applyQuery q)
+  findUniqueOrFail q = do
+    result <- findUnique q
+    pure $ requireFound result (RecordNotFound "No record found matching query")
 
 instance FindManyIngredient IngredientSelect where
   findMany q@IngredientQuery {select_} =
     Ops.findManyWith
       (parseIngredientPicked select_)
       (selectColumns (ingredientSelectColumns select_) . applyQuery q)
+  findUnique q@IngredientQuery {select_} = do
+    rows <-
+      Ops.findManyWith
+        (parseIngredientPicked select_)
+        (selectColumns (ingredientSelectColumns select_) . applyQuery q {limit_ = Just 1})
+    pure $ case rows of
+      [] -> Nothing
+      (row : _) -> Just row
+  findUniqueOrFail q = do
+    result <- findUnique q
+    pure $ requireFound result (RecordNotFound "No record found matching query")
 
 applyQuery :: IngredientQuery select -> QueryBuilder IngredientTable -> QueryBuilder IngredientTable
 applyQuery IngredientQuery {where_, orderBy_, limit_, offset_} =
   applyQueryModifiers where_ orderBy_ limit_ offset_
-
-
-findUnique :: UUID -> Db (Maybe IngredientRow)
-findUnique = Ops.findUnique @IngredientTable @IngredientRow
-
-
-findUniqueOrFail :: UUID -> Db (Either ORMError IngredientRow)
-findUniqueOrFail = Ops.findUniqueOrFail @IngredientTable @IngredientRow
 
 
 delete :: UUID -> Db Int

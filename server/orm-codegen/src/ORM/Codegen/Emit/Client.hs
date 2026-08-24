@@ -34,7 +34,8 @@ import ORM.Codegen.TextUtil (lowerFirst, upperFirst)
 emitSimpleClientModule :: Text -> Model -> Text
 emitSimpleClientModule moduleName model =
   T.unlines
-    [ "{-# LANGUAGE FlexibleInstances #-}",
+    [ "{-# LANGUAGE FlexibleContexts #-}",
+      "{-# LANGUAGE FlexibleInstances #-}",
       "{-# LANGUAGE RecordWildCards #-}",
       "{-# LANGUAGE TypeApplications #-}",
       "{-# LANGUAGE TypeFamilies #-}",
@@ -45,7 +46,7 @@ emitSimpleClientModule moduleName model =
       "",
       "import Data.UUID (UUID)",
       "import ORM.Db (Db)",
-      "import ORM.Errors (ORMError)",
+      "import ORM.Errors (ORMError (..), requireFound)",
       "import qualified ORM.Delete as Delete",
       "import qualified ORM.Insert as Insert",
       "import qualified ORM.Operations as Ops",
@@ -72,7 +73,9 @@ emitSimpleClientModule moduleName model =
         <> tableTypeName model
         <> ", "
         <> updateTypeName model
-        <> " (..))",
+        <> " (..), "
+        <> fieldBinder model (primaryKeyField model)
+        <> ")",
       "import qualified ORM.Update as Update",
       "",
       emitCreateFn model,
@@ -86,10 +89,6 @@ emitSimpleClientModule moduleName model =
       emitResolveSelect model,
       "",
       emitFindManyFn model,
-      "",
-      emitFindUniqueFn model,
-      "",
-      emitFindUniqueOrFailFn model,
       "",
       emitDeleteFn model,
       "",
@@ -149,7 +148,9 @@ emitWriteClientModule moduleName schema incl =
               ++ [ presetTypeName schema incl <> " (..),",
                    "NoInclude (..),",
                    "ResolveInclude,",
-                   queryTypeName root <> " (..),"
+                   queryTypeName root <> " (..),",
+                   "emptyQuery,",
+                   fieldBinder root (primaryKeyField root) <> ","
                  ]
               ++ writeClientTypeReexportItems schema root incl
           )
@@ -160,7 +161,7 @@ emitWriteClientModule moduleName schema incl =
              "import ORM.Core (fieldColumn)",
              "import ORM.Db (Db, liftIO, transaction)",
              "import qualified ORM.Delete as Delete",
-             "import ORM.Errors (ORMError)",
+             "import ORM.Errors (ORMError (..), requireFound)",
              "import qualified ORM.Include as Include",
              "import qualified ORM.Insert as Insert",
              "import "
@@ -185,7 +186,9 @@ emitWriteClientModule moduleName schema incl =
                <> tableTypeName root
                <> ", "
                <> updateTypeName root
-               <> " (..))",
+               <> " (..), "
+               <> fieldBinder root (primaryKeyField root)
+               <> ")",
              includeModuleImportLine moduleName schema incl,
              "import "
                <> schemaModule moduleName child
@@ -645,7 +648,8 @@ emitSimpleExports model =
       "    " <> updateTypeName model <> " (..),",
       "    " <> tableTypeName model <> ",",
       "    " <> queryTypeName model <> " (..),",
-      "    emptyQuery",
+      "    emptyQuery,",
+      "    " <> fieldBinder model (primaryKeyField model),
       "  )"
     ]
 
@@ -665,6 +669,7 @@ includeReadExportItems schema incl =
              "NoInclude (..),",
              "ResolveInclude,",
              queryTypeName root <> " (..),",
+             "emptyQuery,",
              "OmitSelect (..),",
              "Picked (..),",
              selectTypeName root <> " (..),",
@@ -730,7 +735,7 @@ includeReadImportLines :: Text -> Schema -> ModelInclude -> [Text]
 includeReadImportLines moduleName schema incl =
   [ "import Data.UUID (UUID)",
     "import ORM.Db (Db)",
-    "import ORM.Errors (ORMError)",
+    "import ORM.Errors (ORMError (..), requireFound)",
     "import qualified ORM.Include as Include",
     "import qualified ORM.Operations as Ops",
     "import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)",
@@ -830,11 +835,10 @@ emitIncludeReadDefinitions schema incl =
         emitNoIncludePreset schema incl,
         emitPickedIncludeType schema root incl,
         emitIncludeQueryType root incl,
+        emitIncludeEmptyQueryFn root,
         emitIncludeQueryResolveInstances schema root incl,
         emitIncludeFindManyClass root incl,
-        emitIncludeFindManyInstances schema root incl,
-        emitIncludeFindUnique schema root incl,
-        emitIncludeFindUniqueOrFail schema root incl
+        emitIncludeFindManyInstances schema root incl
       ]
 
 emitPickedIncludeType :: Schema -> Model -> ModelInclude -> Text
@@ -923,16 +927,34 @@ emitFindManyFn model =
   T.unlines
     [ "class FindMany" <> modelName model <> " select where",
       "  findMany :: " <> queryTypeName model <> " select -> Db [ResolveSelect select]",
+      "  findUnique :: " <> queryTypeName model <> " select -> Db (Maybe (ResolveSelect select))",
+      "  findUniqueOrFail :: " <> queryTypeName model <> " select -> Db (Either ORMError (ResolveSelect select))",
       "",
       "instance FindMany" <> modelName model <> " OmitSelect where",
       "  findMany q =",
       "    Ops.findMany @" <> tableTypeName model <> " @" <> rowTypeName model <> " (applyQuery q)",
+      "  findUnique q =",
+      "    Ops.findFirst @" <> tableTypeName model <> " @" <> rowTypeName model <> " (applyQuery q)",
+      "  findUniqueOrFail q = do",
+      "    result <- findUnique q",
+      "    pure $ requireFound result (RecordNotFound \"No record found matching query\")",
       "",
       "instance FindMany" <> modelName model <> " " <> selectTypeName model <> " where",
       "  findMany q@" <> queryTypeName model <> " {select_} =",
       "    Ops.findManyWith",
       "      (" <> parsePickedName model <> " select_)",
       "      (selectColumns (" <> selectColumnsFnName model <> " select_) . applyQuery q)",
+      "  findUnique q@" <> queryTypeName model <> " {select_} = do",
+      "    rows <-",
+      "      Ops.findManyWith",
+      "        (" <> parsePickedName model <> " select_)",
+      "        (selectColumns (" <> selectColumnsFnName model <> " select_) . applyQuery q {limit_ = Just 1})",
+      "    pure $ case rows of",
+      "      [] -> Nothing",
+      "      (row : _) -> Just row",
+      "  findUniqueOrFail q = do",
+      "    result <- findUnique q",
+      "    pure $ requireFound result (RecordNotFound \"No record found matching query\")",
       "",
       "applyQuery :: " <> queryTypeName model <> " select -> QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model,
       "applyQuery " <> queryTypeName model <> " {where_, orderBy_, limit_, offset_} =",
@@ -965,20 +987,6 @@ emitQueryType model =
       "  , limit_ :: Maybe Int",
       "  , offset_ :: Maybe Int",
       "  }"
-    ]
-
-emitFindUniqueFn :: Model -> Text
-emitFindUniqueFn model =
-  T.unlines
-    [ "findUnique :: UUID -> Db (Maybe " <> rowTypeName model <> ")",
-      "findUnique = Ops.findUnique @" <> tableTypeName model <> " @" <> rowTypeName model
-    ]
-
-emitFindUniqueOrFailFn :: Model -> Text
-emitFindUniqueOrFailFn model =
-  T.unlines
-    [ "findUniqueOrFail :: UUID -> Db (Either ORMError " <> rowTypeName model <> ")",
-      "findUniqueOrFail = Ops.findUniqueOrFail @" <> tableTypeName model <> " @" <> rowTypeName model
     ]
 
 emitDeleteFn :: Model -> Text
@@ -1014,8 +1022,9 @@ emitNoIncludePreset schema incl =
 emitIncludeQueryType :: Model -> ModelInclude -> Text
 emitIncludeQueryType model _incl =
   T.unlines
-    [ "data " <> queryTypeName model <> " preset select = " <> queryTypeName model,
-      "  { select_ :: select",
+    [ "data " <> queryTypeName model <> " include select = " <> queryTypeName model,
+      "  { include_ :: include",
+      "  , select_ :: select",
       "  , where_ :: Maybe (Where " <> tableTypeName model <> ")",
       "  , orderBy_ :: Maybe (QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model <> ")",
       "  , limit_ :: Maybe Int",
@@ -1023,12 +1032,23 @@ emitIncludeQueryType model _incl =
       "  }"
     ]
 
+emitIncludeEmptyQueryFn :: Model -> Text
+emitIncludeEmptyQueryFn model =
+  T.unlines
+    [ "emptyQuery :: " <> queryTypeName model <> " NoInclude OmitSelect",
+      "emptyQuery =",
+      "  " <> queryTypeName model <> " {include_ = noInclude, select_ = OmitSelect, where_ = Nothing, orderBy_ = Nothing, limit_ = Nothing, offset_ = Nothing}"
+    ]
+
 emitIncludeFindManyClass :: Model -> ModelInclude -> Text
 emitIncludeFindManyClass model _incl =
-  T.unlines
-    [ "class FindMany" <> modelName model <> " preset where",
-      "  findMany :: preset -> Db [ResolveInclude preset]"
-    ]
+  let query = queryTypeName model
+   in T.unlines
+        [ "class FindMany" <> modelName model <> " include select where",
+          "  findMany :: " <> query <> " include select -> Db [ResolveInclude (" <> query <> " include select)]",
+          "  findUnique :: " <> query <> " include select -> Db (Maybe (ResolveInclude (" <> query <> " include select)))",
+          "  findUniqueOrFail :: " <> query <> " include select -> Db (Either ORMError (ResolveInclude (" <> query <> " include select)))"
+        ]
 
 emitIncludeFindManyInstances :: Schema -> Model -> ModelInclude -> Text
 emitIncludeFindManyInstances schema model incl =
@@ -1036,100 +1056,69 @@ emitIncludeFindManyInstances schema model incl =
       row = rowTypeName model
       withPreset = presetTypeName schema incl
       unwrapFn = "unwrap" <> withPreset
-      presetVal = fullPresetName schema incl
       query = queryTypeName model
       selectTy = selectTypeName model
       parseFn = parsePickedName model
       colsFn = selectColumnsFnName model
       toPickedIncl = toPickedIncludeFnName model incl
-   in T.unlines
-        [ "instance FindMany" <> modelName model <> " " <> withPreset <> " where",
-          "  findMany preset =",
-          "    Include.findMany @" <> table <> " (" <> unwrapFn <> " preset) Prelude.id",
-          "",
-          "instance FindMany" <> modelName model <> " NoInclude where",
-          "  findMany _ =",
-          "    Ops.findMany @" <> table <> " @" <> row <> " Prelude.id",
-          "",
-          "instance FindMany" <> modelName model <> " (" <> query <> " " <> withPreset <> " OmitSelect) where",
-          "  findMany " <> query <> " {where_, orderBy_, limit_, offset_} =",
-          "    Include.findMany @" <> table <> " (" <> unwrapFn <> " " <> presetVal <> ") (applyQueryModifiers where_ orderBy_ limit_ offset_)",
-          "",
-          "instance FindMany" <> modelName model <> " (" <> query <> " NoInclude OmitSelect) where",
-          "  findMany " <> query <> " {where_, orderBy_, limit_, offset_} =",
-          "    Ops.findMany @" <> table <> " @" <> row <> " (applyQueryModifiers where_ orderBy_ limit_ offset_)",
-          "",
-          "instance FindMany" <> modelName model <> " (" <> query <> " " <> withPreset <> " " <> selectTy <> ") where",
-          "  findMany " <> query <> " {select_, where_, orderBy_, limit_, offset_} = do",
-          "    rows <- Include.findMany @" <> table <> " (" <> unwrapFn <> " " <> presetVal <> ") (applyQueryModifiers where_ orderBy_ limit_ offset_)",
-          "    pure $ map (" <> toPickedIncl <> " select_) rows",
-          "",
-          "instance FindMany" <> modelName model <> " (" <> query <> " NoInclude " <> selectTy <> ") where",
-          "  findMany " <> query <> " {select_, where_, orderBy_, limit_, offset_} =",
-          "    Ops.findManyWith",
-          "      (" <> parseFn <> " select_)",
-          "      (selectColumns (" <> colsFn <> " select_) . applyQueryModifiers where_ orderBy_ limit_ offset_)"
-        ]
-
-emitIncludeFindUniqueClass :: Model -> Text
-emitIncludeFindUniqueClass model =
-  T.unlines
-    [ "class FindUnique" <> modelName model <> " preset where",
-      "  findUnique :: preset -> UUID -> Db (Maybe (ResolveInclude preset))"
-    ]
-
-emitIncludeFindUniqueOrFailClass :: Model -> Text
-emitIncludeFindUniqueOrFailClass model =
-  T.unlines
-    [ "class FindUniqueOrFail" <> modelName model <> " preset where",
-      "  findUniqueOrFail :: preset -> UUID -> Db (Either ORMError (ResolveInclude preset))"
-    ]
-
-emitIncludeFindUniqueInstances :: Schema -> Model -> ModelInclude -> Text
-emitIncludeFindUniqueInstances schema model incl =
-  let table = tableTypeName model
-      row = rowTypeName model
-      withPreset = presetTypeName schema incl
-      unwrapFn = "unwrap" <> withPreset
       modelNm = modelName model
-   in T.unlines
-        [ "instance FindUnique" <> modelNm <> " " <> withPreset <> " where",
-          "  findUnique preset =",
-          "    Include.findUnique @" <> table <> " (" <> unwrapFn <> " preset)",
-          "",
-          "instance FindUnique" <> modelNm <> " NoInclude where",
-          "  findUnique _ =",
-          "    Ops.findUnique @" <> table <> " @" <> row
+      uniqueFromMany =
+        [ "  findUnique q = do",
+          "    rows <- findMany q {limit_ = Just 1}",
+          "    pure $ case rows of",
+          "      [] -> Nothing",
+          "      (row : _) -> Just row",
+          "  findUniqueOrFail q = do",
+          "    result <- findUnique q",
+          "    pure $ requireFound result (RecordNotFound \"No record found matching query\")"
         ]
-
-emitIncludeFindUniqueOrFailInstances :: Schema -> Model -> ModelInclude -> Text
-emitIncludeFindUniqueOrFailInstances schema model incl =
-  let table = tableTypeName model
-      row = rowTypeName model
-      withPreset = presetTypeName schema incl
-      unwrapFn = "unwrap" <> withPreset
-      modelNm = modelName model
-   in T.unlines
-        [ "instance FindUniqueOrFail" <> modelNm <> " " <> withPreset <> " where",
-          "  findUniqueOrFail preset =",
-          "    Include.findUniqueOrFail @" <> table <> " (" <> unwrapFn <> " preset)",
-          "",
-          "instance FindUniqueOrFail" <> modelNm <> " NoInclude where",
-          "  findUniqueOrFail _ =",
-          "    Ops.findUniqueOrFail @" <> table <> " @" <> row
+      uniqueFromFirst =
+        [ "  findUnique " <> query <> " {where_, orderBy_, limit_, offset_} =",
+          "    Ops.findFirst @" <> table <> " @" <> row <> " (applyQueryModifiers where_ orderBy_ limit_ offset_)",
+          "  findUniqueOrFail q = do",
+          "    result <- findUnique q",
+          "    pure $ requireFound result (RecordNotFound \"No record found matching query\")"
         ]
-
-emitIncludeFindUnique :: Schema -> Model -> ModelInclude -> Text
-emitIncludeFindUnique schema model incl =
-  emitIncludeFindUniqueClass model
-    <> "\n\n"
-    <> emitIncludeFindUniqueInstances schema model incl
-
-emitIncludeFindUniqueOrFail :: Schema -> Model -> ModelInclude -> Text
-emitIncludeFindUniqueOrFail schema model incl =
-  emitIncludeFindUniqueOrFailClass model
-    <> "\n\n"
-    <> emitIncludeFindUniqueOrFailInstances schema model incl
+      uniqueFromSelect =
+        [ "  findUnique " <> query <> " {select_, where_, orderBy_, offset_} = do",
+          "    rows <-",
+          "      Ops.findManyWith",
+          "        (" <> parseFn <> " select_)",
+          "        (selectColumns (" <> colsFn <> " select_) . applyQueryModifiers where_ orderBy_ (Just 1) offset_)",
+          "    pure $ case rows of",
+          "      [] -> Nothing",
+          "      (row : _) -> Just row",
+          "  findUniqueOrFail q = do",
+          "    result <- findUnique q",
+          "    pure $ requireFound result (RecordNotFound \"No record found matching query\")"
+        ]
+   in T.unlines $
+        [ "instance FindMany" <> modelNm <> " " <> withPreset <> " OmitSelect where",
+          "  findMany " <> query <> " {include_, where_, orderBy_, limit_, offset_} =",
+          "    Include.findMany @" <> table <> " (" <> unwrapFn <> " include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)"
+        ]
+          ++ uniqueFromMany
+          ++ [ "",
+               "instance FindMany" <> modelNm <> " NoInclude OmitSelect where",
+               "  findMany " <> query <> " {where_, orderBy_, limit_, offset_} =",
+               "    Ops.findMany @" <> table <> " @" <> row <> " (applyQueryModifiers where_ orderBy_ limit_ offset_)"
+             ]
+          ++ uniqueFromFirst
+          ++ [ "",
+               "instance FindMany" <> modelNm <> " " <> withPreset <> " " <> selectTy <> " where",
+               "  findMany " <> query <> " {include_, select_, where_, orderBy_, limit_, offset_} = do",
+               "    rows <- Include.findMany @" <> table <> " (" <> unwrapFn <> " include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)",
+               "    pure $ map (" <> toPickedIncl <> " select_) rows"
+             ]
+          ++ uniqueFromMany
+          ++ [ "",
+               "instance FindMany" <> modelNm <> " NoInclude " <> selectTy <> " where",
+               "  findMany " <> query <> " {select_, where_, orderBy_, limit_, offset_} =",
+               "    Ops.findManyWith",
+               "      (" <> parseFn <> " select_)",
+               "      (selectColumns (" <> colsFn <> " select_) . applyQueryModifiers where_ orderBy_ limit_ offset_)"
+             ]
+          ++ uniqueFromSelect
 
 presetTypeName :: Schema -> ModelInclude -> Text
 presetTypeName schema incl =
