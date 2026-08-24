@@ -6,6 +6,9 @@ author: "Henrik Nerdrum"
 maintainer: "henrik.nerdrum@gmail.com"
 copyright: "2023 Henrik Nerdrum"
 
+extra-source-files:
+  - README.md
+
 dependencies:
   - base >= 4.7 && < 5
   - bytestring

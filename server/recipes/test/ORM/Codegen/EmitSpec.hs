@@ -20,6 +20,7 @@ import ORM.Codegen.IR
     relJoin,
     relName,
   )
+import ORM.Codegen.Spec.Example (exampleSchema, taskModel)
 import ORM.Codegen.Spec.Flag (flagModel, flagSchema)
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
@@ -29,6 +30,12 @@ import Test.Hspec
 emitSpec :: Spec
 emitSpec = do
   describe "ORM.Codegen.Emit.Schema" $ do
+    it "emits the canonical Example Task module" $ do
+      let actual = emitModelModule "Schema.Task" exampleSchema taskModel
+      actual `shouldSatisfy` T.isInfixOf "data TaskRow"
+      actual `shouldSatisfy` T.isInfixOf "done :: Bool"
+      actual `shouldSatisfy` T.isInfixOf "tableName = \"task\""
+
     it "emits Widget matching the golden file" $ do
       expected <- T.readFile "test/ORM/Codegen/golden/Widget.hs.golden"
       let actual = emitModelModule "Schema.Widget" widgetSchema widgetModel

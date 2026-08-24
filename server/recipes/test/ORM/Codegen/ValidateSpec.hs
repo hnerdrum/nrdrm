@@ -7,6 +7,7 @@ where
 
 import ORM.Codegen.IR
 import qualified ORM.Codegen.Schema as Builder
+import ORM.Codegen.Spec.Example (exampleSchema)
 import ORM.Codegen.Spec.Flag (flagSchema)
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
@@ -26,6 +27,9 @@ validateSpec =
 
       it "accepts the Recipe schema" $
         validateSchema recipeSchema `shouldBe` []
+
+      it "accepts the canonical Example schema" $
+        validateSchema exampleSchema `shouldBe` []
 
       it "accepts a Schema with a boolean field" $
         validateSchema flagSchema `shouldBe` []

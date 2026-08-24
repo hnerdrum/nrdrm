@@ -20,6 +20,7 @@ import ORM.Codegen.IR
     schemaIncludes,
     schemaModels,
   )
+import ORM.Codegen.Spec.Example (taskModel)
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import Test.Hspec
@@ -27,6 +28,12 @@ import Test.Hspec
 emitClientSpec :: Spec
 emitClientSpec =
   describe "ORM.Codegen.Emit.Client" $ do
+    it "emits Client for the canonical Example Task model" $ do
+      let actual = emitSimpleClientModule "ORM.Client.Task" taskModel
+      actual `shouldSatisfy` T.isInfixOf "data TaskQuery"
+      actual `shouldSatisfy` T.isInfixOf "findMany :: TaskQuery"
+      actual `shouldSatisfy` T.isInfixOf "emptyQuery"
+
     it "emits Ingredient Client matching the golden file" $ do
       expected <- TIO.readFile "test/ORM/Codegen/golden/IngredientClient.hs.golden"
       let actual = emitSimpleClientModule "ORM.Client.Ingredient" ingredientModel
