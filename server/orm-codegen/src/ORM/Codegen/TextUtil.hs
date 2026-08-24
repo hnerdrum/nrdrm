@@ -19,7 +19,6 @@ upperFirst t = case T.uncons t of
   Nothing -> t
   Just (c, rest) -> T.cons (toUpper c) rest
 
--- | @createdAt@ → @created_at@, @RecipeIngredient@ → @recipe_ingredient@.
 camelToSnake :: Text -> Text
 camelToSnake =
   T.dropWhile (== '_') . T.concatMap step

@@ -925,12 +925,12 @@ emitUpdateFn model =
 emitFindManyFn :: Model -> Text
 emitFindManyFn model =
   T.unlines
-    [ "class FindMany" <> modelName model <> " select where",
+    [ "class Read" <> modelName model <> " select where",
       "  findMany :: " <> queryTypeName model <> " select -> Db [ResolveSelect select]",
       "  findUnique :: " <> queryTypeName model <> " select -> Db (Maybe (ResolveSelect select))",
       "  findUniqueOrFail :: " <> queryTypeName model <> " select -> Db (Either ORMError (ResolveSelect select))",
       "",
-      "instance FindMany" <> modelName model <> " OmitSelect where",
+      "instance Read" <> modelName model <> " OmitSelect where",
       "  findMany q =",
       "    Ops.findMany @" <> tableTypeName model <> " @" <> rowTypeName model <> " (applyQuery q)",
       "  findUnique q =",
@@ -939,7 +939,7 @@ emitFindManyFn model =
       "    result <- findUnique q",
       "    pure $ requireFound result (RecordNotFound \"No record found matching query\")",
       "",
-      "instance FindMany" <> modelName model <> " " <> selectTypeName model <> " where",
+      "instance Read" <> modelName model <> " " <> selectTypeName model <> " where",
       "  findMany q@" <> queryTypeName model <> " {select_} =",
       "    Ops.findManyWith",
       "      (" <> parsePickedName model <> " select_)",
@@ -1044,7 +1044,7 @@ emitIncludeFindManyClass :: Model -> ModelInclude -> Text
 emitIncludeFindManyClass model _incl =
   let query = queryTypeName model
    in T.unlines
-        [ "class FindMany" <> modelName model <> " include select where",
+        [ "class Read" <> modelName model <> " include select where",
           "  findMany :: " <> query <> " include select -> Db [ResolveInclude (" <> query <> " include select)]",
           "  findUnique :: " <> query <> " include select -> Db (Maybe (ResolveInclude (" <> query <> " include select)))",
           "  findUniqueOrFail :: " <> query <> " include select -> Db (Either ORMError (ResolveInclude (" <> query <> " include select)))"
@@ -1093,26 +1093,26 @@ emitIncludeFindManyInstances schema model incl =
           "    pure $ requireFound result (RecordNotFound \"No record found matching query\")"
         ]
    in T.unlines $
-        [ "instance FindMany" <> modelNm <> " " <> withPreset <> " OmitSelect where",
+        [ "instance Read" <> modelNm <> " " <> withPreset <> " OmitSelect where",
           "  findMany " <> query <> " {include_, where_, orderBy_, limit_, offset_} =",
           "    Include.findMany @" <> table <> " (" <> unwrapFn <> " include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)"
         ]
           ++ uniqueFromMany
           ++ [ "",
-               "instance FindMany" <> modelNm <> " NoInclude OmitSelect where",
+               "instance Read" <> modelNm <> " NoInclude OmitSelect where",
                "  findMany " <> query <> " {where_, orderBy_, limit_, offset_} =",
                "    Ops.findMany @" <> table <> " @" <> row <> " (applyQueryModifiers where_ orderBy_ limit_ offset_)"
              ]
           ++ uniqueFromFirst
           ++ [ "",
-               "instance FindMany" <> modelNm <> " " <> withPreset <> " " <> selectTy <> " where",
+               "instance Read" <> modelNm <> " " <> withPreset <> " " <> selectTy <> " where",
                "  findMany " <> query <> " {include_, select_, where_, orderBy_, limit_, offset_} = do",
                "    rows <- Include.findMany @" <> table <> " (" <> unwrapFn <> " include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)",
                "    pure $ map (" <> toPickedIncl <> " select_) rows"
              ]
           ++ uniqueFromMany
           ++ [ "",
-               "instance FindMany" <> modelNm <> " NoInclude " <> selectTy <> " where",
+               "instance Read" <> modelNm <> " NoInclude " <> selectTy <> " where",
                "  findMany " <> query <> " {select_, where_, orderBy_, limit_, offset_} =",
                "    Ops.findManyWith",
                "      (" <> parseFn <> " select_)",
