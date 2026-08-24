@@ -38,6 +38,7 @@ import ORM.Client.Recipe
 import qualified ORM.Client.Recipe as Recipe
 import ORM.Core (NullableValue (..))
 import ORM.Db (Db)
+import ORM.Where (eq)
 
 data CreateRecipeInput = CreateRecipeInput
   { name :: Text,
@@ -127,12 +128,17 @@ $(deriveJSON defaultOptions ''Recipe)
 
 getAllRecipes :: Db [Recipe]
 getAllRecipes =
-  map fromRecipeWithIngredients <$> Recipe.findMany Recipe.withIngredients
+  map fromRecipeWithIngredients
+    <$> Recipe.findMany Recipe.emptyQuery {Recipe.include_ = Recipe.withIngredients}
 
 getRecipe :: UUID -> Db (Either AppError Recipe)
 getRecipe recipeId =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> Recipe.findUniqueOrFail Recipe.withIngredients recipeId
+    <$> Recipe.findUniqueOrFail
+      Recipe.emptyQuery
+        { Recipe.include_ = Recipe.withIngredients,
+          Recipe.where_ = Just (eq Recipe.recipeId recipeId)
+        }
 
 createRecipe :: CreateRecipeInput -> Db (Either AppError Recipe)
 createRecipe input =

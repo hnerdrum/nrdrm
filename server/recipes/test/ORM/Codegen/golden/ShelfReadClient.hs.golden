@@ -16,6 +16,7 @@ module Schema.Client.Shelf
     NoInclude (..),
     ResolveInclude,
     ShelfQuery (..),
+    emptyQuery,
     OmitSelect (..),
     Picked (..),
     ShelfSelect (..),
@@ -27,7 +28,7 @@ where
 
 import Data.UUID (UUID)
 import ORM.Db (Db)
-import ORM.Errors (ORMError)
+import ORM.Errors (ORMError (..), requireFound)
 import qualified ORM.Include as Include
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)
@@ -56,69 +57,76 @@ toShelfWithBooksPicked select_ ShelfWithBooks {shelf, books} =
     , books = books
     }
 
-data ShelfQuery preset select = ShelfQuery
-  { select_ :: select
+data ShelfQuery include select = ShelfQuery
+  { include_ :: include
+  , select_ :: select
   , where_ :: Maybe (Where ShelfTable)
   , orderBy_ :: Maybe (QueryBuilder ShelfTable -> QueryBuilder ShelfTable)
   , limit_ :: Maybe Int
   , offset_ :: Maybe Int
   }
 
+emptyQuery :: ShelfQuery NoInclude OmitSelect
+emptyQuery =
+  ShelfQuery {include_ = noInclude, select_ = OmitSelect, where_ = Nothing, orderBy_ = Nothing, limit_ = Nothing, offset_ = Nothing}
+
 type instance ResolveInclude (ShelfQuery WithBooks OmitSelect) = ShelfWithBooks
 type instance ResolveInclude (ShelfQuery NoInclude OmitSelect) = ShelfRow
 type instance ResolveInclude (ShelfQuery WithBooks ShelfSelect) = ShelfWithBooksPicked
 type instance ResolveInclude (ShelfQuery NoInclude ShelfSelect) = ShelfPicked
 
-class FindManyShelf preset where
-  findMany :: preset -> Db [ResolveInclude preset]
+class FindManyShelf include select where
+  findMany :: ShelfQuery include select -> Db [ResolveInclude (ShelfQuery include select)]
+  findUnique :: ShelfQuery include select -> Db (Maybe (ResolveInclude (ShelfQuery include select)))
+  findUniqueOrFail :: ShelfQuery include select -> Db (Either ORMError (ResolveInclude (ShelfQuery include select)))
 
-instance FindManyShelf WithBooks where
-  findMany preset =
-    Include.findMany @ShelfTable (unwrapWithBooks preset) Prelude.id
+instance FindManyShelf WithBooks OmitSelect where
+  findMany ShelfQuery {include_, where_, orderBy_, limit_, offset_} =
+    Include.findMany @ShelfTable (unwrapWithBooks include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
+  findUnique q = do
+    rows <- findMany q {limit_ = Just 1}
+    pure $ case rows of
+      [] -> Nothing
+      (row : _) -> Just row
+  findUniqueOrFail q = do
+    result <- findUnique q
+    pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyShelf NoInclude where
-  findMany _ =
-    Ops.findMany @ShelfTable @ShelfRow Prelude.id
-
-instance FindManyShelf (ShelfQuery WithBooks OmitSelect) where
-  findMany ShelfQuery {where_, orderBy_, limit_, offset_} =
-    Include.findMany @ShelfTable (unwrapWithBooks withBooks) (applyQueryModifiers where_ orderBy_ limit_ offset_)
-
-instance FindManyShelf (ShelfQuery NoInclude OmitSelect) where
+instance FindManyShelf NoInclude OmitSelect where
   findMany ShelfQuery {where_, orderBy_, limit_, offset_} =
     Ops.findMany @ShelfTable @ShelfRow (applyQueryModifiers where_ orderBy_ limit_ offset_)
+  findUnique ShelfQuery {where_, orderBy_, limit_, offset_} =
+    Ops.findFirst @ShelfTable @ShelfRow (applyQueryModifiers where_ orderBy_ limit_ offset_)
+  findUniqueOrFail q = do
+    result <- findUnique q
+    pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyShelf (ShelfQuery WithBooks ShelfSelect) where
-  findMany ShelfQuery {select_, where_, orderBy_, limit_, offset_} = do
-    rows <- Include.findMany @ShelfTable (unwrapWithBooks withBooks) (applyQueryModifiers where_ orderBy_ limit_ offset_)
+instance FindManyShelf WithBooks ShelfSelect where
+  findMany ShelfQuery {include_, select_, where_, orderBy_, limit_, offset_} = do
+    rows <- Include.findMany @ShelfTable (unwrapWithBooks include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
     pure $ map (toShelfWithBooksPicked select_) rows
+  findUnique q = do
+    rows <- findMany q {limit_ = Just 1}
+    pure $ case rows of
+      [] -> Nothing
+      (row : _) -> Just row
+  findUniqueOrFail q = do
+    result <- findUnique q
+    pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyShelf (ShelfQuery NoInclude ShelfSelect) where
+instance FindManyShelf NoInclude ShelfSelect where
   findMany ShelfQuery {select_, where_, orderBy_, limit_, offset_} =
     Ops.findManyWith
       (parseShelfPicked select_)
       (selectColumns (shelfSelectColumns select_) . applyQueryModifiers where_ orderBy_ limit_ offset_)
-
-class FindUniqueShelf preset where
-  findUnique :: preset -> UUID -> Db (Maybe (ResolveInclude preset))
-
-
-instance FindUniqueShelf WithBooks where
-  findUnique preset =
-    Include.findUnique @ShelfTable (unwrapWithBooks preset)
-
-instance FindUniqueShelf NoInclude where
-  findUnique _ =
-    Ops.findUnique @ShelfTable @ShelfRow
-
-class FindUniqueOrFailShelf preset where
-  findUniqueOrFail :: preset -> UUID -> Db (Either ORMError (ResolveInclude preset))
-
-
-instance FindUniqueOrFailShelf WithBooks where
-  findUniqueOrFail preset =
-    Include.findUniqueOrFail @ShelfTable (unwrapWithBooks preset)
-
-instance FindUniqueOrFailShelf NoInclude where
-  findUniqueOrFail _ =
-    Ops.findUniqueOrFail @ShelfTable @ShelfRow
+  findUnique ShelfQuery {select_, where_, orderBy_, offset_} = do
+    rows <-
+      Ops.findManyWith
+        (parseShelfPicked select_)
+        (selectColumns (shelfSelectColumns select_) . applyQueryModifiers where_ orderBy_ (Just 1) offset_)
+    pure $ case rows of
+      [] -> Nothing
+      (row : _) -> Just row
+  findUniqueOrFail q = do
+    result <- findUnique q
+    pure $ requireFound result (RecordNotFound "No record found matching query")

@@ -15,6 +15,7 @@ import ORM.Db (DbPool)
 import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow, IngredientTable)
 import ORM.Schema.Recipe (RecipeTable)
 import ORM.Schema.Unit (Unit (G, Ml))
+import ORM.Where (eq)
 import Support.Assert (assertRight)
 import Support.TestDb (TestEnv (..), truncateTable)
 import Test.Hspec (SpecWith, describe, it, shouldBe)
@@ -228,7 +229,14 @@ nestedWriteSpec =
           )
           >>= assertRight
       leftover <-
-        runDb pool (Recipe.findUniqueOrFail Recipe.withIngredients first.recipe.id)
+        runDb
+          pool
+          ( Recipe.findUniqueOrFail
+              Recipe.emptyQuery
+                { Recipe.include_ = Recipe.withIngredients,
+                  Recipe.where_ = Just (eq Recipe.recipeId first.recipe.id)
+                }
+          )
           >>= assertRight
       map (.recipeIngredient.id) moved.ingredients `shouldBe` [riId]
       leftover.ingredients `shouldBe` []

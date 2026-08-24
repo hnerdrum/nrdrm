@@ -11,7 +11,7 @@ import qualified ORM.Client.Recipe as Recipe
 import qualified ORM.Operations as Ops
 import ORM.Query (selectColumns)
 import ORM.Schema.Ingredient (IngredientCreate (..), IngredientSelect (..), IngredientTable)
-import ORM.Schema.Recipe (RecipeSelect (..), RecipeTable, recipeName)
+import ORM.Schema.Recipe (RecipeSelect (..), RecipeTable, recipeId, recipeName)
 import ORM.Schema.Unit (Unit (G))
 import ORM.Select (picked)
 import ORM.Where (eq)
@@ -78,6 +78,19 @@ selectSpec = do
       rows <- runDb pool (Ingredient.findMany Ingredient.emptyQuery)
       map (.name) rows `shouldBe` ["salt"]
       map (.id) rows `shouldBe` [created.id]
+
+    it "findUnique looks up by where_ on the query record" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      created <-
+        runDb pool (Ingredient.create (IngredientCreate {id = Nothing, createdAt = Nothing, updatedAt = Nothing, name = "thyme"}))
+          >>= assertRight
+      found <-
+        runDb
+          pool
+          ( Ingredient.findUnique
+              Ingredient.emptyQuery {Ingredient.where_ = Just (eq Ingredient.ingredientId created.id)}
+          )
+      found `shouldBe` Just created
 
     it "returns IngredientPicked when select_ is set" $ \env@TestEnv {envPool = pool} -> do
       resetRecipes env
@@ -148,7 +161,8 @@ selectSpec = do
           query :: Recipe.RecipeQuery Recipe.WithIngredients RecipeSelect
           query =
             Recipe.RecipeQuery
-              { select_ = sel,
+              { include_ = Recipe.withIngredients,
+                select_ = sel,
                 where_ = Just (eq recipeName "Pasta"),
                 orderBy_ = Nothing,
                 limit_ = Nothing,
@@ -161,6 +175,90 @@ selectSpec = do
       row.recipe.createdAt `shouldBe` Skipped
       length row.ingredients `shouldBe` 1
       (head row.ingredients).recipeIngredient.amount `shouldBe` 100
+
+    it "projects recipe scalars with noInclude" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      _ <-
+        runDb
+          pool
+          ( Recipe.create
+              Recipe.withIngredients
+              Recipe.RecipeWriteCreate
+                { root =
+                    Recipe.RecipeCreate
+                      { id = Nothing,
+                        createdAt = Nothing,
+                        updatedAt = Nothing,
+                        name = "Broth",
+                        description = Value "clear"
+                      },
+                  ingredients = Recipe.Set []
+                }
+          )
+          >>= assertRight
+      let sel =
+            RecipeSelect
+              { id = False,
+                createdAt = False,
+                updatedAt = False,
+                name = True,
+                description = False
+              }
+          query :: Recipe.RecipeQuery Recipe.NoInclude RecipeSelect
+          query =
+            Recipe.RecipeQuery
+              { include_ = Recipe.noInclude,
+                select_ = sel,
+                where_ = Just (eq recipeName "Broth"),
+                orderBy_ = Nothing,
+                limit_ = Nothing,
+                offset_ = Nothing
+              }
+      [row] <- runDb pool (Recipe.findMany query)
+      row.name `shouldBe` Picked "Broth"
+      row.description `shouldBe` Skipped
+
+    it "findUnique applies include from the query record" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      ingredient <-
+        runDb pool (Ingredient.create (IngredientCreate {id = Nothing, createdAt = Nothing, updatedAt = Nothing, name = "egg"}))
+          >>= assertRight
+      created <-
+        runDb
+          pool
+          ( Recipe.create
+              Recipe.withIngredients
+              Recipe.RecipeWriteCreate
+                { root =
+                    Recipe.RecipeCreate
+                      { id = Nothing,
+                        createdAt = Nothing,
+                        updatedAt = Nothing,
+                        name = "Omelette",
+                        description = Value "simple"
+                      },
+                  ingredients =
+                    Recipe.Set
+                      [ Recipe.RecipeIngredientNestedCreate
+                          { ingredientId = ingredient.id,
+                            amount = 2,
+                            unit = G
+                          }
+                      ]
+                }
+          )
+          >>= assertRight
+      found <-
+        runDb
+          pool
+          ( Recipe.findUnique
+              Recipe.emptyQuery
+                { Recipe.include_ = Recipe.withIngredients,
+                  Recipe.where_ = Just (eq recipeId created.recipe.id)
+                }
+          )
+      fmap (.recipe.name) found `shouldBe` Just "Omelette"
+      fmap (length . (.ingredients)) found `shouldBe` Just 1
 
 resetRecipes :: TestEnv -> IO ()
 resetRecipes env = do

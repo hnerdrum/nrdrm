@@ -26,6 +26,7 @@ import ORM (DatabaseErrorInfo (..), ORMError (..))
 import ORM.Client.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
 import qualified ORM.Client.Ingredient as Ingredient
 import ORM.Db (Db)
+import ORM.Where (eq)
 
 newtype CreateIngredientInput = CreateIngredientInput
   { name :: Text
@@ -72,7 +73,8 @@ getAllIngredients =
 getIngredient :: UUID -> Db (Either AppError Ingredient)
 getIngredient ingredientId =
   bimap fromIngredientError fromIngredientRow
-    <$> Ingredient.findUniqueOrFail ingredientId
+    <$> Ingredient.findUniqueOrFail
+      Ingredient.emptyQuery {Ingredient.where_ = Just (eq Ingredient.ingredientId ingredientId)}
 
 createIngredient :: CreateIngredientInput -> Db (Either AppError Ingredient)
 createIngredient input =
