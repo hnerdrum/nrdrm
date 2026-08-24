@@ -44,6 +44,7 @@ instance Entity RecipeIngredientTable where
   tableName = "recipe_ingredient"
   primaryKey = recipeIngredientId
   tableColumns = ["id", "recipe_id", "ingredient_id", "amount", "unit"]
+  uniqueKeys = [["id"], ["recipe_id", "ingredient_id"]]
 
 instance Insertable RecipeIngredientTable where
   type CreateInput RecipeIngredientTable = RecipeIngredientCreate

@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module ORM.SelectSpec
@@ -5,12 +6,12 @@ module ORM.SelectSpec
   )
 where
 
-import ORM (NullableValue (..), Picked (..), runDb)
+import ORM (NullableValue (..), ORMError (..), Picked (..), runDb)
 import qualified ORM.Client.Ingredient as Ingredient
 import qualified ORM.Client.Recipe as Recipe
 import qualified ORM.Operations as Ops
 import ORM.Query (selectColumns)
-import ORM.Schema.Ingredient (IngredientCreate (..), IngredientSelect (..), IngredientTable)
+import ORM.Schema.Ingredient (IngredientCreate (..), IngredientSelect (..), IngredientTable, ingredientName)
 import ORM.Schema.Recipe (RecipeSelect (..), RecipeTable, recipeId, recipeName)
 import ORM.Schema.Unit (Unit (G))
 import ORM.Select (picked)
@@ -26,7 +27,7 @@ import Schema.Widget
   )
 import Support.Assert (assertRight)
 import Support.TestDb (TestEnv (..), truncateTable)
-import Test.Hspec (SpecWith, describe, it, shouldBe)
+import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
 
 selectSpec :: SpecWith TestEnv
 selectSpec = do
@@ -90,7 +91,24 @@ selectSpec = do
           ( Ingredient.findUnique
               Ingredient.emptyQuery {Ingredient.where_ = Just (eq Ingredient.ingredientId created.id)}
           )
-      found `shouldBe` Just created
+      found `shouldBe` Right (Just created)
+
+    it "findUnique rejects a where_ that is not a unique key" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      _ <-
+        runDb pool (Ingredient.create (IngredientCreate {id = Nothing, createdAt = Nothing, updatedAt = Nothing, name = "sage"}))
+          >>= assertRight
+      found <-
+        runDb
+          pool
+          ( Ingredient.findUnique
+              Ingredient.emptyQuery {Ingredient.where_ = Just (eq ingredientName "sage")}
+          )
+      found
+        `shouldSatisfy` ( \case
+                            Left (InvalidUniqueInput _) -> True
+                            _ -> False
+                        )
 
     it "returns IngredientPicked when select_ is set" $ \env@TestEnv {envPool = pool} -> do
       resetRecipes env
@@ -257,6 +275,7 @@ selectSpec = do
                   Recipe.where_ = Just (eq recipeId created.recipe.id)
                 }
           )
+          >>= assertRight
       fmap (.recipe.name) found `shouldBe` Just "Omelette"
       fmap (length . (.ingredients)) found `shouldBe` Just 1
 

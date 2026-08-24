@@ -2,6 +2,8 @@ module ORM
   ( findMany,
     findUnique,
     findUniqueOrFail,
+    findUniqueWhere,
+    requireUniqueWhere,
     findFirst,
     findFirstOrFail,
     count,

@@ -1,4 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module ORM.Core
   ( Entity (..),
@@ -29,6 +31,8 @@ class Entity table where
   tableName :: Text
   primaryKey :: Field table (PrimaryKeyType table)
   tableColumns :: [Text]
+  uniqueKeys :: [[Text]]
+  uniqueKeys = [[fieldColumn (primaryKey @table)]]
 
 type family PrimaryKeyType table
 

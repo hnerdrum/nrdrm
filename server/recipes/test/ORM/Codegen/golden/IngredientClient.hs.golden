@@ -35,7 +35,7 @@ import ORM.Errors (ORMError (..), requireFound)
 import qualified ORM.Delete as Delete
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
-import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)
+import ORM.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)
 import ORM.Select (OmitSelect (..), Picked (..))
 import ORM.Where (Where)
 import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientSelect (..), IngredientPicked (..), ingredientSelect, ingredientSelectColumns, parseIngredientPicked, IngredientTable, IngredientUpdate (..), ingredientId)
@@ -70,34 +70,42 @@ type instance ResolveSelect IngredientSelect = IngredientPicked
 
 class ReadIngredient select where
   findMany :: IngredientQuery select -> Db [ResolveSelect select]
-  findUnique :: IngredientQuery select -> Db (Maybe (ResolveSelect select))
+  findUnique :: IngredientQuery select -> Db (Either ORMError (Maybe (ResolveSelect select)))
   findUniqueOrFail :: IngredientQuery select -> Db (Either ORMError (ResolveSelect select))
 
 instance ReadIngredient OmitSelect where
   findMany q =
     Ops.findMany @IngredientTable @IngredientRow (applyQuery q)
-  findUnique q =
-    Ops.findFirst @IngredientTable @IngredientRow (applyQuery q)
+  findUnique IngredientQuery {where_} =
+    Ops.findUniqueWhere @IngredientTable @IngredientRow where_
   findUniqueOrFail q = do
     result <- findUnique q
-    pure $ requireFound result (RecordNotFound "No record found matching query")
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
 
 instance ReadIngredient IngredientSelect where
   findMany q@IngredientQuery {select_} =
     Ops.findManyWith
       (parseIngredientPicked select_)
       (selectColumns (ingredientSelectColumns select_) . applyQuery q)
-  findUnique q@IngredientQuery {select_} = do
-    rows <-
-      Ops.findManyWith
-        (parseIngredientPicked select_)
-        (selectColumns (ingredientSelectColumns select_) . applyQuery q {limit_ = Just 1})
-    pure $ case rows of
-      [] -> Nothing
-      (row : _) -> Just row
+  findUnique IngredientQuery {select_, where_} =
+    case Ops.requireUniqueWhere @IngredientTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        rows <-
+          Ops.findManyWith
+            (parseIngredientPicked select_)
+            (selectColumns (ingredientSelectColumns select_) . matching w)
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
   findUniqueOrFail q = do
     result <- findUnique q
-    pure $ requireFound result (RecordNotFound "No record found matching query")
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
 
 applyQuery :: IngredientQuery select -> QueryBuilder IngredientTable -> QueryBuilder IngredientTable
 applyQuery IngredientQuery {where_, orderBy_, limit_, offset_} =
