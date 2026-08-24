@@ -2,8 +2,6 @@
 
 A Haskell library for Postgres-backed apps: you write a **Schema**, run **Codegen** to produce table types and a **Client**, then query and write through that Client at runtime.
 
-See [CONTEXT.md](../../CONTEXT.md) for vocabulary. This document walks through the workflow and how a consuming app wires Codegen in.
-
 ## Schema → Codegen → Client
 
 ### 1. Write a Schema
@@ -64,13 +62,13 @@ make orm-schema-check # compare Schema to live Postgres (--check-schema)
 
 CLI flags:
 
-| Flag | Purpose |
-|------|---------|
-| _(none)_ | Validate Schemas and write all generated outputs |
-| `--check` | Exit non-zero if generated files on disk differ from what Codegen would write |
-| `--check-schema` | Connect to Postgres (`DATABASE_URL` or `TEST_DATABASE_URL`) and fail on **drift** |
-| `--check-migrations` | Alias for `--check-schema` |
-| `--list` | Print output paths without writing |
+| Flag                 | Purpose                                                                           |
+| -------------------- | --------------------------------------------------------------------------------- |
+| _(none)_             | Validate Schemas and write all generated outputs                                  |
+| `--check`            | Exit non-zero if generated files on disk differ from what Codegen would write     |
+| `--check-schema`     | Connect to Postgres (`DATABASE_URL` or `TEST_DATABASE_URL`) and fail on **drift** |
+| `--check-migrations` | Alias for `--check-schema`                                                        |
+| `--list`             | Print output paths without writing                                                |
 
 Generated Client and Schema modules stay in the consuming app (e.g. recipes writes to `.orm-gen/ORM/…`). Runtime (`orm`) is imported by both generated code and hand-written domain logic.
 
@@ -104,13 +102,13 @@ Recipe.findMany Recipe.emptyQuery {Recipe.include_ = Recipe.withIngredients}
 
 Writes keep a separate Include argument for the returned shape: `create include data`.
 
-`findUnique` / `findUniqueOrFail` require a `where_` that matches exactly one row — primary key or a unique constraint declared on the Schema. Incomplete or ambiguous filters return `InvalidUniqueInput`, not a silent first match.
+`findUnique` / `findUniqueOrFail` require a `where_` that matches exactly one row — primary key or a unique constraint declared on the Schema. Incomplete or ambiguous filters return `InvalidUniqueInput`.
 
 ## Drift-check and migrations
 
 **The Schema is the source of truth** for what Postgres should look like. Codegen does not run migrations.
 
-1. **Hand-written SQL migrations** change the database (recipes uses `postgresql-migration` and files under `migrations/`).
+1. **Hand-written SQL migrations** change the database.
 2. **`--check-schema`** introspects live Postgres and reports drift: missing/extra tables or columns, wrong types or nullability, primary keys, uniques, enums.
 3. Fix drift by updating either the Schema or the migrations — whichever side is wrong — then re-run checks.
 
@@ -118,18 +116,10 @@ Typical CI: `make orm-gen-check` ensures committed generated code matches the Sc
 
 ## Scope and limits
 
-- **No built-in migrator** — you own SQL (or another migration tool) and keep it aligned with the Schema via drift-check.
-- **Postgres only** — introspection and SQL generation target PostgreSQL.
+- **No built-in migration handling**
+- **Postgres only**
 - **No relation filters** — `where_` applies to the root model, not nested relations.
-- **No filtered Includes** — Include trees are fixed presets declared on the Schema, not ad-hoc per query.
+- **No filtered Includes** — Include trees are fixed presets declared on the Schema.
 - **Includes are Schema-declared** — nested read shapes are compiled from `includeGraph` or explicit Include trees.
-- **String-backed SQL** — queries are assembled as text with bound parameters, not a deeply embedded query DSL at runtime.
-- **Limited scalars** — uuid, text, int, bool, timestamptz, and Schema-defined enums.
-
-## Packages
-
-| Package | Role |
-|---------|------|
-| `orm` | Runtime — Db pool, Where/Select, Operations, generated-code typeclasses |
-| `orm-codegen` | Schema builder, validation, emit, drift-check, CLI |
-| _(your app)_ | Schema module(s), `CodegenTarget`, thin `orm-codegen` executable, generated output |
+- **String-backed SQL** — queries are assembled as text with bound parameters
+- **Limited scalars** — currently only support uuid, text, int, bool, timestamptz, and Schema-defined enums.
