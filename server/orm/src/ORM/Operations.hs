@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 
@@ -8,6 +9,8 @@ module ORM.Operations
     findManyWith,
     findUnique,
     findUniqueOrFail,
+    findUniqueWhere,
+    requireUniqueWhere,
     findFirst,
     findFirstOrFail,
     count,
@@ -16,6 +19,7 @@ module ORM.Operations
   )
 where
 
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Database.PostgreSQL.Simple.FromRow (FromRow, RowParser)
 import Database.PostgreSQL.Simple.ToField (ToField)
@@ -32,7 +36,7 @@ import ORM.Query
     runQueryWith,
     selectAll,
   )
-import ORM.Where (compileWhere, eq)
+import ORM.Where (Where, compileWhere, eq, equalityColumns)
 
 findMany ::
   forall table result.
@@ -68,6 +72,48 @@ findUniqueOrFail pkValue = do
   pure $
     requireFound result $
       RecordNotFound ("Record not found with primary key: " <> Text.pack (show pkValue))
+
+findUniqueWhere ::
+  forall table result.
+  (Entity table, FromRow result) =>
+  Maybe (Where table) ->
+  Db (Either ORMError (Maybe result))
+findUniqueWhere predicate = do
+  case requireUniqueWhere @table predicate of
+    Left err -> pure (Left err)
+    Right where_ -> do
+      rows <- runQuery (matching where_ (selectAll @table))
+      pure $ case rows of
+        [] -> Right Nothing
+        [row] -> Right (Just row)
+        _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
+
+requireUniqueWhere ::
+  forall table.
+  (Entity table) =>
+  Maybe (Where table) ->
+  Either ORMError (Where table)
+requireUniqueWhere = \case
+  Nothing ->
+    Left (InvalidUniqueInput "findUnique requires a unique where_")
+  Just where_ ->
+    case equalityColumns where_ of
+      Nothing ->
+        Left (InvalidUniqueInput "findUnique where_ must be equalities on a unique key")
+      Just cols ->
+        let given = Set.fromList cols
+            keys = map Set.fromList (uniqueKeys @table)
+            exact = filter (== given) keys
+            incomplete = any (Set.isProperSubsetOf given) keys
+         in case exact of
+              [_] -> Right where_
+              _ : _ ->
+                Left (InvalidUniqueInput "findUnique where_ matches multiple unique keys")
+              []
+                | incomplete ->
+                    Left (InvalidUniqueInput "findUnique where_ is an incomplete unique key")
+              [] ->
+                Left (InvalidUniqueInput "findUnique where_ is not a unique key")
 
 findFirst ::
   forall table result.

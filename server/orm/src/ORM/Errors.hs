@@ -30,6 +30,7 @@ data ORMError
   | ForeignKeyViolation Text
   | NotNullViolation Text
   | EmptyWhere Text
+  | InvalidUniqueInput Text
   | UnsupportedIncludeModifier Text
   | DatabaseError DatabaseErrorInfo
   | DriverError DriverErrorKind Text

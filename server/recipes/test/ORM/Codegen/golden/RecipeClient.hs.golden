@@ -61,7 +61,7 @@ import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow (..), RecipeSelect (..),
 import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients)
 import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientRow (..), RecipeIngredientUpdate (..), RecipeIngredientTable, recipeIngredientId, recipeIngredientRecipeId)
 import qualified ORM.Operations as Ops
-import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)
+import ORM.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)
 import ORM.Select (OmitSelect (..), Picked (..))
 import ORM.Where (Where, and_, eq, in_)
 import qualified ORM.Update as Update
@@ -272,59 +272,80 @@ type instance ResolveInclude (RecipeQuery NoInclude RecipeSelect) = RecipePicked
 
 class ReadRecipe include select where
   findMany :: RecipeQuery include select -> Db [ResolveInclude (RecipeQuery include select)]
-  findUnique :: RecipeQuery include select -> Db (Maybe (ResolveInclude (RecipeQuery include select)))
+  findUnique :: RecipeQuery include select -> Db (Either ORMError (Maybe (ResolveInclude (RecipeQuery include select))))
   findUniqueOrFail :: RecipeQuery include select -> Db (Either ORMError (ResolveInclude (RecipeQuery include select)))
 
 instance ReadRecipe WithIngredients OmitSelect where
   findMany RecipeQuery {include_, where_, orderBy_, limit_, offset_} =
     Include.findMany @RecipeTable (unwrapWithIngredients include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
-  findUnique q = do
-    rows <- findMany q {limit_ = Just 1}
-    pure $ case rows of
-      [] -> Nothing
-      (row : _) -> Just row
+  findUnique RecipeQuery {include_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        rows <- Include.findMany @RecipeTable (unwrapWithIngredients include_) (matching w)
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
   findUniqueOrFail q = do
     result <- findUnique q
-    pure $ requireFound result (RecordNotFound "No record found matching query")
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
 
 instance ReadRecipe NoInclude OmitSelect where
   findMany RecipeQuery {where_, orderBy_, limit_, offset_} =
     Ops.findMany @RecipeTable @RecipeRow (applyQueryModifiers where_ orderBy_ limit_ offset_)
-  findUnique RecipeQuery {where_, orderBy_, limit_, offset_} =
-    Ops.findFirst @RecipeTable @RecipeRow (applyQueryModifiers where_ orderBy_ limit_ offset_)
+  findUnique RecipeQuery {where_} =
+    Ops.findUniqueWhere @RecipeTable @RecipeRow where_
   findUniqueOrFail q = do
     result <- findUnique q
-    pure $ requireFound result (RecordNotFound "No record found matching query")
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
 
 instance ReadRecipe WithIngredients RecipeSelect where
   findMany RecipeQuery {include_, select_, where_, orderBy_, limit_, offset_} = do
     rows <- Include.findMany @RecipeTable (unwrapWithIngredients include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
     pure $ map (toRecipeWithIngredientsPicked select_) rows
-  findUnique q = do
-    rows <- findMany q {limit_ = Just 1}
-    pure $ case rows of
-      [] -> Nothing
-      (row : _) -> Just row
+  findUnique RecipeQuery {include_, select_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        nested <- Include.findMany @RecipeTable (unwrapWithIngredients include_) (matching w)
+        let rows = map (toRecipeWithIngredientsPicked select_) nested
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
   findUniqueOrFail q = do
     result <- findUnique q
-    pure $ requireFound result (RecordNotFound "No record found matching query")
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
 
 instance ReadRecipe NoInclude RecipeSelect where
   findMany RecipeQuery {select_, where_, orderBy_, limit_, offset_} =
     Ops.findManyWith
       (parseRecipePicked select_)
       (selectColumns (recipeSelectColumns select_) . applyQueryModifiers where_ orderBy_ limit_ offset_)
-  findUnique RecipeQuery {select_, where_, orderBy_, offset_} = do
-    rows <-
-      Ops.findManyWith
-        (parseRecipePicked select_)
-        (selectColumns (recipeSelectColumns select_) . applyQueryModifiers where_ orderBy_ (Just 1) offset_)
-    pure $ case rows of
-      [] -> Nothing
-      (row : _) -> Just row
+  findUnique RecipeQuery {select_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        rows <-
+          Ops.findManyWith
+            (parseRecipePicked select_)
+            (selectColumns (recipeSelectColumns select_) . matching w)
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
   findUniqueOrFail q = do
     result <- findUnique q
-    pure $ requireFound result (RecordNotFound "No record found matching query")
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
 
 create ::
   WithIngredients ->

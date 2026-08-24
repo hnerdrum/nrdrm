@@ -16,6 +16,7 @@ module ORM.Where
     or_,
     not_,
     compileWhere,
+    equalityColumns,
   )
 where
 
@@ -80,6 +81,14 @@ not_ = WhereNot
 cmp :: (ToField a) => Text -> Field table a -> a -> Where table
 cmp op field value =
   WhereCmp (fieldColumn field) op (toField value)
+
+-- | Column names of a conjunction of equalities. 'Nothing' if the predicate
+-- uses anything other than 'eq' combined with 'and_'.
+equalityColumns :: Where table -> Maybe [Text]
+equalityColumns = \case
+  WhereCmp col "=" _ -> Just [col]
+  WhereAnd left right -> (++) <$> equalityColumns left <*> equalityColumns right
+  _ -> Nothing
 
 compileWhere :: Where table -> (Text, [Action])
 compileWhere = \case

@@ -50,7 +50,7 @@ emitSimpleClientModule moduleName model =
       "import qualified ORM.Delete as Delete",
       "import qualified ORM.Insert as Insert",
       "import qualified ORM.Operations as Ops",
-      "import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)",
+      "import ORM.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)",
       "import ORM.Select (OmitSelect (..), Picked (..))",
       "import ORM.Where (Where)",
       "import "
@@ -206,7 +206,7 @@ emitWriteClientModule moduleName schema incl =
                <> fieldBinder child (lookupField child (relForeignField rel))
                <> ")",
              "import qualified ORM.Operations as Ops",
-             "import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)",
+             "import ORM.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)",
              "import ORM.Select (OmitSelect (..), Picked (..))",
              "import ORM.Where (Where, and_, eq, in_)",
              "import qualified ORM.Update as Update"
@@ -738,7 +738,7 @@ includeReadImportLines moduleName schema incl =
     "import ORM.Errors (ORMError (..), requireFound)",
     "import qualified ORM.Include as Include",
     "import qualified ORM.Operations as Ops",
-    "import ORM.Query (QueryBuilder, applyQueryModifiers, selectColumns)",
+    "import ORM.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)",
     "import ORM.Select (OmitSelect (..), Picked (..))",
     "import ORM.Where (Where)",
     "import "
@@ -924,42 +924,63 @@ emitUpdateFn model =
 
 emitFindManyFn :: Model -> Text
 emitFindManyFn model =
-  T.unlines
+  T.unlines $
     [ "class Read" <> modelName model <> " select where",
       "  findMany :: " <> queryTypeName model <> " select -> Db [ResolveSelect select]",
-      "  findUnique :: " <> queryTypeName model <> " select -> Db (Maybe (ResolveSelect select))",
+      "  findUnique :: " <> queryTypeName model <> " select -> Db (Either ORMError (Maybe (ResolveSelect select)))",
       "  findUniqueOrFail :: " <> queryTypeName model <> " select -> Db (Either ORMError (ResolveSelect select))",
       "",
       "instance Read" <> modelName model <> " OmitSelect where",
       "  findMany q =",
       "    Ops.findMany @" <> tableTypeName model <> " @" <> rowTypeName model <> " (applyQuery q)",
-      "  findUnique q =",
-      "    Ops.findFirst @" <> tableTypeName model <> " @" <> rowTypeName model <> " (applyQuery q)",
-      "  findUniqueOrFail q = do",
-      "    result <- findUnique q",
-      "    pure $ requireFound result (RecordNotFound \"No record found matching query\")",
-      "",
-      "instance Read" <> modelName model <> " " <> selectTypeName model <> " where",
-      "  findMany q@" <> queryTypeName model <> " {select_} =",
-      "    Ops.findManyWith",
-      "      (" <> parsePickedName model <> " select_)",
-      "      (selectColumns (" <> selectColumnsFnName model <> " select_) . applyQuery q)",
-      "  findUnique q@" <> queryTypeName model <> " {select_} = do",
-      "    rows <-",
-      "      Ops.findManyWith",
-      "        (" <> parsePickedName model <> " select_)",
-      "        (selectColumns (" <> selectColumnsFnName model <> " select_) . applyQuery q {limit_ = Just 1})",
-      "    pure $ case rows of",
-      "      [] -> Nothing",
-      "      (row : _) -> Just row",
-      "  findUniqueOrFail q = do",
-      "    result <- findUnique q",
-      "    pure $ requireFound result (RecordNotFound \"No record found matching query\")",
-      "",
-      "applyQuery :: " <> queryTypeName model <> " select -> QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model,
-      "applyQuery " <> queryTypeName model <> " {where_, orderBy_, limit_, offset_} =",
-      "  applyQueryModifiers where_ orderBy_ limit_ offset_"
+      "  findUnique " <> queryTypeName model <> " {where_} =",
+      "    Ops.findUniqueWhere @" <> tableTypeName model <> " @" <> rowTypeName model <> " where_"
     ]
+      ++ emitFindUniqueOrFailLines
+      ++ [ "",
+           "instance Read" <> modelName model <> " " <> selectTypeName model <> " where",
+           "  findMany q@" <> queryTypeName model <> " {select_} =",
+           "    Ops.findManyWith",
+           "      (" <> parsePickedName model <> " select_)",
+           "      (selectColumns (" <> selectColumnsFnName model <> " select_) . applyQuery q)"
+         ]
+      ++ emitFindUniqueByRowsLines
+        (tableTypeName model)
+        (queryTypeName model <> " {select_, where_}")
+        [ "rows <-",
+          "  Ops.findManyWith",
+          "    (" <> parsePickedName model <> " select_)",
+          "    (selectColumns (" <> selectColumnsFnName model <> " select_) . matching w)"
+        ]
+      ++ emitFindUniqueOrFailLines
+      ++ [ "",
+           "applyQuery :: " <> queryTypeName model <> " select -> QueryBuilder " <> tableTypeName model <> " -> QueryBuilder " <> tableTypeName model,
+           "applyQuery " <> queryTypeName model <> " {where_, orderBy_, limit_, offset_} =",
+           "  applyQueryModifiers where_ orderBy_ limit_ offset_"
+         ]
+
+emitFindUniqueOrFailLines :: [Text]
+emitFindUniqueOrFailLines =
+  [ "  findUniqueOrFail q = do",
+    "    result <- findUnique q",
+    "    case result of",
+    "      Left err -> pure (Left err)",
+    "      Right found -> pure $ requireFound found (RecordNotFound \"No record found matching query\")"
+  ]
+
+emitFindUniqueByRowsLines :: Text -> Text -> [Text] -> [Text]
+emitFindUniqueByRowsLines table binding rowLines =
+  [ "  findUnique " <> binding <> " =",
+    "    case Ops.requireUniqueWhere @" <> table <> " where_ of",
+    "      Left err -> pure (Left err)",
+    "      Right w -> do"
+  ]
+    ++ map ("        " <>) rowLines
+    ++ [ "        pure $ case rows of",
+         "          [] -> Right Nothing",
+         "          [row] -> Right (Just row)",
+         "          _ -> Left (MultipleRecordsFound \"findUnique matched multiple rows\")"
+       ]
 
 emitResolveSelect :: Model -> Text
 emitResolveSelect model =
@@ -1046,7 +1067,7 @@ emitIncludeFindManyClass model _incl =
    in T.unlines
         [ "class Read" <> modelName model <> " include select where",
           "  findMany :: " <> query <> " include select -> Db [ResolveInclude (" <> query <> " include select)]",
-          "  findUnique :: " <> query <> " include select -> Db (Maybe (ResolveInclude (" <> query <> " include select)))",
+          "  findUnique :: " <> query <> " include select -> Db (Either ORMError (Maybe (ResolveInclude (" <> query <> " include select))))",
           "  findUniqueOrFail :: " <> query <> " include select -> Db (Either ORMError (ResolveInclude (" <> query <> " include select)))"
         ]
 
@@ -1062,55 +1083,55 @@ emitIncludeFindManyInstances schema model incl =
       colsFn = selectColumnsFnName model
       toPickedIncl = toPickedIncludeFnName model incl
       modelNm = modelName model
-      uniqueFromMany =
-        [ "  findUnique q = do",
-          "    rows <- findMany q {limit_ = Just 1}",
-          "    pure $ case rows of",
-          "      [] -> Nothing",
-          "      (row : _) -> Just row",
-          "  findUniqueOrFail q = do",
-          "    result <- findUnique q",
-          "    pure $ requireFound result (RecordNotFound \"No record found matching query\")"
+      uniqueFromInclude =
+        emitFindUniqueByRowsLines
+          table
+          (query <> " {include_, where_}")
+          [ "rows <- Include.findMany @" <> table <> " (" <> unwrapFn <> " include_) (matching w)"
+          ]
+          ++ emitFindUniqueOrFailLines
+      uniqueFromWhere =
+        [ "  findUnique " <> query <> " {where_} =",
+          "    Ops.findUniqueWhere @" <> table <> " @" <> row <> " where_"
         ]
-      uniqueFromFirst =
-        [ "  findUnique " <> query <> " {where_, orderBy_, limit_, offset_} =",
-          "    Ops.findFirst @" <> table <> " @" <> row <> " (applyQueryModifiers where_ orderBy_ limit_ offset_)",
-          "  findUniqueOrFail q = do",
-          "    result <- findUnique q",
-          "    pure $ requireFound result (RecordNotFound \"No record found matching query\")"
-        ]
+          ++ emitFindUniqueOrFailLines
       uniqueFromSelect =
-        [ "  findUnique " <> query <> " {select_, where_, orderBy_, offset_} = do",
-          "    rows <-",
-          "      Ops.findManyWith",
-          "        (" <> parseFn <> " select_)",
-          "        (selectColumns (" <> colsFn <> " select_) . applyQueryModifiers where_ orderBy_ (Just 1) offset_)",
-          "    pure $ case rows of",
-          "      [] -> Nothing",
-          "      (row : _) -> Just row",
-          "  findUniqueOrFail q = do",
-          "    result <- findUnique q",
-          "    pure $ requireFound result (RecordNotFound \"No record found matching query\")"
-        ]
+        emitFindUniqueByRowsLines
+          table
+          (query <> " {select_, where_}")
+          [ "rows <-",
+            "  Ops.findManyWith",
+            "    (" <> parseFn <> " select_)",
+            "    (selectColumns (" <> colsFn <> " select_) . matching w)"
+          ]
+          ++ emitFindUniqueOrFailLines
+      uniqueFromIncludeSelect =
+        emitFindUniqueByRowsLines
+          table
+          (query <> " {include_, select_, where_}")
+          [ "nested <- Include.findMany @" <> table <> " (" <> unwrapFn <> " include_) (matching w)",
+            "let rows = map (" <> toPickedIncl <> " select_) nested"
+          ]
+          ++ emitFindUniqueOrFailLines
    in T.unlines $
         [ "instance Read" <> modelNm <> " " <> withPreset <> " OmitSelect where",
           "  findMany " <> query <> " {include_, where_, orderBy_, limit_, offset_} =",
           "    Include.findMany @" <> table <> " (" <> unwrapFn <> " include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)"
         ]
-          ++ uniqueFromMany
+          ++ uniqueFromInclude
           ++ [ "",
                "instance Read" <> modelNm <> " NoInclude OmitSelect where",
                "  findMany " <> query <> " {where_, orderBy_, limit_, offset_} =",
                "    Ops.findMany @" <> table <> " @" <> row <> " (applyQueryModifiers where_ orderBy_ limit_ offset_)"
              ]
-          ++ uniqueFromFirst
+          ++ uniqueFromWhere
           ++ [ "",
                "instance Read" <> modelNm <> " " <> withPreset <> " " <> selectTy <> " where",
                "  findMany " <> query <> " {include_, select_, where_, orderBy_, limit_, offset_} = do",
                "    rows <- Include.findMany @" <> table <> " (" <> unwrapFn <> " include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)",
                "    pure $ map (" <> toPickedIncl <> " select_) rows"
              ]
-          ++ uniqueFromMany
+          ++ uniqueFromIncludeSelect
           ++ [ "",
                "instance Read" <> modelNm <> " NoInclude " <> selectTy <> " where",
                "  findMany " <> query <> " {select_, where_, orderBy_, limit_, offset_} =",

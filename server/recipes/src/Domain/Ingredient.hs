@@ -122,6 +122,7 @@ fromIngredientError err =
     ForeignKeyViolation message -> AppError ConflictError message (object [])
     NotNullViolation message -> AppError ConflictError message (object [])
     EmptyWhere message -> AppError InternalError message (object [])
+    InvalidUniqueInput message -> AppError InternalError message (object [])
     DatabaseError DatabaseErrorInfo {message} -> AppError InternalError message (object [])
     DriverError _ message -> AppError InternalError message (object [])
     UnsupportedIncludeModifier message -> AppError InternalError message (object [])

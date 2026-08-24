@@ -28,7 +28,7 @@ import ORM.Codegen.EmitCommon
     updateTypeName,
   )
 import ORM.Codegen.IR
-import ORM.Codegen.Lookup (lookupField, lookupModel)
+import ORM.Codegen.Lookup (lookupField, lookupModel, lookupUniques)
 import ORM.Codegen.TextUtil (lowerFirst)
 
 emitModelModule :: Text -> Schema -> Model -> Text
@@ -49,8 +49,10 @@ emitModelModule moduleName schema model =
           "instance Entity " <> tableName_ <> " where",
           "  tableName = \"" <> modelTable model <> "\"",
           "  primaryKey = " <> fieldBinder model pkField,
-          "  tableColumns = [" <> T.intercalate ", " (map colLit (modelFields model)) <> "]",
-          "",
+          "  tableColumns = [" <> T.intercalate ", " (map colLit (modelFields model)) <> "]"
+        ]
+        ++ uniqueKeysLines schema model
+        ++ [ "",
           emitInsertable model,
           "",
           emitUpdatable model,
@@ -386,6 +388,20 @@ emitFromRow model =
 
 colLit :: FieldSpec -> Text
 colLit f = "\"" <> fieldColumn f <> "\""
+
+uniqueKeysLines :: Schema -> Model -> [Text]
+uniqueKeysLines schema model =
+  case lookupUniques schema (modelName model) of
+    [] -> []
+    uniques ->
+      [ "  uniqueKeys = ["
+          <> T.intercalate ", " (map emitKey (pkCols : map uniqueCols uniques))
+          <> "]"
+      ]
+  where
+    pkCols = [fieldColumn (primaryKeyField model)]
+    uniqueCols constraint = map (fieldColumn . lookupField model) (uniqueFields constraint)
+    emitKey cols = "[" <> T.intercalate ", " (map (\c -> "\"" <> c <> "\"") cols) <> "]"
 
 pickedFieldHsType :: FieldSpec -> Text
 pickedFieldHsType f

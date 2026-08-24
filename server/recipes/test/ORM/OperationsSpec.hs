@@ -6,19 +6,27 @@ module ORM.OperationsSpec
 where
 
 import Data.List (sort)
+import Data.Text (Text)
 import Data.UUID (UUID, nil)
 import ORM (NullableValue (..), ORMError (..), runDb)
+import qualified ORM.Client.Ingredient as Ingredient
+import qualified ORM.Client.Recipe as Recipe
 import qualified ORM.Delete as Delete
 import qualified ORM.Insert as Insert
 import qualified ORM.Operations as Ops
 import ORM.Query (OrderDirection (Asc), limit, matching, offset, orderBy)
+import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow, IngredientTable)
+import ORM.Schema.Recipe (RecipeTable)
+import ORM.Db (DbPool)
+import ORM.Schema.RecipeIngredient (RecipeIngredientRow (..), RecipeIngredientTable, recipeIngredientIngredientId, recipeIngredientRecipeId)
+import ORM.Schema.Unit (Unit (G))
 import qualified ORM.Update as Update
-import ORM.Where (contains, eq, in_, isNull, or_)
+import ORM.Where (and_, contains, eq, in_, isNull, or_)
 import qualified ORM.WidgetFixtures as WidgetFixtures
 import Schema.Book (BookCreate (..), BookRow (..), BookTable)
 import Schema.Widget (WidgetCreate (..), WidgetRow (..), WidgetTable (..), WidgetUpdate (..), widgetCreatedAt, widgetDescription, widgetId, widgetName)
 import Support.Assert (assertJust, assertRight)
-import Support.TestDb (TestEnv (..))
+import Support.TestDb (TestEnv (..), truncateTable)
 import Test.Hspec (SpecWith, describe, it, shouldBe, shouldSatisfy)
 
 operationsSpec :: SpecWith TestEnv
@@ -57,6 +65,84 @@ operationsSpec =
       result
         `shouldSatisfy` ( \case
                             Left (RecordNotFound _) -> True
+                            _ -> False
+                        )
+
+    it "findUniqueWhere returns a row by a unique constraint" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      flour <- insertIngredient pool "flour"
+      created <-
+        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+          >>= assertRight
+      let child = (head created.ingredients).recipeIngredient
+      result <-
+        runDb
+          pool
+          ( Ops.findUniqueWhere @RecipeIngredientTable @RecipeIngredientRow $
+              Just
+                ( eq recipeIngredientRecipeId created.recipe.id
+                    `and_` eq recipeIngredientIngredientId flour.id
+                )
+          )
+      result `shouldBe` Right (Just child)
+
+    it "findUniqueWhere looks up by primary key where_" $ \TestEnv {envPool = pool} -> do
+      widget <- WidgetFixtures.insertWidget pool "test"
+      result <-
+        runDb
+          pool
+          (Ops.findUniqueWhere @WidgetTable @WidgetRow (Just (eq widgetId widget.id)))
+      result `shouldBe` Right (Just widget)
+
+    it "findUniqueWhere rejects an incomplete unique constraint" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      flour <- insertIngredient pool "flour"
+      created <-
+        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+          >>= assertRight
+      result <-
+        runDb
+          pool
+          ( Ops.findUniqueWhere @RecipeIngredientTable @RecipeIngredientRow $
+              Just (eq recipeIngredientRecipeId created.recipe.id)
+          )
+      result
+        `shouldSatisfy` ( \case
+                            Left (InvalidUniqueInput _) -> True
+                            _ -> False
+                        )
+
+    it "findUniqueWhere rejects a where_ that is not a unique key" $ \TestEnv {envPool = pool} -> do
+      _ <- WidgetFixtures.insertWidget pool "alpha"
+      result <-
+        runDb
+          pool
+          (Ops.findUniqueWhere @WidgetTable @WidgetRow (Just (eq widgetName "alpha")))
+      result
+        `shouldSatisfy` ( \case
+                            Left (InvalidUniqueInput _) -> True
+                            _ -> False
+                        )
+
+    it "findUniqueWhere rejects a missing where_" $ \TestEnv {envPool = pool} -> do
+      result <- runDb pool (Ops.findUniqueWhere @WidgetTable @WidgetRow Nothing)
+      result
+        `shouldSatisfy` ( \case
+                            Left (InvalidUniqueInput _) -> True
+                            _ -> False
+                        )
+
+    it "findUniqueWhere rejects a non-equality unique where_" $ \TestEnv {envPool = pool} -> do
+      widget <- WidgetFixtures.insertWidget pool "alpha"
+      result <-
+        runDb
+          pool
+          ( Ops.findUniqueWhere @WidgetTable @WidgetRow $
+              Just (eq widgetId widget.id `or_` eq widgetName "alpha")
+          )
+      result
+        `shouldSatisfy` ( \case
+                            Left (InvalidUniqueInput _) -> True
                             _ -> False
                         )
 
@@ -288,3 +374,41 @@ operationsSpec =
                             Left (ForeignKeyViolation _) -> True
                             _ -> False
                         )
+
+writeCreate :: Text -> [Recipe.RecipeIngredientNestedCreate] -> Recipe.RecipeWriteCreate
+writeCreate name items =
+  Recipe.RecipeWriteCreate
+    { root =
+        Recipe.RecipeCreate
+          { id = Nothing,
+            createdAt = Nothing,
+            updatedAt = Nothing,
+            name,
+            description = Omit
+          },
+      ingredients = Recipe.Set items
+    }
+
+nested :: UUID -> Int -> Unit -> Recipe.RecipeIngredientNestedCreate
+nested ingredientId amount unit =
+  Recipe.RecipeIngredientNestedCreate {ingredientId, amount, unit}
+
+insertIngredient :: DbPool -> Text -> IO IngredientRow
+insertIngredient pool name =
+  runDb
+    pool
+    ( Ingredient.create
+        ( IngredientCreate
+            { id = Nothing,
+              createdAt = Nothing,
+              updatedAt = Nothing,
+              name
+            }
+        )
+    )
+    >>= assertRight
+
+resetRecipes :: TestEnv -> IO ()
+resetRecipes env = do
+  truncateTable @RecipeTable env
+  truncateTable @IngredientTable env
