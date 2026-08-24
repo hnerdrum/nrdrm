@@ -270,12 +270,12 @@ type instance ResolveInclude (RecipeQuery NoInclude OmitSelect) = RecipeRow
 type instance ResolveInclude (RecipeQuery WithIngredients RecipeSelect) = RecipeWithIngredientsPicked
 type instance ResolveInclude (RecipeQuery NoInclude RecipeSelect) = RecipePicked
 
-class FindManyRecipe include select where
+class ReadRecipe include select where
   findMany :: RecipeQuery include select -> Db [ResolveInclude (RecipeQuery include select)]
   findUnique :: RecipeQuery include select -> Db (Maybe (ResolveInclude (RecipeQuery include select)))
   findUniqueOrFail :: RecipeQuery include select -> Db (Either ORMError (ResolveInclude (RecipeQuery include select)))
 
-instance FindManyRecipe WithIngredients OmitSelect where
+instance ReadRecipe WithIngredients OmitSelect where
   findMany RecipeQuery {include_, where_, orderBy_, limit_, offset_} =
     Include.findMany @RecipeTable (unwrapWithIngredients include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
   findUnique q = do
@@ -287,7 +287,7 @@ instance FindManyRecipe WithIngredients OmitSelect where
     result <- findUnique q
     pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyRecipe NoInclude OmitSelect where
+instance ReadRecipe NoInclude OmitSelect where
   findMany RecipeQuery {where_, orderBy_, limit_, offset_} =
     Ops.findMany @RecipeTable @RecipeRow (applyQueryModifiers where_ orderBy_ limit_ offset_)
   findUnique RecipeQuery {where_, orderBy_, limit_, offset_} =
@@ -296,7 +296,7 @@ instance FindManyRecipe NoInclude OmitSelect where
     result <- findUnique q
     pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyRecipe WithIngredients RecipeSelect where
+instance ReadRecipe WithIngredients RecipeSelect where
   findMany RecipeQuery {include_, select_, where_, orderBy_, limit_, offset_} = do
     rows <- Include.findMany @RecipeTable (unwrapWithIngredients include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
     pure $ map (toRecipeWithIngredientsPicked select_) rows
@@ -309,7 +309,7 @@ instance FindManyRecipe WithIngredients RecipeSelect where
     result <- findUnique q
     pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyRecipe NoInclude RecipeSelect where
+instance ReadRecipe NoInclude RecipeSelect where
   findMany RecipeQuery {select_, where_, orderBy_, limit_, offset_} =
     Ops.findManyWith
       (parseRecipePicked select_)

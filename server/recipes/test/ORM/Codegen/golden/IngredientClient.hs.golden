@@ -68,12 +68,12 @@ type instance ResolveSelect OmitSelect = IngredientRow
 type instance ResolveSelect IngredientSelect = IngredientPicked
 
 
-class FindManyIngredient select where
+class ReadIngredient select where
   findMany :: IngredientQuery select -> Db [ResolveSelect select]
   findUnique :: IngredientQuery select -> Db (Maybe (ResolveSelect select))
   findUniqueOrFail :: IngredientQuery select -> Db (Either ORMError (ResolveSelect select))
 
-instance FindManyIngredient OmitSelect where
+instance ReadIngredient OmitSelect where
   findMany q =
     Ops.findMany @IngredientTable @IngredientRow (applyQuery q)
   findUnique q =
@@ -82,7 +82,7 @@ instance FindManyIngredient OmitSelect where
     result <- findUnique q
     pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyIngredient IngredientSelect where
+instance ReadIngredient IngredientSelect where
   findMany q@IngredientQuery {select_} =
     Ops.findManyWith
       (parseIngredientPicked select_)

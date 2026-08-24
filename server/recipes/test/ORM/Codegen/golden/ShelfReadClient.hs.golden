@@ -75,12 +75,12 @@ type instance ResolveInclude (ShelfQuery NoInclude OmitSelect) = ShelfRow
 type instance ResolveInclude (ShelfQuery WithBooks ShelfSelect) = ShelfWithBooksPicked
 type instance ResolveInclude (ShelfQuery NoInclude ShelfSelect) = ShelfPicked
 
-class FindManyShelf include select where
+class ReadShelf include select where
   findMany :: ShelfQuery include select -> Db [ResolveInclude (ShelfQuery include select)]
   findUnique :: ShelfQuery include select -> Db (Maybe (ResolveInclude (ShelfQuery include select)))
   findUniqueOrFail :: ShelfQuery include select -> Db (Either ORMError (ResolveInclude (ShelfQuery include select)))
 
-instance FindManyShelf WithBooks OmitSelect where
+instance ReadShelf WithBooks OmitSelect where
   findMany ShelfQuery {include_, where_, orderBy_, limit_, offset_} =
     Include.findMany @ShelfTable (unwrapWithBooks include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
   findUnique q = do
@@ -92,7 +92,7 @@ instance FindManyShelf WithBooks OmitSelect where
     result <- findUnique q
     pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyShelf NoInclude OmitSelect where
+instance ReadShelf NoInclude OmitSelect where
   findMany ShelfQuery {where_, orderBy_, limit_, offset_} =
     Ops.findMany @ShelfTable @ShelfRow (applyQueryModifiers where_ orderBy_ limit_ offset_)
   findUnique ShelfQuery {where_, orderBy_, limit_, offset_} =
@@ -101,7 +101,7 @@ instance FindManyShelf NoInclude OmitSelect where
     result <- findUnique q
     pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyShelf WithBooks ShelfSelect where
+instance ReadShelf WithBooks ShelfSelect where
   findMany ShelfQuery {include_, select_, where_, orderBy_, limit_, offset_} = do
     rows <- Include.findMany @ShelfTable (unwrapWithBooks include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
     pure $ map (toShelfWithBooksPicked select_) rows
@@ -114,7 +114,7 @@ instance FindManyShelf WithBooks ShelfSelect where
     result <- findUnique q
     pure $ requireFound result (RecordNotFound "No record found matching query")
 
-instance FindManyShelf NoInclude ShelfSelect where
+instance ReadShelf NoInclude ShelfSelect where
   findMany ShelfQuery {select_, where_, orderBy_, limit_, offset_} =
     Ops.findManyWith
       (parseShelfPicked select_)
