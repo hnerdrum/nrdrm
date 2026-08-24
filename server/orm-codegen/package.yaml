@@ -42,6 +42,8 @@ library:
     - ORM.Codegen.Introspect
     - ORM.Codegen.JoinAlias
     - ORM.Codegen.Run
+    - ORM.Codegen.Schema
+    - ORM.Codegen.Spec.Flag
     - ORM.Codegen.Spec.Shelf
     - ORM.Codegen.Spec.ShelfDeep
     - ORM.Codegen.Spec.Widget
