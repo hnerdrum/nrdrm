@@ -43,6 +43,7 @@ library:
     - ORM.Codegen.JoinAlias
     - ORM.Codegen.Run
     - ORM.Codegen.Schema
+    - ORM.Codegen.Spec.Example
     - ORM.Codegen.Spec.Flag
     - ORM.Codegen.Spec.Shelf
     - ORM.Codegen.Spec.ShelfDeep
