@@ -5,124 +5,78 @@ module ORM.Codegen.Spec.Shelf
   )
 where
 
-import ORM.Codegen.IR
+import ORM.Codegen.Schema
 
 shelfSchema :: Schema
 shelfSchema =
-  Schema
-    { schemaEnums = [],
-      schemaModels = [shelfModel, bookModel, chapterModel, sectionModel, tagModel],
-      schemaIncludes = [shelfInclude, shelfGraphInclude],
-      schemaUniques = []
-    }
+  schema
+    []
+    [shelfModel, bookModel, chapterModel, sectionModel, tagModel]
+    [ include
+        "ShelfInclude"
+        "Shelf"
+        [tree "shelfBooks" [tree "bookChapters" []]],
+      include
+        "ShelfGraphInclude"
+        "Shelf"
+        [ tree "shelfBooks" [tree "bookChapters" []],
+          tree "shelfTags" []
+        ]
+    ]
+    []
 
 shelfModel :: Model
 shelfModel =
-  Model
-    { modelName = "Shelf",
-      modelTable = "test_shelf",
-      modelFields =
-        [ pk (withDefault DefaultUuidV4 (uuid "id")),
-          text "name"
-        ],
-      modelRelations =
-        [ hasMany "shelfBooks" "Shelf" "Book" "id" "shelfId",
-          hasMany "shelfTags" "Shelf" "Tag" "id" "shelfId"
-        ]
-    }
+  model
+    "Shelf"
+    [ uuid "id" & pk & withDefault DefaultUuidV4,
+      text "name"
+    ]
+    [ hasMany "shelfBooks" "Book" "shelfId",
+      hasMany "shelfTags" "Tag" "shelfId"
+    ]
+    & table "test_shelf"
 
 bookModel :: Model
 bookModel =
-  Model
-    { modelName = "Book",
-      modelTable = "test_book",
-      modelFields =
-        [ pk (withDefault DefaultUuidV4 (uuid "id")),
-          column "shelf_id" (uuid "shelfId"),
-          text "title"
-        ],
-      modelRelations =
-        [ hasMany "bookChapters" "Book" "Chapter" "id" "bookRef"
-        ]
-    }
+  model
+    "Book"
+    [ uuid "id" & pk & withDefault DefaultUuidV4,
+      uuid "shelfId",
+      text "title"
+    ]
+    [hasMany "bookChapters" "Chapter" "bookRef"]
+    & table "test_book"
 
 chapterModel :: Model
 chapterModel =
-  Model
-    { modelName = "Chapter",
-      modelTable = "test_chapter",
-      modelFields =
-        [ pk (withDefault DefaultUuidV4 (uuid "id")),
-          column "book_id" (uuid "bookRef"),
-          text "heading"
-        ],
-      modelRelations =
-        [ hasMany "chapterSections" "Chapter" "Section" "id" "chapterRef"
-        ]
-    }
+  model
+    "Chapter"
+    [ uuid "id" & pk & withDefault DefaultUuidV4,
+      uuid "bookRef" & column "book_id",
+      text "heading"
+    ]
+    [hasMany "chapterSections" "Section" "chapterRef"]
+    & table "test_chapter"
 
 sectionModel :: Model
 sectionModel =
-  Model
-    { modelName = "Section",
-      modelTable = "test_section",
-      modelFields =
-        [ pk (withDefault DefaultUuidV4 (uuid "id")),
-          column "chapter_id" (uuid "chapterRef"),
-          text "label"
-        ],
-      modelRelations = []
-    }
+  model
+    "Section"
+    [ uuid "id" & pk & withDefault DefaultUuidV4,
+      uuid "chapterRef" & column "chapter_id",
+      text "label"
+    ]
+    []
+    & table "test_section"
 
 tagModel :: Model
 tagModel =
-  Model
-    { modelName = "Tag",
-      modelTable = "test_tag",
-      modelFields =
-        [ pk (withDefault DefaultUuidV4 (uuid "id")),
-          column "shelf_id" (uuid "shelfId"),
-          text "label"
-        ],
-      modelRelations = []
-    }
-
-shelfInclude :: ModelInclude
-shelfInclude =
-  ModelInclude
-    { includeName = "ShelfInclude",
-      includeRootModel = "Shelf",
-      includeTree =
-        [ IncludeTree
-            { includeRelation = "shelfBooks",
-              includeChildren =
-                [ IncludeTree
-                    { includeRelation = "bookChapters",
-                      includeChildren = []
-                    }
-                ]
-            }
-        ]
-    }
-
-shelfGraphInclude :: ModelInclude
-shelfGraphInclude =
-  ModelInclude
-    { includeName = "ShelfGraphInclude",
-      includeRootModel = "Shelf",
-      includeTree =
-        [ IncludeTree
-            { includeRelation = "shelfBooks",
-              includeChildren =
-                [ IncludeTree
-                    { includeRelation = "bookChapters",
-                      includeChildren = []
-                    }
-                ]
-            },
-          IncludeTree
-            { includeRelation = "shelfTags",
-              includeChildren = []
-            }
-        ]
-    }
+  model
+    "Tag"
+    [ uuid "id" & pk & withDefault DefaultUuidV4,
+      uuid "shelfId",
+      text "label"
+    ]
+    []
+    & table "test_tag"

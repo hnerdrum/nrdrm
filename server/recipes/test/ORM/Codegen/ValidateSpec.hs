@@ -6,6 +6,8 @@ module ORM.Codegen.ValidateSpec
 where
 
 import ORM.Codegen.IR
+import qualified ORM.Codegen.Schema as Builder
+import ORM.Codegen.Spec.Flag (flagSchema)
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import ORM.Codegen.Validate
@@ -24,6 +26,13 @@ validateSpec =
 
       it "accepts the Recipe schema" $
         validateSchema recipeSchema `shouldBe` []
+
+      it "accepts a Schema with a boolean field" $
+        validateSchema flagSchema `shouldBe` []
+
+      it "rejects a builder model with no primary key" $
+        validateSchema (Builder.schema [] [Builder.model "Widget" [text "name"] []] [] [])
+          `shouldBe` [ModelMissingPrimaryKey "Widget"]
 
     describe "primary keys" $ do
       it "rejects a model with no primary key" $ do

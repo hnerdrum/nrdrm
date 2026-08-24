@@ -34,6 +34,7 @@ hsType TyText = "Text"
 hsType TyUuid = "UUID"
 hsType TyInt = "Int"
 hsType TyTimestamptz = "UTCTime"
+hsType TyBool = "Bool"
 hsType (TyEnum name) = name
 
 primaryKeyField :: Model -> FieldSpec

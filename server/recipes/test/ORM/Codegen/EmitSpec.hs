@@ -20,6 +20,7 @@ import ORM.Codegen.IR
     relJoin,
     relName,
   )
+import ORM.Codegen.Spec.Flag (flagModel, flagSchema)
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import ORM.Codegen.Spec.Widget (widgetModel)
@@ -31,6 +32,11 @@ emitSpec = do
     it "emits Widget matching the golden file" $ do
       expected <- T.readFile "test/ORM/Codegen/golden/Widget.hs.golden"
       let actual = emitModelModule "Schema.Widget" widgetSchema widgetModel
+      T.strip actual `shouldBe` T.strip expected
+
+    it "emits Flag matching the golden file" $ do
+      expected <- T.readFile "test/ORM/Codegen/golden/Flag.hs.golden"
+      let actual = emitModelModule "Schema.Flag" flagSchema flagModel
       T.strip actual `shouldBe` T.strip expected
 
     it "includes HasMany in a Shelf model module" $ do

@@ -206,4 +206,5 @@ irType spec =
     TyUuid -> "uuid"
     TyInt -> "int"
     TyTimestamptz -> "timestamptz"
+    TyBool -> "boolean"
     TyEnum name -> "enum:" <> T.toLower name

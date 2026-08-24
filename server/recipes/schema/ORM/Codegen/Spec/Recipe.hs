@@ -5,16 +5,15 @@ module ORM.Codegen.Spec.Recipe
   )
 where
 
-import ORM.Codegen.IR
+import ORM.Codegen.Schema
 
 recipeSchema :: Schema
 recipeSchema =
-  Schema
-    { schemaEnums = [unitEnum],
-      schemaModels = [recipeModel, ingredientModel, recipeIngredientModel],
-      schemaIncludes = [recipeInclude],
-      schemaUniques = [unique_ "RecipeIngredient" ["recipeId", "ingredientId"]]
-    }
+  schema
+    [unitEnum]
+    [recipeModel, ingredientModel, recipeIngredientModel]
+    [includeGraph "RecipeInclude" "Recipe"]
+    [unique_ "RecipeIngredient" ["recipeId", "ingredientId"]]
 
 unitEnum :: EnumSpec
 unitEnum =
@@ -29,67 +28,36 @@ unitEnum =
 
 recipeModel :: Model
 recipeModel =
-  Model
-    { modelName = "Recipe",
-      modelTable = "recipe",
-      modelFields =
-        [ pk (withDefault DefaultUuidV4 (uuid "id")),
-          column "created_at" (withDefault DefaultNow (timestamptz "createdAt")),
-          updatedAt (column "updated_at" (withDefault DefaultNow (timestamptz "updatedAt"))),
-          text "name",
-          nullable (text "description")
-        ],
-      modelRelations =
-        [ replaceChildren $
-            hasMany "recipeIngredients" "Recipe" "RecipeIngredient" "id" "recipeId"
-        ]
-    }
+  model
+    "Recipe"
+    [ uuid "id" & pk & withDefault DefaultUuidV4,
+      timestamptz "createdAt" & withDefault DefaultNow,
+      timestamptz "updatedAt" & withDefault DefaultNow & updatedAt,
+      text "name",
+      text "description" & nullable
+    ]
+    [ hasMany "recipeIngredients" "RecipeIngredient" "recipeId" & replaceChildren
+    ]
 
 ingredientModel :: Model
 ingredientModel =
-  Model
-    { modelName = "Ingredient",
-      modelTable = "ingredient",
-      modelFields =
-        [ pk (withDefault DefaultUuidV4 (uuid "id")),
-          column "created_at" (withDefault DefaultNow (timestamptz "createdAt")),
-          updatedAt (column "updated_at" (withDefault DefaultNow (timestamptz "updatedAt"))),
-          text "name"
-        ],
-      modelRelations = []
-    }
+  model
+    "Ingredient"
+    [ uuid "id" & pk & withDefault DefaultUuidV4,
+      timestamptz "createdAt" & withDefault DefaultNow,
+      timestamptz "updatedAt" & withDefault DefaultNow & updatedAt,
+      text "name"
+    ]
+    []
 
 recipeIngredientModel :: Model
 recipeIngredientModel =
-  Model
-    { modelName = "RecipeIngredient",
-      modelTable = "recipe_ingredient",
-      modelFields =
-        [ pk (withDefault DefaultUuidV4 (uuid "id")),
-          column "recipe_id" (uuid "recipeId"),
-          column "ingredient_id" (uuid "ingredientId"),
-          int "amount",
-          enumField "unit" "Unit"
-        ],
-      modelRelations =
-        [ belongsTo "riIngredient" "RecipeIngredient" "Ingredient" "ingredientId" "id"
-        ]
-    }
-
-recipeInclude :: ModelInclude
-recipeInclude =
-  ModelInclude
-    { includeName = "RecipeInclude",
-      includeRootModel = "Recipe",
-      includeTree =
-        [ IncludeTree
-            { includeRelation = "recipeIngredients",
-              includeChildren =
-                [ IncludeTree
-                    { includeRelation = "riIngredient",
-                      includeChildren = []
-                    }
-                ]
-            }
-        ]
-    }
+  model
+    "RecipeIngredient"
+    [ uuid "id" & pk & withDefault DefaultUuidV4,
+      uuid "recipeId",
+      uuid "ingredientId",
+      int "amount",
+      enumField "unit" "Unit"
+    ]
+    [belongsTo "riIngredient" "Ingredient" "ingredientId"]

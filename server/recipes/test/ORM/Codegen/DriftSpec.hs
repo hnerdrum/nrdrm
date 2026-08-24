@@ -11,7 +11,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Data.Text (Text)
 import ORM.Codegen.Drift
-import ORM.Codegen.Introspect (introspectCatalog)
+import ORM.Codegen.Introspect (canonicalizeColumnType, introspectCatalog)
+import ORM.Codegen.Spec.Flag (flagSchema)
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import ORM.Codegen.Spec.Widget (widgetSchema)
@@ -44,6 +45,16 @@ driftSpec =
     it "reports enum label drift" $
       checkSchema recipeSchema recipeCatalogWrongEnum
         `shouldBe` [DriftEnumLabels "Unit" ["g", "ml", "qty", "tbsp", "tsp"] ["g", "ml"]]
+
+    it "accepts a boolean column that matches the catalog" $
+      checkSchema flagSchema flagCatalog `shouldBe` []
+
+    it "reports type drift on a boolean column" $
+      checkSchema flagSchema flagCatalogAsText
+        `shouldBe` [DriftType "flag" "active" "boolean" "text"]
+
+    it "canonicalizes Postgres boolean to the IR boolean type" $
+      canonicalizeColumnType "boolean" "bool" `shouldBe` "boolean"
 
 driftDbSpec :: SpecWith TestEnv
 driftDbSpec =
@@ -150,6 +161,35 @@ recipeTables =
           }
       )
     ]
+
+flagCatalog :: DbCatalog
+flagCatalog =
+  emptyCatalog
+    { dbTables =
+        Map.singleton
+          "flag"
+          DbTable
+            { dbTableName = "flag",
+              dbColumns =
+                Map.fromList
+                  [ col "id" "uuid" False,
+                    col "active" "boolean" False
+                  ],
+              dbPrimaryKey = ["id"],
+              dbUniques = []
+            }
+    }
+
+flagCatalogAsText :: DbCatalog
+flagCatalogAsText =
+  let table = dbTables flagCatalog Map.! "flag"
+      active = dbColumns table Map.! "active"
+   in flagCatalog
+        { dbTables =
+            Map.singleton
+              "flag"
+              table {dbColumns = Map.insert "active" active {dbColType = "text"} (dbColumns table)}
+        }
 
 col :: Text -> Text -> Bool -> (Text, DbColumn)
 col name ty isNullable =

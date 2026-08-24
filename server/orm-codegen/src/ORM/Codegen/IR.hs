@@ -17,6 +17,7 @@ module ORM.Codegen.IR
     text,
     int,
     timestamptz,
+    bool,
     enumField,
     pk,
     nullable,
@@ -76,6 +77,7 @@ data FieldType
   | TyUuid
   | TyInt
   | TyTimestamptz
+  | TyBool
   | TyEnum Text
   deriving (Show, Eq)
 
@@ -149,6 +151,9 @@ int name = field name TyInt
 
 timestamptz :: Text -> FieldSpec
 timestamptz name = field name TyTimestamptz
+
+bool :: Text -> FieldSpec
+bool name = field name TyBool
 
 enumField :: Text -> Text -> FieldSpec
 enumField name enumName = field name (TyEnum enumName)
