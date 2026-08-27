@@ -24,7 +24,6 @@ module ORM.Codegen.Schema
     JoinKind (..),
     hasMany,
     belongsTo,
-    replaceChildren,
     ModelInclude (..),
     IncludeTree (..),
     IncludeDecl (..),
@@ -39,6 +38,7 @@ module ORM.Codegen.Schema
     variantMap,
     UniqueConstraint (..),
     unique_,
+    isFullGraphInclude,
   )
 where
 
@@ -63,7 +63,6 @@ import ORM.Codegen.IR
     enum_,
     nullable,
     pk,
-    replaceChildren,
     unique_,
     updatedAt,
     variant,
@@ -75,12 +74,20 @@ import ORM.Codegen.TextUtil (camelToSnake)
 
 schema :: [EnumSpec] -> [Model] -> [IncludeDecl] -> [UniqueConstraint] -> Schema
 schema enums models includes uniques =
-  Schema
-    { schemaEnums = enums,
-      schemaModels = models,
-      schemaIncludes = map (resolveInclude models) includes,
-      schemaUniques = uniques
-    }
+  let declared = map (resolveInclude models) includes
+      declaredRoots = map includeRootModel declared
+      auto =
+        [ resolveInclude models (IncludeGraph (fullGraphIncludeName (modelName m)) (modelName m))
+          | m <- models,
+            not (null (modelRelations m)),
+            modelName m `notElem` declaredRoots
+        ]
+   in Schema
+        { schemaEnums = enums,
+          schemaModels = models,
+          schemaIncludes = declared ++ auto,
+          schemaUniques = uniques
+        }
 
 model :: Text -> [FieldSpec] -> [RelationSpec] -> Model
 model name fields rels =
@@ -179,6 +186,14 @@ graphTree models rootName =
                     Nothing -> []
                     Just child -> walk nextPath child
             }
+
+isFullGraphInclude :: [Model] -> ModelInclude -> Bool
+isFullGraphInclude models incl =
+  includeName incl == fullGraphIncludeName (includeRootModel incl)
+    && includeTree incl == graphTree models (includeRootModel incl)
+
+fullGraphIncludeName :: Text -> Text
+fullGraphIncludeName root = root <> "Include"
 
 findModel :: [Model] -> Text -> Maybe Model
 findModel models name =

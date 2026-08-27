@@ -61,9 +61,9 @@ emitSpec = do
         `shouldSatisfy` T.isInfixOf "import ORM.Relation (BelongsTo (..), JoinType (..))"
       actual
         `shouldSatisfy` T.isInfixOf "import ORM.Schema.Ingredient (IngredientTable)"
-      actual `shouldSatisfy` T.isInfixOf "    riIngredient"
+      actual `shouldSatisfy` T.isInfixOf "    ingredient"
       actual `shouldSatisfy` T.isInfixOf "import ORM.Schema.Unit (Unit)"
-      T.strip (emitBelongsTo recipeSchema riIngredientRel)
+      T.strip (emitBelongsTo recipeSchema ingredientRel)
         `shouldSatisfy` (`T.isInfixOf` T.strip actual)
 
     it "emits Shelf matching the golden file" $ do
@@ -111,9 +111,9 @@ emitSpec = do
         `shouldBe` T.strip expectedBookChapters
 
   describe "ORM.Codegen.Emit.Schema.emitBelongsTo" $ do
-    it "emits riIngredient" $ do
-      T.strip (emitBelongsTo recipeSchema riIngredientRel)
-        `shouldBe` T.strip expectedRiIngredient
+    it "emits ingredient" $ do
+      T.strip (emitBelongsTo recipeSchema ingredientRel)
+        `shouldBe` T.strip expectedIngredientRel
 
 widgetSchema :: Schema
 widgetSchema =
@@ -208,17 +208,17 @@ recipeIngredientModel =
     Just m -> m
     Nothing -> error "recipeIngredientModel: RecipeIngredient missing"
 
-riIngredientRel :: RelationSpec
-riIngredientRel =
-  case find ((== "riIngredient") . relName) (modelRelations recipeIngredientModel) of
+ingredientRel :: RelationSpec
+ingredientRel =
+  case find ((== "ingredient") . relName) (modelRelations recipeIngredientModel) of
     Just rel | relKind rel == RelBelongsTo -> rel
-    _ -> error "riIngredientRel: riIngredient BelongsTo missing"
+    _ -> error "ingredientRel: ingredient BelongsTo missing"
 
-expectedRiIngredient :: T.Text
-expectedRiIngredient =
+expectedIngredientRel :: T.Text
+expectedIngredientRel =
   T.unlines
-    [ "riIngredient :: BelongsTo RecipeIngredientTable IngredientTable UUID",
-      "riIngredient =",
+    [ "ingredient :: BelongsTo RecipeIngredientTable IngredientTable UUID",
+      "ingredient =",
       "  BelongsTo",
       "    { foreignKey = recipeIngredientIngredientId,",
       "      references = Ingredient.ingredientId,",

@@ -16,13 +16,14 @@ module ORM.Codegen.Target
 where
 
 import Data.List (nub)
-import Data.Maybe (isNothing)
+import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.Emit.Client
   ( emitIncludeReadClientModule,
     emitSimpleClientModule,
     emitWriteClientModule,
+    nestedWriteRelation,
   )
 import ORM.Codegen.Emit.Include (emitIncludeModule)
 import ORM.Codegen.Emit.Schema (emitEnumModule, emitModelModule)
@@ -34,17 +35,14 @@ import ORM.Codegen.IR
     enumImport,
     enumName,
     includeName,
-    includeRelation,
     includeRootModel,
-    includeTree,
     modelName,
-    relReplaceChildren,
-    relToModel,
     schemaEnums,
     schemaIncludes,
     schemaModels,
   )
-import ORM.Codegen.Lookup (lookupModel, lookupRelation)
+import ORM.Codegen.Lookup (lookupModel)
+import ORM.Codegen.Schema (isFullGraphInclude)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 import ORM.Codegen.Spec.ShelfDeep (shelfDeepSchema)
 import ORM.Codegen.Spec.Widget (widgetSchema)
@@ -188,36 +186,39 @@ includeClientOutput layout schema incl =
       root = lookupModel schema rootName
       moduleName = layout.clModulePrefix <> rootName
       path = layout.clOutputDir </> T.unpack rootName <> ".hs"
-      text =
-        if includeUsesReplaceChildren root incl
-          then emitWriteClientModule moduleName schema incl
-          else emitIncludeReadClientModule moduleName schema incl
-   in withGolden layout.clGolden (T.unpack rootName <> "Client.hs") path text
+   in case includeClientKind schema root incl of
+        WriteIncludeClient ->
+          withGolden layout.clGolden (T.unpack rootName <> "Client.hs") path (emitWriteClientModule moduleName schema incl)
+        ReadIncludeClient ->
+          withGolden layout.clGolden (T.unpack rootName <> "Client.hs") path (emitIncludeReadClientModule moduleName schema incl)
+        NoIncludeClient ->
+          []
+
+-- Nested writes are inferred from hasMany + child FK. Auto full-graph
+-- Includes without an owned child keep a simple Client (e.g. RecipeIngredient).
+-- Explicit partial Includes still get an include-read Client.
+data IncludeClientKind = WriteIncludeClient | ReadIncludeClient | NoIncludeClient
+  deriving (Eq)
+
+includeClientKind :: Schema -> Model -> ModelInclude -> IncludeClientKind
+includeClientKind schema root incl
+  | isJust (nestedWriteRelation schema root incl) = WriteIncludeClient
+  | isFullGraphInclude (schemaModels schema) incl = NoIncludeClient
+  | otherwise = ReadIncludeClient
 
 simpleClientModels :: Schema -> [Model]
 simpleClientModels schema =
-  let skip = includeRootModels schema ++ replaceChildTargetModels schema
+  let skip = includeClientRootModels schema
    in filter (\model -> modelName model `notElem` skip) (schemaModels schema)
 
-includeRootModels :: Schema -> [Text]
-includeRootModels = map includeRootModel . schemaIncludes
-
-replaceChildTargetModels :: Schema -> [Text]
-replaceChildTargetModels schema =
+includeClientRootModels :: Schema -> [Text]
+includeClientRootModels schema =
   nub
-    [ relToModel rel
+    [ includeRootModel incl
       | incl <- schemaIncludes schema,
         let root = lookupModel schema (includeRootModel incl),
-        edge <- includeTree incl,
-        let rel = lookupRelation root (includeRelation edge),
-        relReplaceChildren rel
+        includeClientKind schema root incl /= NoIncludeClient
     ]
-
-includeUsesReplaceChildren :: Model -> ModelInclude -> Bool
-includeUsesReplaceChildren root incl =
-  any
-    (relReplaceChildren . lookupRelation root . includeRelation)
-    (includeTree incl)
 
 withGolden :: Bool -> FilePath -> FilePath -> Text -> [GenOutput]
 withGolden golden goldenFile path text =
