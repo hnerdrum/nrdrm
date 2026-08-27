@@ -12,7 +12,7 @@ recipeSchema =
   schema
     [unitEnum]
     [recipeModel, ingredientModel, recipeIngredientModel]
-    [includeGraph "RecipeInclude" "Recipe"]
+    []
     [unique_ "RecipeIngredient" ["recipeId", "ingredientId"]]
 
 unitEnum :: EnumSpec
@@ -36,7 +36,7 @@ recipeModel =
       text "name",
       text "description" & nullable
     ]
-    [ hasMany "recipeIngredients" "RecipeIngredient" "recipeId" & replaceChildren
+    [ hasMany "recipeIngredients" "RecipeIngredient" "recipeId"
     ]
 
 ingredientModel :: Model
@@ -60,4 +60,4 @@ recipeIngredientModel =
       int "amount",
       enumField "unit" "Unit"
     ]
-    [belongsTo "riIngredient" "Ingredient" "ingredientId"]
+    [belongsTo "ingredient" "Ingredient" "ingredientId"]

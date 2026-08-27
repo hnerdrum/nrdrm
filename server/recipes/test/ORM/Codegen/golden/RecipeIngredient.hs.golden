@@ -20,7 +20,7 @@ module ORM.Schema.RecipeIngredient
     recipeIngredientIngredientId,
     recipeIngredientAmount,
     recipeIngredientUnit,
-    riIngredient
+    ingredient
   )
 where
 
@@ -169,8 +169,8 @@ recipeIngredientAmount = Field "amount" "amount"
 recipeIngredientUnit :: Field RecipeIngredientTable Unit
 recipeIngredientUnit = Field "unit" "unit"
 
-riIngredient :: BelongsTo RecipeIngredientTable IngredientTable UUID
-riIngredient =
+ingredient :: BelongsTo RecipeIngredientTable IngredientTable UUID
+ingredient =
   BelongsTo
     { foreignKey = recipeIngredientIngredientId,
       references = Ingredient.ingredientId,

@@ -51,8 +51,19 @@ emitClientSpec =
           actual = emitIncludeReadClientModule "Schema.Client.Shelf" shelfSchema incl
       T.strip actual `shouldBe` T.strip expected
 
+    it "emits RecipeIngredient Client matching the golden file" $ do
+      expected <- TIO.readFile "test/ORM/Codegen/golden/RecipeIngredientClient.hs.golden"
+      let actual = emitSimpleClientModule "ORM.Client.RecipeIngredient" recipeIngredientModel
+      T.strip actual `shouldBe` T.strip expected
+
 ingredientModel :: Model
 ingredientModel =
   case find ((== "Ingredient") . modelName) (schemaModels recipeSchema) of
     Just m -> m
     Nothing -> error "ingredientModel: Ingredient missing"
+
+recipeIngredientModel :: Model
+recipeIngredientModel =
+  case find ((== "RecipeIngredient") . modelName) (schemaModels recipeSchema) of
+    Just m -> m
+    Nothing -> error "recipeIngredientModel: RecipeIngredient missing"

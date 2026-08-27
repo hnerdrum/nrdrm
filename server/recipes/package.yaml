@@ -76,10 +76,12 @@ library:
     - Logger
     - ORM.Client.Ingredient
     - ORM.Client.Recipe
+    - ORM.Client.RecipeIngredient
     - ORM.Schema.Ingredient
     - ORM.Schema.Recipe
     - ORM.Schema.RecipeInclude
     - ORM.Schema.RecipeIngredient
+    - ORM.Schema.RecipeIngredientInclude
     - ORM.Schema.Unit
   default-extensions:
     - DataKinds
@@ -135,7 +137,9 @@ tests:
       - Schema.Widget
       - Schema.Shelf
       - Schema.Book
+      - Schema.BookInclude
       - Schema.Chapter
+      - Schema.ChapterInclude
       - Schema.Section
       - Schema.Tag
       - Schema.ShelfInclude
@@ -154,6 +158,7 @@ tests:
       - ORM.SelectSpec
       - ORM.NestedWriteSpec
       - ORM.Codegen.ValidateSpec
+      - ORM.Codegen.SchemaSpec
       - ORM.Codegen.JoinAliasSpec
       - ORM.Codegen.IncludePathSpec
       - ORM.Codegen.EmitSpec

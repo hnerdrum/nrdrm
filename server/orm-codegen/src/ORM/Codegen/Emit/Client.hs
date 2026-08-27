@@ -4,6 +4,7 @@ module ORM.Codegen.Emit.Client
   ( emitSimpleClientModule,
     emitIncludeReadClientModule,
     emitWriteClientModule,
+    nestedWriteRelation,
   )
 where
 
@@ -231,7 +232,14 @@ emitWriteClientModule moduleName schema incl =
       )
   where
     root = lookupModel schema (includeRootModel incl)
-    (rel, child) = replaceChildRelation schema root incl
+    (rel, child) =
+      case nestedWriteRelation schema root incl of
+        Just found -> found
+        Nothing ->
+          error $
+            "emitWriteClientModule: include "
+              <> T.unpack (includeName incl)
+              <> " has no owned-child hasMany (child FK matching the relation)"
 
 emitWriteCreateType :: Model -> Model -> RelationSpec -> Text
 emitWriteCreateType root child rel =
@@ -582,19 +590,25 @@ applyOpsFnName child = "apply" <> nestedOpsTypeName child
 childrenFieldName :: Model -> RelationSpec -> Text
 childrenFieldName = includeFieldName
 
-replaceChildRelation :: Schema -> Model -> ModelInclude -> (RelationSpec, Model)
-replaceChildRelation schema root incl =
+-- Nested writes are inferred from hasMany + child FK (the field named on
+-- the relation). `replaceChildren` was dropped; there is no opt-in for
+-- non-FK patterns.
+nestedWriteRelation :: Schema -> Model -> ModelInclude -> Maybe (RelationSpec, Model)
+nestedWriteRelation schema root incl =
   case [ (rel, lookupModel schema (relToModel rel))
          | edge <- includeTree incl,
            let rel = lookupRelation root (includeRelation edge),
-           relReplaceChildren rel
+           relKind rel == RelHasMany,
+           childHasForeignKey schema rel
        ] of
-    (found : _) -> found
-    [] ->
-      error $
-        "emitWriteClientModule: include "
-          <> T.unpack (includeName incl)
-          <> " has no replaceChildren relation"
+    (found : _) -> Just found
+    [] -> Nothing
+
+childHasForeignKey :: Schema -> RelationSpec -> Bool
+childHasForeignKey schema rel =
+  any
+    ((== relForeignField rel) . fieldName)
+    (modelFields (lookupModel schema (relToModel rel)))
 
 createRootInputExpr :: Model -> Text
 createRootInputExpr model =

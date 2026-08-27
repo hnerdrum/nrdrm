@@ -28,7 +28,6 @@ data ValidationError
   | UnknownIncludeRelation Text Text Text
   | JoinAliasExhausted Text Text
   | MaxIncludeDepthExceeded Text Int Int
-  | ReplaceChildrenNotHasMany Text
   | DuplicateIncludeRelation Text Text Text
   | UnknownUniqueModel Text
   | UnknownUniqueField Text Text
@@ -108,12 +107,7 @@ validateRelation schema rel =
           requireField (relName rel) (modelName fromModel) (relForeignField rel) fromModel
             ++ requireField (relName rel) (modelName toModel) (relLocalField rel) toModel
         _ -> []
-      replaceErrs =
-        [ ReplaceChildrenNotHasMany (relName rel)
-          | relReplaceChildren rel,
-            relKind rel /= RelHasMany
-        ]
-   in modelErrs ++ fieldErrs ++ replaceErrs
+   in modelErrs ++ fieldErrs
 
 validateInclude :: Schema -> ModelInclude -> [ValidationError]
 validateInclude schema incl =

@@ -30,7 +30,6 @@ module ORM.Codegen.IR
     variantMap,
     hasMany,
     belongsTo,
-    replaceChildren,
     unique_,
   )
 where
@@ -110,8 +109,7 @@ data RelationSpec = RelationSpec
     relToModel :: Text,
     relLocalField :: Text,
     relForeignField :: Text,
-    relJoin :: JoinKind,
-    relReplaceChildren :: Bool
+    relJoin :: JoinKind
   }
   deriving (Show, Eq)
 
@@ -196,8 +194,7 @@ hasMany name fromModel toModel localFld foreignFld =
       relToModel = toModel,
       relLocalField = localFld,
       relForeignField = foreignFld,
-      relJoin = JoinLeft,
-      relReplaceChildren = False
+      relJoin = JoinLeft
     }
 
 belongsTo :: Text -> Text -> Text -> Text -> Text -> RelationSpec
@@ -209,12 +206,8 @@ belongsTo name fromModel toModel foreignFld referencedFld =
       relToModel = toModel,
       relLocalField = referencedFld,
       relForeignField = foreignFld,
-      relJoin = JoinLeft,
-      relReplaceChildren = False
+      relJoin = JoinLeft
     }
-
-replaceChildren :: RelationSpec -> RelationSpec
-replaceChildren rel = rel {relReplaceChildren = True}
 
 unique_ :: Text -> [Text] -> UniqueConstraint
 unique_ model fields = UniqueConstraint {uniqueModel = model, uniqueFields = fields}

@@ -35,9 +35,9 @@ targetSpec =
                             recipeSchema
                           ]
 
-    it "derives 31 outputs across all targets" $ do
-      length (concatMap targetOutputs allTargets) `shouldBe` 31
-      length (allOutputs allTargets) `shouldBe` 31
+    it "derives 41 outputs across all targets" $ do
+      length (concatMap targetOutputs allTargets) `shouldBe` 41
+      length (allOutputs allTargets) `shouldBe` 41
 
     it "derives expected output paths" $ do
       let paths = sort (nub (map outputPath (allOutputs allTargets)))
@@ -45,19 +45,25 @@ targetSpec =
         `shouldBe` sort
           [ ".orm-gen/ORM/Client/Ingredient.hs",
             ".orm-gen/ORM/Client/Recipe.hs",
+            ".orm-gen/ORM/Client/RecipeIngredient.hs",
             ".orm-gen/ORM/Schema/Ingredient.hs",
             ".orm-gen/ORM/Schema/Recipe.hs",
             ".orm-gen/ORM/Schema/RecipeInclude.hs",
             ".orm-gen/ORM/Schema/RecipeIngredient.hs",
+            ".orm-gen/ORM/Schema/RecipeIngredientInclude.hs",
             ".orm-gen/ORM/Schema/Unit.hs",
             "test/ORM/Codegen/golden/Book.hs.golden",
+            "test/ORM/Codegen/golden/BookInclude.hs.golden",
             "test/ORM/Codegen/golden/Chapter.hs.golden",
+            "test/ORM/Codegen/golden/ChapterInclude.hs.golden",
             "test/ORM/Codegen/golden/Ingredient.hs.golden",
             "test/ORM/Codegen/golden/IngredientClient.hs.golden",
             "test/ORM/Codegen/golden/Recipe.hs.golden",
             "test/ORM/Codegen/golden/RecipeClient.hs.golden",
             "test/ORM/Codegen/golden/RecipeInclude.hs.golden",
             "test/ORM/Codegen/golden/RecipeIngredient.hs.golden",
+            "test/ORM/Codegen/golden/RecipeIngredientClient.hs.golden",
+            "test/ORM/Codegen/golden/RecipeIngredientInclude.hs.golden",
             "test/ORM/Codegen/golden/Section.hs.golden",
             "test/ORM/Codegen/golden/Shelf.hs.golden",
             "test/ORM/Codegen/golden/ShelfGraphInclude.hs.golden",
@@ -66,7 +72,9 @@ targetSpec =
             "test/ORM/Codegen/golden/Unit.hs.golden",
             "test/ORM/Codegen/golden/Widget.hs.golden",
             "test/Schema/Book.hs",
+            "test/Schema/BookInclude.hs",
             "test/Schema/Chapter.hs",
+            "test/Schema/ChapterInclude.hs",
             "test/Schema/Section.hs",
             "test/Schema/Shelf.hs",
             "test/Schema/ShelfDeepInclude.hs",
