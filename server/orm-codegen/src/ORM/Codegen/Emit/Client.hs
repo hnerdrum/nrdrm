@@ -145,11 +145,8 @@ emitWriteClientModule moduleName schema incl =
                    nestedOpsTypeName child <> " (..),",
                    emptyNestedOpsName child <> ","
                  ]
-              ++ includeReadPresetExportItems schema incl
               ++ includeCombinatorExportItems schema incl
-              ++ [ presetTypeName schema incl <> " (..),",
-                   "NoInclude (..),",
-                   "ResolveInclude,",
+              ++ [ "ResolveInclude,",
                    queryTypeName root <> " (..),",
                    "emptyQuery,",
                    fieldBinder root (primaryKeyField root) <> ","

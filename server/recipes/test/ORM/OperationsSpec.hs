@@ -72,7 +72,7 @@ operationsSpec =
       resetRecipes env
       flour <- insertIngredient pool "flour"
       created <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
           >>= assertRight
       let child = (head created.ingredients).recipeIngredient
       result <-
@@ -98,7 +98,7 @@ operationsSpec =
       resetRecipes env
       flour <- insertIngredient pool "flour"
       created <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
           >>= assertRight
       result <-
         runDb

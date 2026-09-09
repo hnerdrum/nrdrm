@@ -147,7 +147,7 @@ selectSpec = do
         runDb
           pool
           ( Recipe.create
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               Recipe.RecipeWriteCreate
                 { root =
                     Recipe.RecipeCreate
@@ -176,10 +176,9 @@ selectSpec = do
                 name = True,
                 description = True
               }
-          query :: Recipe.RecipeQuery Recipe.WithIngredients RecipeSelect
           query =
             Recipe.RecipeQuery
-              { include_ = Recipe.withIngredients,
+              { include_ = Recipe.ingredients Recipe.ingredient,
                 select_ = sel,
                 where_ = Just (eq recipeName "Pasta"),
                 orderBy_ = Nothing,
@@ -194,13 +193,13 @@ selectSpec = do
       length row.ingredients `shouldBe` 1
       (head row.ingredients).recipeIngredient.amount `shouldBe` 100
 
-    it "projects recipe scalars with noInclude" $ \env@TestEnv {envPool = pool} -> do
+    it "projects recipe scalars without include_" $ \env@TestEnv {envPool = pool} -> do
       resetRecipes env
       _ <-
         runDb
           pool
           ( Recipe.create
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               Recipe.RecipeWriteCreate
                 { root =
                     Recipe.RecipeCreate
@@ -222,15 +221,10 @@ selectSpec = do
                 name = True,
                 description = False
               }
-          query :: Recipe.RecipeQuery Recipe.NoInclude RecipeSelect
           query =
-            Recipe.RecipeQuery
-              { include_ = Recipe.noInclude,
-                select_ = sel,
-                where_ = Just (eq recipeName "Broth"),
-                orderBy_ = Nothing,
-                limit_ = Nothing,
-                offset_ = Nothing
+            Recipe.emptyQuery
+              { Recipe.select_ = sel,
+                Recipe.where_ = Just (eq recipeName "Broth")
               }
       [row] <- runDb pool (Recipe.findMany query)
       row.name `shouldBe` Picked "Broth"
@@ -245,7 +239,7 @@ selectSpec = do
         runDb
           pool
           ( Recipe.create
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               Recipe.RecipeWriteCreate
                 { root =
                     Recipe.RecipeCreate
@@ -271,7 +265,7 @@ selectSpec = do
           pool
           ( Recipe.findUnique
               Recipe.emptyQuery
-                { Recipe.include_ = Recipe.withIngredients,
+                { Recipe.include_ = Recipe.ingredients Recipe.ingredient,
                   Recipe.where_ = Just (eq recipeId created.recipe.id)
                 }
           )
@@ -285,7 +279,7 @@ selectSpec = do
         runDb
           pool
           ( Recipe.create
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               Recipe.RecipeWriteCreate
                 { root =
                     Recipe.RecipeCreate

@@ -27,7 +27,7 @@ nestedWriteSpec =
       resetRecipes env
       flour <- insertIngredient pool "flour"
       created <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
           >>= assertRight
       map (.recipeIngredient.amount) created.ingredients `shouldBe` [100]
 
@@ -73,7 +73,7 @@ nestedWriteSpec =
         runDb
           pool
           ( Recipe.create
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               Recipe.RecipeWriteCreate
                 { root = recipeCreate "Pasta",
                   ingredients = Recipe.Ops (opsCreate [nested flour.id 100 G])
@@ -87,13 +87,13 @@ nestedWriteSpec =
       flour <- insertIngredient pool "flour"
       salt <- insertIngredient pool "salt"
       created <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
           >>= assertRight
       updated <-
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               created.recipe.id
               (writeUpdate (Recipe.Set [nested salt.id 5 G]))
           )
@@ -106,13 +106,13 @@ nestedWriteSpec =
       flour <- insertIngredient pool "flour"
       salt <- insertIngredient pool "salt"
       created <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
           >>= assertRight
       updated <-
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               created.recipe.id
               (writeUpdate (Recipe.Ops (opsCreate [nested salt.id 5 G])))
           )
@@ -123,13 +123,13 @@ nestedWriteSpec =
       resetRecipes env
       flour <- insertIngredient pool "flour"
       created <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
           >>= assertRight
       updated <-
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               created.recipe.id
               Recipe.RecipeWriteUpdate {root = emptyRootUpdate, ingredients = Nothing}
           )
@@ -143,14 +143,14 @@ nestedWriteSpec =
       created <-
         runDb
           pool
-          (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G, nested salt.id 5 G]))
+          (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G, nested salt.id 5 G]))
           >>= assertRight
       flourRow <- requireChild flour.id created.ingredients
       updated <-
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               created.recipe.id
               (writeUpdate (Recipe.Ops (opsDelete [flourRow.recipeIngredient.id])))
           )
@@ -164,14 +164,14 @@ nestedWriteSpec =
       created <-
         runDb
           pool
-          (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G, nested salt.id 5 G]))
+          (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G, nested salt.id 5 G]))
           >>= assertRight
       flourRow <- requireChild flour.id created.ingredients
       updated <-
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               created.recipe.id
               (writeUpdate (Recipe.Ops (opsDisconnect [flourRow.recipeIngredient.id])))
           )
@@ -182,14 +182,14 @@ nestedWriteSpec =
       resetRecipes env
       flour <- insertIngredient pool "flour"
       created <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
           >>= assertRight
       let riId = (head created.ingredients).recipeIngredient.id
       updated <-
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               created.recipe.id
               (writeUpdate (Recipe.Ops (opsUpdate [(riId, nested flour.id 250 Ml)])))
           )
@@ -201,13 +201,13 @@ nestedWriteSpec =
       resetRecipes env
       flour <- insertIngredient pool "flour"
       created <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" []))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" []))
           >>= assertRight
       afterInsert <-
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               created.recipe.id
               (writeUpdate (Recipe.Ops (opsUpsert [nested flour.id 10 G])))
           )
@@ -217,7 +217,7 @@ nestedWriteSpec =
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               created.recipe.id
               (writeUpdate (Recipe.Ops (opsUpsert [nested flour.id 20 G])))
           )
@@ -230,13 +230,13 @@ nestedWriteSpec =
       flour <- insertIngredient pool "flour"
       salt <- insertIngredient pool "salt"
       created <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Pasta" [nested flour.id 100 G]))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
           >>= assertRight
       updated <-
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               created.recipe.id
               (writeUpdate (Recipe.Ops (opsCreateMany [nested flour.id 999 G, nested salt.id 1 G])))
           )
@@ -248,17 +248,17 @@ nestedWriteSpec =
       resetRecipes env
       flour <- insertIngredient pool "flour"
       first <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "One" [nested flour.id 100 G]))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "One" [nested flour.id 100 G]))
           >>= assertRight
       second <-
-        runDb pool (Recipe.create Recipe.withIngredients (writeCreate "Two" []))
+        runDb pool (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Two" []))
           >>= assertRight
       let riId = (head first.ingredients).recipeIngredient.id
       moved <-
         runDb
           pool
           ( Recipe.update
-              Recipe.withIngredients
+              (Recipe.ingredients Recipe.ingredient)
               second.recipe.id
               (writeUpdate (Recipe.Ops (opsConnect [riId])))
           )
@@ -268,7 +268,7 @@ nestedWriteSpec =
           pool
           ( Recipe.findUniqueOrFail
               Recipe.emptyQuery
-                { Recipe.include_ = Recipe.withIngredients,
+                { Recipe.include_ = Recipe.ingredients Recipe.ingredient,
                   Recipe.where_ = Just (eq Recipe.recipeId first.recipe.id)
                 }
           )
