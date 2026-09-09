@@ -5,7 +5,7 @@ A Haskell library: you write a Schema, generate a Client, then query and write t
 ## Language
 
 **Schema**:
-The Haskell description of models, relations, includes, and unique constraints. It is the input to codegen and the source of truth for the Client. You write it as a builder (tables, columns, relations), not as `data` types.
+The Haskell description of models, relations, and unique constraints. It is the input to codegen and the source of truth for the Client. You write it as a builder (tables, columns, relations), not as `data` types.
 _Avoid_: persist models, schema.prisma, entity defs, row types as authoring
 
 **Client**:
@@ -13,8 +13,8 @@ The generated per-model API used by application code to query and write.
 _Avoid_: query builder, repository, DAO
 
 **Include**:
-A nested-read tree declared on the Schema and compiled into Client presets (`withIngredients`, `noInclude`). Reads pass it as a field on the query record; writes pass it as the returned shape.
-_Avoid_: join, eager load, populate
+A query-time combinator tree — one function per relation — passed as `include_` on the query record. Writes take the same combinator as the returned shape. The Client result type is the named ADT for that tree.
+_Avoid_: join, eager load, populate, preset, includeGraph
 
 **Codegen**:
 The tool that turns a Schema into table types and a Client.

@@ -94,10 +94,10 @@ getTask id =
     Task.emptyQuery {Task.where_ = Just (eq Task.taskId id)}
 ```
 
-Models with Includes pass the preset on the same record (recipes example):
+Models with Includes pass a combinator on the same record (recipes example):
 
 ```haskell
-Recipe.findMany Recipe.emptyQuery {Recipe.include_ = Recipe.withIngredients}
+Recipe.findMany Recipe.emptyQuery {Recipe.include_ = Recipe.ingredients Recipe.ingredient}
 ```
 
 Writes keep a separate Include argument for the returned shape: `create include data`.

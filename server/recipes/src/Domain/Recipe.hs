@@ -129,26 +129,26 @@ $(deriveJSON defaultOptions ''Recipe)
 getAllRecipes :: Db [Recipe]
 getAllRecipes =
   map fromRecipeWithIngredients
-    <$> Recipe.findMany Recipe.emptyQuery {Recipe.include_ = Recipe.withIngredients}
+    <$> Recipe.findMany Recipe.emptyQuery {Recipe.include_ = Recipe.ingredients Recipe.ingredient}
 
 getRecipe :: UUID -> Db (Either AppError Recipe)
 getRecipe recipeId =
   bimap fromRecipeError fromRecipeWithIngredients
     <$> Recipe.findUniqueOrFail
       Recipe.emptyQuery
-        { Recipe.include_ = Recipe.withIngredients,
+        { Recipe.include_ = Recipe.ingredients Recipe.ingredient,
           Recipe.where_ = Just (eq Recipe.recipeId recipeId)
         }
 
 createRecipe :: CreateRecipeInput -> Db (Either AppError Recipe)
 createRecipe input =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> Recipe.create Recipe.withIngredients (toRecipeWriteCreate input)
+    <$> Recipe.create (Recipe.ingredients Recipe.ingredient) (toRecipeWriteCreate input)
 
 updateRecipe :: UUID -> UpdateRecipeInput -> Db (Either AppError Recipe)
 updateRecipe recipeId input =
   bimap fromRecipeError fromRecipeWithIngredients
-    <$> Recipe.update Recipe.withIngredients recipeId (toRecipeWriteUpdate input)
+    <$> Recipe.update (Recipe.ingredients Recipe.ingredient) recipeId (toRecipeWriteUpdate input)
 
 toRecipeWriteCreate :: CreateRecipeInput -> Recipe.RecipeWriteCreate
 toRecipeWriteCreate input =
