@@ -114,7 +114,7 @@ emitIncludeReadClientModule moduleName schema incl =
         ++ includeReadImportLines moduleName schema incl
     )
     <> "\n"
-    <> intercalateSections (emitIncludeReadDefinitions schema incl)
+    <> intercalateSections (emitIncludeReadDefinitions schema incl False)
 
 emitWriteClientModule :: Text -> Schema -> ModelInclude -> Text
 emitWriteClientModule moduleName schema incl =
@@ -146,6 +146,7 @@ emitWriteClientModule moduleName schema incl =
                    emptyNestedOpsName child <> ","
                  ]
               ++ includeReadPresetExportItems schema incl
+              ++ includeCombinatorExportItems schema incl
               ++ [ presetTypeName schema incl <> " (..),",
                    "NoInclude (..),",
                    "ResolveInclude,",
@@ -223,7 +224,7 @@ emitWriteClientModule moduleName schema incl =
           emitNestedToChildUpdate child rel,
           emitNestedWriteHelpers schema root child rel
         ]
-          ++ emitIncludeReadDefinitions schema incl
+          ++ emitIncludeReadDefinitions schema incl True
           ++ [ emitWriteCreate schema root incl rel,
                emitWriteUpdate schema root incl rel,
                emitDeleteFn root,
@@ -705,6 +706,15 @@ includeReadPresetExportItems schema incl =
     "noInclude,"
   ]
 
+includeCombinatorExportItems :: Schema -> ModelInclude -> [Text]
+includeCombinatorExportItems schema incl =
+  case singleNestCombinator schema incl of
+    Nothing -> []
+    Just spec ->
+      [ acParentName spec <> ",",
+        acChildName spec <> ","
+      ]
+
 writeClientTypeReexportItems :: Schema -> Model -> ModelInclude -> [Text]
 writeClientTypeReexportItems schema root incl =
   nubExportItems $
@@ -842,40 +852,54 @@ nestedIncludeTypeExports schema incl =
           not (null (includeChildren edge))
       ]
 
-emitIncludeReadDefinitions :: Schema -> ModelInclude -> [Text]
-emitIncludeReadDefinitions schema incl =
+emitIncludeReadDefinitions :: Schema -> ModelInclude -> Bool -> [Text]
+emitIncludeReadDefinitions schema incl emitCombinators =
   let root = lookupModel schema (includeRootModel incl)
    in [ emitFullIncludePreset schema incl,
-        emitNoIncludePreset schema incl,
-        emitPickedIncludeType schema root incl,
-        emitIncludeQueryType root incl,
-        emitIncludeEmptyQueryFn root,
-        emitIncludeQueryResolveInstances schema root incl,
-        emitIncludeFindManyClass root incl,
-        emitIncludeFindManyInstances schema root incl
+        emitNoIncludePreset schema incl
       ]
+        ++ [section | emitCombinators, section <- emitIncludeCombinatorSection schema incl]
+        ++ [ emitPickedIncludeType schema root incl emitCombinators,
+             emitIncludeQueryType root incl,
+             emitIncludeEmptyQueryFn root,
+             emitIncludeQueryResolveInstances schema root incl,
+             emitIncludeFindManyClass root incl,
+             emitIncludeFindManyInstances schema root incl
+           ]
 
-emitPickedIncludeType :: Schema -> Model -> ModelInclude -> Text
-emitPickedIncludeType schema model incl =
+emitPickedIncludeType :: Schema -> Model -> ModelInclude -> Bool -> Text
+emitPickedIncludeType schema model incl useRecordDot =
   let pickedName = pickedIncludeTypeName model incl
       nested = includeResultName model incl
       rootVar = lowerFirst (modelName model)
       relFields = map (pickedIncludeRelField schema model) (includeTree incl)
       copyFields = map (includeRelName schema model) (includeTree incl)
-   in T.unlines
+      pickedBody
+        | useRecordDot =
+            [ toPickedIncludeFnName model incl <> " select_ nested =",
+              "  " <> pickedName,
+              "    { " <> rootVar <> " = " <> toPickedName model <> " select_ nested." <> rootVar,
+              if null copyFields
+                then "    }"
+                else "    , " <> T.intercalate "\n    , " (map (\f -> f <> " = nested." <> f) copyFields) <> "\n    }"
+            ]
+        | otherwise =
+            [ toPickedIncludeFnName model incl <> " select_ " <> nested <> " {" <> T.intercalate ", " (rootVar : copyFields) <> "} =",
+              "  " <> pickedName,
+              "    { " <> rootVar <> " = " <> toPickedName model <> " select_ " <> rootVar,
+              if null copyFields
+                then "    }"
+                else "    , " <> T.intercalate "\n    , " (map (\f -> f <> " = " <> f) copyFields) <> "\n    }"
+            ]
+   in T.unlines $
         [ "data " <> pickedName <> " = " <> pickedName,
           "  { " <> T.intercalate ",\n    " ((rootVar <> " :: " <> pickedTypeName model) : relFields),
           "  }",
           "  deriving (Show, Eq)",
           "",
-          toPickedIncludeFnName model incl <> " :: " <> selectTypeName model <> " -> " <> nested <> " -> " <> pickedName,
-          toPickedIncludeFnName model incl <> " select_ " <> nested <> " {" <> T.intercalate ", " (rootVar : copyFields) <> "} =",
-          "  " <> pickedName,
-          "    { " <> rootVar <> " = " <> toPickedName model <> " select_ " <> rootVar,
-          if null copyFields
-            then "    }"
-            else "    , " <> T.intercalate "\n    , " (map (\f -> f <> " = " <> f) copyFields) <> "\n    }"
+          toPickedIncludeFnName model incl <> " :: " <> selectTypeName model <> " -> " <> nested <> " -> " <> pickedName
         ]
+          ++ pickedBody
 
 includeRelName :: Schema -> Model -> IncludeTree -> Text
 includeRelName _schema parent edge =
@@ -1052,6 +1076,51 @@ emitNoIncludePreset schema incl =
   T.unlines
     [ "noInclude :: NoInclude",
       "noInclude = NoInclude " <> noIncludeValue schema incl
+    ]
+
+data AppliedCombinator = AppliedCombinator
+  { acParentName :: Text,
+    acChildName :: Text,
+    acTokenType :: Text
+  }
+
+singleNestCombinator :: Schema -> ModelInclude -> Maybe AppliedCombinator
+singleNestCombinator schema incl =
+  case includeTree incl of
+    [parentEdge] ->
+      case includeChildren parentEdge of
+        [childEdge]
+          | null (includeChildren childEdge) ->
+              let root = lookupModel schema (includeRootModel incl)
+                  parentRel = lookupRelation root (includeRelation parentEdge)
+                  childModel = lookupModel schema (relToModel parentRel)
+                  childRel = lookupRelation childModel (includeRelation childEdge)
+                  childName = includeFieldName childModel childRel
+               in Just
+                    AppliedCombinator
+                      { acParentName = includeFieldName root parentRel,
+                        acChildName = childName,
+                        acTokenType = upperFirst childName
+                      }
+        _ -> Nothing
+    _ -> Nothing
+
+emitIncludeCombinatorSection :: Schema -> ModelInclude -> [Text]
+emitIncludeCombinatorSection schema incl =
+  case singleNestCombinator schema incl of
+    Nothing -> []
+    Just spec -> [emitAppliedCombinator spec (presetTypeName schema incl) (fullPresetName schema incl)]
+
+emitAppliedCombinator :: AppliedCombinator -> Text -> Text -> Text
+emitAppliedCombinator spec withType withValue =
+  T.unlines
+    [ "data " <> acTokenType spec <> " = " <> acTokenType spec,
+      "",
+      acChildName spec <> " :: " <> acTokenType spec,
+      acChildName spec <> " = " <> acTokenType spec,
+      "",
+      acParentName spec <> " :: " <> acTokenType spec <> " -> " <> withType,
+      acParentName spec <> " " <> acTokenType spec <> " = " <> withValue
     ]
 
 emitIncludeQueryType :: Model -> ModelInclude -> Text

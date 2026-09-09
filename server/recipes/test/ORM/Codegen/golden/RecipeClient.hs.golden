@@ -25,6 +25,8 @@ module ORM.Client.Recipe
     emptyRecipeIngredientNestedOps,
     withIngredients,
     noInclude,
+    ingredients,
+    ingredient,
     WithIngredients (..),
     NoInclude (..),
     ResolveInclude,
@@ -239,6 +241,14 @@ withIngredients =
 noInclude :: NoInclude
 noInclude = NoInclude RecipeInclude {ingredients = Nothing}
 
+data Ingredient = Ingredient
+
+ingredient :: Ingredient
+ingredient = Ingredient
+
+ingredients :: Ingredient -> WithIngredients
+ingredients Ingredient = withIngredients
+
 data RecipeWithIngredientsPicked = RecipeWithIngredientsPicked
   { recipe :: RecipePicked,
     ingredients :: [RecipeIngredientWithIngredient]
@@ -246,10 +256,10 @@ data RecipeWithIngredientsPicked = RecipeWithIngredientsPicked
   deriving (Show, Eq)
 
 toRecipeWithIngredientsPicked :: RecipeSelect -> RecipeWithIngredients -> RecipeWithIngredientsPicked
-toRecipeWithIngredientsPicked select_ RecipeWithIngredients {recipe, ingredients} =
+toRecipeWithIngredientsPicked select_ nested =
   RecipeWithIngredientsPicked
-    { recipe = toRecipePicked select_ recipe
-    , ingredients = ingredients
+    { recipe = toRecipePicked select_ nested.recipe
+    , ingredients = nested.ingredients
     }
 
 data RecipeQuery include select = RecipeQuery
