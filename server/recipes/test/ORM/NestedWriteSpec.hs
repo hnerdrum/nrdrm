@@ -31,6 +31,41 @@ nestedWriteSpec =
           >>= assertRight
       map (.recipeIngredient.amount) created.ingredients `shouldBe` [100]
 
+    it "create accepts ingredients ingredient and returns RecipeWithIngredients" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      flour <- insertIngredient pool "flour"
+      created <-
+        runDb
+          pool
+          (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
+          >>= assertRight
+      created.recipe.name `shouldBe` "Pasta"
+      map (.recipeIngredient.amount) created.ingredients `shouldBe` [100]
+      (head created.ingredients).ingredient `shouldBe` Just flour
+
+    it "update accepts ingredients ingredient and returns RecipeWithIngredients" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      flour <- insertIngredient pool "flour"
+      salt <- insertIngredient pool "salt"
+      created <-
+        runDb
+          pool
+          (Recipe.create (Recipe.ingredients Recipe.ingredient) (writeCreate "Pasta" [nested flour.id 100 G]))
+          >>= assertRight
+      updated <-
+        runDb
+          pool
+          ( Recipe.update
+              (Recipe.ingredients Recipe.ingredient)
+              created.recipe.id
+              (writeUpdate (Recipe.Set [nested salt.id 5 G]))
+          )
+          >>= assertRight
+      updated.recipe.name `shouldBe` "Pasta"
+      map (\row -> (row.recipeIngredient.ingredientId, row.recipeIngredient.amount)) updated.ingredients
+        `shouldBe` [(salt.id, 5)]
+      (head updated.ingredients).ingredient `shouldBe` Just salt
+
     it "create with Ops.create inserts children" $ \env@TestEnv {envPool = pool} -> do
       resetRecipes env
       flour <- insertIngredient pool "flour"
