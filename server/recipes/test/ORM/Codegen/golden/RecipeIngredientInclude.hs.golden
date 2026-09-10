@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -49,6 +50,7 @@ data RecipeIngredientWithIngredient = RecipeIngredientWithIngredient
   }
   deriving (Show, Eq)
 
+
 type family ResolveInclude preset :: Type
 type instance ResolveInclude WithIngredient = RecipeIngredientWithIngredient
 type instance ResolveInclude NoInclude = RecipeIngredientRow
@@ -87,8 +89,10 @@ loadRecipeIngredientInclude include roots = do
     | root <- roots
     ]
 
+
 instance {-# OVERLAPPING #-} ExecuteInclude RecipeIngredientTable RecipeIngredientInclude RecipeIngredientWithIngredient where
   executeInclude include modifier = do
     roots <- findMany @RecipeIngredientTable @RecipeIngredientRow (prepareIncludeRootQuery @RecipeIngredientTable modifier)
     loadRecipeIngredientInclude include roots
+
 

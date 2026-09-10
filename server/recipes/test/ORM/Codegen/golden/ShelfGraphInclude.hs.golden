@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -69,6 +70,7 @@ data ShelfWithBooksTags = ShelfWithBooksTags
   }
   deriving (Show, Eq)
 
+
 type family ResolveInclude preset :: Type
 type instance ResolveInclude WithBooksTags = ShelfWithBooksTags
 type instance ResolveInclude NoInclude = ShelfRow
@@ -129,8 +131,10 @@ loadShelfGraphInclude include roots = do
     | root <- roots
     ]
 
+
 instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfGraphInclude ShelfWithBooksTags where
   executeInclude include modifier = do
     roots <- findMany @ShelfTable @ShelfRow (prepareIncludeRootQuery @ShelfTable modifier)
     loadShelfGraphInclude include roots
+
 

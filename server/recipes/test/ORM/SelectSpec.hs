@@ -305,6 +305,71 @@ selectSpec = do
           >>= assertRight
       fmap (.name) found `shouldBe` Just "Toast"
 
+    it "findMany with nullary ingredients returns RecipeIngredient rows and does not load Ingredient" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      flour <-
+        runDb pool (Ingredient.create (IngredientCreate {id = Nothing, createdAt = Nothing, updatedAt = Nothing, name = "flour"}))
+          >>= assertRight
+      created <-
+        runDb
+          pool
+          ( Recipe.create
+              (Recipe.ingredients Recipe.ingredient)
+              Recipe.RecipeWriteCreate
+                { root =
+                    Recipe.RecipeCreate
+                      { id = Nothing,
+                        createdAt = Nothing,
+                        updatedAt = Nothing,
+                        name = "Pasta",
+                        description = Value "fresh"
+                      },
+                  ingredients =
+                    Recipe.Set
+                      [ Recipe.RecipeIngredientNestedCreate
+                          { ingredientId = flour.id,
+                            amount = 100,
+                            unit = G
+                          }
+                      ]
+                }
+          )
+          >>= assertRight
+      [row] <-
+        runDb
+          pool
+          ( Recipe.findMany
+              Recipe.emptyQuery {Recipe.include_ = Recipe.ingredients :: Recipe.Ingredients}
+          )
+      row.recipe.name `shouldBe` "Pasta"
+      row.recipe.id `shouldBe` created.recipe.id
+      map (.amount) row.ingredients `shouldBe` [100]
+      map (.ingredientId) row.ingredients `shouldBe` [flour.id]
+      found <-
+        runDb
+          pool
+          ( Recipe.findUnique
+              Recipe.emptyQuery
+                { Recipe.include_ = Recipe.ingredients :: Recipe.Ingredients,
+                  Recipe.where_ = Just (eq recipeId created.recipe.id)
+                }
+          )
+          >>= assertRight
+      fmap (.recipe.name) found `shouldBe` Just "Pasta"
+      fmap (map (.amount) . (.ingredients)) found `shouldBe` Just [100]
+      required <-
+        runDb
+          pool
+          ( Recipe.findUniqueOrFail
+              Recipe.emptyQuery
+                { Recipe.include_ = Recipe.ingredients :: Recipe.Ingredients,
+                  Recipe.where_ = Just (eq recipeId created.recipe.id)
+                }
+          )
+          >>= assertRight
+      required.recipe.name `shouldBe` "Pasta"
+      map (.ingredientId) required.ingredients `shouldBe` [flour.id]
+
     it "findMany uses ingredients ingredient as the full Recipe Include" $ \env@TestEnv {envPool = pool} -> do
       resetRecipes env
       flour <-
@@ -439,6 +504,57 @@ selectSpec = do
       row.recipe.createdAt `shouldBe` Skipped
       length row.ingredients `shouldBe` 1
       (head row.ingredients).recipeIngredient.amount `shouldBe` 100
+
+    it "projects recipe scalars with nullary ingredients on include_" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      flour <-
+        runDb pool (Ingredient.create (IngredientCreate {id = Nothing, createdAt = Nothing, updatedAt = Nothing, name = "flour"}))
+          >>= assertRight
+      _ <-
+        runDb
+          pool
+          ( Recipe.create
+              (Recipe.ingredients :: Recipe.Ingredients)
+              Recipe.RecipeWriteCreate
+                { root =
+                    Recipe.RecipeCreate
+                      { id = Nothing,
+                        createdAt = Nothing,
+                        updatedAt = Nothing,
+                        name = "Pasta",
+                        description = Value "fresh"
+                      },
+                  ingredients =
+                    Recipe.Set
+                      [ Recipe.RecipeIngredientNestedCreate
+                          { ingredientId = flour.id,
+                            amount = 100,
+                            unit = G
+                          }
+                      ]
+                }
+          )
+          >>= assertRight
+      let sel =
+            RecipeSelect
+              { id = False,
+                createdAt = False,
+                updatedAt = False,
+                name = True,
+                description = True
+              }
+          query =
+            Recipe.emptyQuery
+              { Recipe.include_ = Recipe.ingredients :: Recipe.Ingredients,
+                Recipe.select_ = sel,
+                Recipe.where_ = Just (eq recipeName "Pasta")
+              }
+      [row] <- runDb pool (Recipe.findMany query)
+      row.recipe.name `shouldBe` Picked "Pasta"
+      row.recipe.description `shouldBe` Picked (Just "fresh")
+      row.recipe.createdAt `shouldBe` Skipped
+      map (.amount) row.ingredients `shouldBe` [100]
+      map (.ingredientId) row.ingredients `shouldBe` [flour.id]
 
 resetRecipes :: TestEnv -> IO ()
 resetRecipes env = do
