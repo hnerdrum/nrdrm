@@ -66,6 +66,39 @@ nestedWriteSpec =
         `shouldBe` [(salt.id, 5)]
       (head updated.ingredients).ingredient `shouldBe` Just salt
 
+    it "create accepts nullary ingredients and returns RecipeIngredient rows" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      flour <- insertIngredient pool "flour"
+      created <-
+        runDb
+          pool
+          (Recipe.create (Recipe.ingredients :: Recipe.Ingredients) (writeCreate "Pasta" [nested flour.id 100 G]))
+          >>= assertRight
+      created.recipe.name `shouldBe` "Pasta"
+      map (.amount) created.ingredients `shouldBe` [100]
+      map (.ingredientId) created.ingredients `shouldBe` [flour.id]
+
+    it "update accepts nullary ingredients and returns RecipeIngredient rows" $ \env@TestEnv {envPool = pool} -> do
+      resetRecipes env
+      flour <- insertIngredient pool "flour"
+      salt <- insertIngredient pool "salt"
+      created <-
+        runDb
+          pool
+          (Recipe.create (Recipe.ingredients :: Recipe.Ingredients) (writeCreate "Pasta" [nested flour.id 100 G]))
+          >>= assertRight
+      updated <-
+        runDb
+          pool
+          ( Recipe.update
+              (Recipe.ingredients :: Recipe.Ingredients)
+              created.recipe.id
+              (writeUpdate (Recipe.Set [nested salt.id 5 G]))
+          )
+          >>= assertRight
+      updated.recipe.name `shouldBe` "Pasta"
+      map (\row -> (row.ingredientId, row.amount)) updated.ingredients `shouldBe` [(salt.id, 5)]
+
     it "create with Ops.create inserts children" $ \env@TestEnv {envPool = pool} -> do
       resetRecipes env
       flour <- insertIngredient pool "flour"

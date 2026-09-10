@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -15,6 +16,9 @@ module Schema.ShelfInclude
     ResolveInclude,
     unwrapWithBooks,
     unwrapNoInclude,
+    Books (..),
+    unwrapBooks,
+    ShelfWithBook (..),
     BookInclude (..),
     BookWithChapters (..),
     ShelfWithBooks (..)
@@ -65,9 +69,16 @@ data ShelfWithBooks = ShelfWithBooks
   }
   deriving (Show, Eq)
 
+data ShelfWithBook = ShelfWithBook
+  { shelf :: ShelfRow,
+    books :: [BookRow]
+  }
+  deriving (Show, Eq)
+
 type family ResolveInclude preset :: Type
 type instance ResolveInclude WithBooks = ShelfWithBooks
 type instance ResolveInclude NoInclude = ShelfRow
+type instance ResolveInclude Books = ShelfWithBook
 
 newtype WithBooks = WithBooks ShelfInclude
   deriving (Show, Eq)
@@ -80,6 +91,12 @@ unwrapWithBooks (WithBooks include) = include
 
 unwrapNoInclude :: NoInclude -> ShelfInclude
 unwrapNoInclude (NoInclude include) = include
+
+newtype Books = Books ShelfInclude
+  deriving (Show, Eq)
+
+unwrapBooks :: Books -> ShelfInclude
+unwrapBooks (Books include) = include
 
 instance IncludesJoin ShelfInclude where
   includesJoin ShelfInclude {books} = isJust books
@@ -120,8 +137,31 @@ loadShelfInclude include roots = do
     | root <- roots
     ]
 
+loadShelfWithBook :: ShelfInclude -> [ShelfRow] -> Db [ShelfWithBook]
+loadShelfWithBook include roots = do
+  booksMap <- case include.books of
+    Nothing -> pure emptyGroups
+    Just _ ->
+      indexHasMany (.shelfId) <$> findByIn @BookTable @BookRow Book.bookShelfId (map (.id) roots)
+  pure
+    [
+      ShelfWithBook {
+        shelf = root,
+        books = lookupGroups root.id booksMap
+      }
+    | root <- roots
+    ]
+
 instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfInclude ShelfWithBooks where
   executeInclude include modifier = do
     roots <- findMany @ShelfTable @ShelfRow (prepareIncludeRootQuery @ShelfTable modifier)
     loadShelfInclude include roots
+
+instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable Books ShelfWithBook where
+  executeInclude (Books include) modifier = do
+    roots <- findMany @ShelfTable @ShelfRow (prepareIncludeRootQuery @ShelfTable modifier)
+    loadShelfWithBook include roots
+
+instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable WithBooks ShelfWithBooks where
+  executeInclude (WithBooks include) modifier = executeInclude include modifier
 

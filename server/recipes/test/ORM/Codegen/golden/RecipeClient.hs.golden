@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -25,6 +26,7 @@ module ORM.Client.Recipe
     emptyRecipeIngredientNestedOps,
     ingredients,
     ingredient,
+    Ingredients (..),
     ResolveInclude,
     RecipeQuery (..),
     emptyQuery,
@@ -39,6 +41,8 @@ module ORM.Client.Recipe
     RecipeWithIngredientsPicked (..),
     RecipeUpdate (..),
     RecipeWithIngredients (..),
+    RecipeWithRecipeIngredient (..),
+    RecipeWithRecipeIngredientPicked (..),
     RecipeIngredientWithIngredient (..),
     RecipeIngredientRow (..),
     IngredientRow (..),
@@ -56,7 +60,7 @@ import ORM.Errors (ORMError (..), requireFound)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
 import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow (..), RecipeSelect (..), RecipePicked (..), recipeSelect, recipeSelectColumns, parseRecipePicked, toRecipePicked, RecipeTable, RecipeUpdate (..), recipeId)
-import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients)
+import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients, Ingredients (..), RecipeWithRecipeIngredient (..))
 import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientRow (..), RecipeIngredientUpdate (..), RecipeIngredientTable, recipeIngredientId, recipeIngredientRecipeId)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)
@@ -242,8 +246,15 @@ data Ingredient = Ingredient
 ingredient :: Ingredient
 ingredient = Ingredient
 
-ingredients :: Ingredient -> WithIngredients
-ingredients Ingredient = withIngredients
+class IncludeIngredients include where
+  ingredients :: include
+
+instance IncludeIngredients Ingredients where
+  ingredients =
+    Ingredients RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = False})}
+
+instance (include ~ WithIngredients) => IncludeIngredients (Ingredient -> include) where
+  ingredients Ingredient = withIngredients
 
 data RecipeWithIngredientsPicked = RecipeWithIngredientsPicked
   { recipe :: RecipePicked,
@@ -254,6 +265,19 @@ data RecipeWithIngredientsPicked = RecipeWithIngredientsPicked
 toRecipeWithIngredientsPicked :: RecipeSelect -> RecipeWithIngredients -> RecipeWithIngredientsPicked
 toRecipeWithIngredientsPicked select_ nested =
   RecipeWithIngredientsPicked
+    { recipe = toRecipePicked select_ nested.recipe
+    , ingredients = nested.ingredients
+    }
+
+data RecipeWithRecipeIngredientPicked = RecipeWithRecipeIngredientPicked
+  { recipe :: RecipePicked,
+    ingredients :: [RecipeIngredientRow]
+  }
+  deriving (Show, Eq)
+
+toRecipeWithRecipeIngredientPicked :: RecipeSelect -> RecipeWithRecipeIngredient -> RecipeWithRecipeIngredientPicked
+toRecipeWithRecipeIngredientPicked select_ nested =
+  RecipeWithRecipeIngredientPicked
     { recipe = toRecipePicked select_ nested.recipe
     , ingredients = nested.ingredients
     }
@@ -275,6 +299,8 @@ type instance ResolveInclude (RecipeQuery WithIngredients OmitSelect) = RecipeWi
 type instance ResolveInclude (RecipeQuery NoInclude OmitSelect) = RecipeRow
 type instance ResolveInclude (RecipeQuery WithIngredients RecipeSelect) = RecipeWithIngredientsPicked
 type instance ResolveInclude (RecipeQuery NoInclude RecipeSelect) = RecipePicked
+type instance ResolveInclude (RecipeQuery Ingredients OmitSelect) = RecipeWithRecipeIngredient
+type instance ResolveInclude (RecipeQuery Ingredients RecipeSelect) = RecipeWithRecipeIngredientPicked
 
 class ReadRecipe include select where
   findMany :: RecipeQuery include select -> Db [ResolveInclude (RecipeQuery include select)]
@@ -353,10 +379,49 @@ instance ReadRecipe NoInclude RecipeSelect where
       Left err -> pure (Left err)
       Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
 
+instance ReadRecipe Ingredients OmitSelect where
+  findMany RecipeQuery {include_, where_, orderBy_, limit_, offset_} =
+    Include.findMany @RecipeTable include_ (applyQueryModifiers where_ orderBy_ limit_ offset_)
+  findUnique RecipeQuery {include_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        rows <- Include.findMany @RecipeTable include_ (matching w)
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
+instance ReadRecipe Ingredients RecipeSelect where
+  findMany RecipeQuery {include_, select_, where_, orderBy_, limit_, offset_} = do
+    rows <- Include.findMany @RecipeTable include_ (applyQueryModifiers where_ orderBy_ limit_ offset_)
+    pure $ map (toRecipeWithRecipeIngredientPicked select_) rows
+  findUnique RecipeQuery {include_, select_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        nested <- Include.findMany @RecipeTable include_ (matching w)
+        let rows = map (toRecipeWithRecipeIngredientPicked select_) nested
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
 create ::
-  WithIngredients ->
+  (Include.ExecuteInclude RecipeTable include result) =>
+  include ->
   RecipeWriteCreate ->
-  Db (Either ORMError RecipeWithIngredients)
+  Db (Either ORMError result)
 create include input = transaction $ do
   rootId <- liftIO $ maybe V4.nextRandom pure input.root.id
   let rootInput =
@@ -369,13 +434,14 @@ create include input = transaction $ do
       nestedResult <- applyIngredientsWrite rootId input.ingredients
       case nestedResult of
         Left err -> pure (Left err)
-        Right () -> Include.findUniqueOrFail @RecipeTable (unwrapWithIngredients include) rootId
+        Right () -> Include.findUniqueOrFail @RecipeTable include rootId
 
 update ::
-  WithIngredients ->
+  (Include.ExecuteInclude RecipeTable include result) =>
+  include ->
   UUID ->
   RecipeWriteUpdate ->
-  Db (Either ORMError RecipeWithIngredients)
+  Db (Either ORMError result)
 update include rootId input = transaction $ do
   updateResult <-
     Update.update @RecipeTable @RecipeRow rootId input.root
@@ -387,7 +453,7 @@ update include rootId input = transaction $ do
         Just write -> applyIngredientsWrite rootId write
       case nestedResult of
         Left err -> pure (Left err)
-        Right () -> Include.findUniqueOrFail @RecipeTable (unwrapWithIngredients include) rootId
+        Right () -> Include.findUniqueOrFail @RecipeTable include rootId
 
 delete :: UUID -> Db Int
 delete = Ops.delete @RecipeTable

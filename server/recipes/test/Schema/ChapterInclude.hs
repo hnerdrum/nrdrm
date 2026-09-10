@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -49,6 +50,7 @@ data ChapterWithSections = ChapterWithSections
   }
   deriving (Show, Eq)
 
+
 type family ResolveInclude preset :: Type
 type instance ResolveInclude WithSections = ChapterWithSections
 type instance ResolveInclude NoInclude = ChapterRow
@@ -87,8 +89,10 @@ loadChapterInclude include roots = do
     | root <- roots
     ]
 
+
 instance {-# OVERLAPPING #-} ExecuteInclude ChapterTable ChapterInclude ChapterWithSections where
   executeInclude include modifier = do
     roots <- findMany @ChapterTable @ChapterRow (prepareIncludeRootQuery @ChapterTable modifier)
     loadChapterInclude include roots
+
 

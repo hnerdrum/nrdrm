@@ -16,13 +16,16 @@ module ORM.Codegen.EmitCommon
     parsePickedName,
     toPickedName,
     resultTypeName,
+    singlePrefixEdge,
+    leafResultTypeName,
+    leafTagTypeName,
   )
 where
 
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.IR
-import ORM.Codegen.Lookup (lookupRelation)
+import ORM.Codegen.Lookup (lookupModel, lookupRelation)
 import ORM.Codegen.TextUtil (lowerFirst, upperFirst)
 
 fieldBinder :: Model -> FieldSpec -> Text
@@ -91,3 +94,24 @@ resultTypeName _schema model edges =
   where
     fieldOf edge =
       includeFieldName model (lookupRelation model (includeRelation edge))
+
+-- Single relation whose children are themselves leaves (Recipe: ingredients → ingredient).
+singlePrefixEdge :: ModelInclude -> Maybe IncludeTree
+singlePrefixEdge incl =
+  case includeTree incl of
+    [edge]
+      | not (null (includeChildren edge)),
+        all (null . includeChildren) (includeChildren edge) ->
+          Just edge
+    _ -> Nothing
+
+leafResultTypeName :: Schema -> Model -> IncludeTree -> Text
+leafResultTypeName schema parent edge =
+  modelName parent <> "With" <> modelName child
+  where
+    rel = lookupRelation parent (includeRelation edge)
+    child = lookupModel schema (relToModel rel)
+
+leafTagTypeName :: Model -> IncludeTree -> Text
+leafTagTypeName parent edge =
+  upperFirst (includeFieldName parent (lookupRelation parent (includeRelation edge)))

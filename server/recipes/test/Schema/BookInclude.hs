@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoFieldSelectors #-}
 {-# LANGUAGE OverloadedRecordDot #-}
@@ -15,6 +16,9 @@ module Schema.BookInclude
     ResolveInclude,
     unwrapWithChapters,
     unwrapNoInclude,
+    Chapters (..),
+    unwrapChapters,
+    BookWithChapter (..),
     ChapterInclude (..),
     ChapterWithSections (..),
     BookWithChapters (..)
@@ -65,9 +69,16 @@ data BookWithChapters = BookWithChapters
   }
   deriving (Show, Eq)
 
+data BookWithChapter = BookWithChapter
+  { book :: BookRow,
+    chapters :: [ChapterRow]
+  }
+  deriving (Show, Eq)
+
 type family ResolveInclude preset :: Type
 type instance ResolveInclude WithChapters = BookWithChapters
 type instance ResolveInclude NoInclude = BookRow
+type instance ResolveInclude Chapters = BookWithChapter
 
 newtype WithChapters = WithChapters BookInclude
   deriving (Show, Eq)
@@ -80,6 +91,12 @@ unwrapWithChapters (WithChapters include) = include
 
 unwrapNoInclude :: NoInclude -> BookInclude
 unwrapNoInclude (NoInclude include) = include
+
+newtype Chapters = Chapters BookInclude
+  deriving (Show, Eq)
+
+unwrapChapters :: Chapters -> BookInclude
+unwrapChapters (Chapters include) = include
 
 instance IncludesJoin BookInclude where
   includesJoin BookInclude {chapters} = isJust chapters
@@ -120,8 +137,31 @@ loadBookInclude include roots = do
     | root <- roots
     ]
 
+loadBookWithChapter :: BookInclude -> [BookRow] -> Db [BookWithChapter]
+loadBookWithChapter include roots = do
+  chaptersMap <- case include.chapters of
+    Nothing -> pure emptyGroups
+    Just _ ->
+      indexHasMany (.bookRef) <$> findByIn @ChapterTable @ChapterRow Chapter.chapterBookRef (map (.id) roots)
+  pure
+    [
+      BookWithChapter {
+        book = root,
+        chapters = lookupGroups root.id chaptersMap
+      }
+    | root <- roots
+    ]
+
 instance {-# OVERLAPPING #-} ExecuteInclude BookTable BookInclude BookWithChapters where
   executeInclude include modifier = do
     roots <- findMany @BookTable @BookRow (prepareIncludeRootQuery @BookTable modifier)
     loadBookInclude include roots
+
+instance {-# OVERLAPPING #-} ExecuteInclude BookTable Chapters BookWithChapter where
+  executeInclude (Chapters include) modifier = do
+    roots <- findMany @BookTable @BookRow (prepareIncludeRootQuery @BookTable modifier)
+    loadBookWithChapter include roots
+
+instance {-# OVERLAPPING #-} ExecuteInclude BookTable WithChapters BookWithChapters where
+  executeInclude (WithChapters include) modifier = executeInclude include modifier
 
