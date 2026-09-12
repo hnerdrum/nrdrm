@@ -11,7 +11,6 @@ import ORM.Codegen.RecipeTarget (prodTarget)
 import ORM.Codegen.Run (allOutputs, schemasForTargets)
 import ORM.Codegen.Spec.Recipe (recipeSchema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
-import ORM.Codegen.Spec.ShelfDeep (shelfDeepSchema)
 import ORM.Codegen.Spec.Widget (widgetSchema)
 import ORM.Codegen.Target
   ( CodegenTarget,
@@ -31,13 +30,12 @@ targetSpec =
       schemasForTargets allTargets
         `shouldMatchList` [ widgetSchema,
                             shelfSchema,
-                            shelfDeepSchema,
                             recipeSchema
                           ]
 
-    it "derives 41 outputs across all targets" $ do
-      length (concatMap targetOutputs allTargets) `shouldBe` 41
-      length (allOutputs allTargets) `shouldBe` 41
+    it "derives 36 outputs across all targets" $ do
+      length (concatMap targetOutputs allTargets) `shouldBe` 36
+      length (allOutputs allTargets) `shouldBe` 36
 
     it "derives expected output paths" $ do
       let paths = sort (nub (map outputPath (allOutputs allTargets)))
@@ -66,7 +64,6 @@ targetSpec =
             "test/ORM/Codegen/golden/RecipeIngredientInclude.hs.golden",
             "test/ORM/Codegen/golden/Section.hs.golden",
             "test/ORM/Codegen/golden/Shelf.hs.golden",
-            "test/ORM/Codegen/golden/ShelfGraphInclude.hs.golden",
             "test/ORM/Codegen/golden/ShelfInclude.hs.golden",
             "test/ORM/Codegen/golden/Tag.hs.golden",
             "test/ORM/Codegen/golden/Unit.hs.golden",
@@ -77,8 +74,6 @@ targetSpec =
             "test/Schema/ChapterInclude.hs",
             "test/Schema/Section.hs",
             "test/Schema/Shelf.hs",
-            "test/Schema/ShelfDeepInclude.hs",
-            "test/Schema/ShelfGraphInclude.hs",
             "test/Schema/ShelfInclude.hs",
             "test/Schema/Tag.hs",
             "test/Schema/Widget.hs"

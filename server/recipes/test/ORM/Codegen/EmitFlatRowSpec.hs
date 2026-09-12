@@ -35,13 +35,13 @@ emitFlatRowSpec =
 
     it "emits ShelfBookChapterJoinRow for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
-          path = includeLongestJoinPath shelfSchema incl
+          path = joinPathTake 2 (includeLongestJoinPath shelfSchema incl)
       T.strip (emitFlatJoinRow shelfSchema path)
         `shouldBe` T.strip expectedShelfBookChapterJoinRow
 
     it "emits shelfBookChapterColumns for ShelfInclude" $ do
       let incl = head (schemaIncludes shelfSchema)
-          path = includeLongestJoinPath shelfSchema incl
+          path = joinPathTake 2 (includeLongestJoinPath shelfSchema incl)
       T.strip (emitColumnList shelfSchema path)
         `shouldBe` T.strip expectedShelfBookChapterColumns
 

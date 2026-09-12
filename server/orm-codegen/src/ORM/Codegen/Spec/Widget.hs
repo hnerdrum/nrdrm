@@ -10,7 +10,7 @@ import ORM.Codegen.Schema
 
 widgetSchema :: Schema
 widgetSchema =
-  schema [] [widgetModel] [] []
+  schema [] [widgetModel] []
 
 widgetModel :: Model
 widgetModel =

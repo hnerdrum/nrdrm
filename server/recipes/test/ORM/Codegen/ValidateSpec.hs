@@ -35,7 +35,7 @@ validateSpec =
         validateSchema flagSchema `shouldBe` []
 
       it "rejects a builder model with no primary key" $
-        validateSchema (Builder.schema [] [Builder.model "Widget" [text "name"] []] [] [])
+        validateSchema (Builder.schema [] [Builder.model "Widget" [text "name"] []] [])
           `shouldBe` [ModelMissingPrimaryKey "Widget"]
 
     describe "primary keys" $ do
@@ -230,6 +230,34 @@ validateSpec =
                 ]
         validateSchema schema
           `shouldBe` [DuplicateIncludeRelation "ShelfInclude" "Shelf" "shelfBooks"]
+
+      it "rejects leftover include declarations that are not the relation graph" $ do
+        let schema =
+              emptySchema
+                [ Model
+                    { modelName = "Shelf",
+                      modelTable = "test_shelf",
+                      modelFields = [pk (uuid "id"), uuid "name"],
+                      modelRelations =
+                        [ hasMany "shelfBooks" "Shelf" "Book" "id" "shelfId"
+                        ]
+                    },
+                  Model
+                    { modelName = "Book",
+                      modelTable = "test_book",
+                      modelFields = [pk (uuid "id"), column "shelf_id" (uuid "shelfId")],
+                      modelRelations = []
+                    }
+                ]
+                [ ModelInclude
+                    { includeName = "ShelfBooksOnly",
+                      includeRootModel = "Shelf",
+                      includeTree =
+                        [IncludeTree {includeRelation = "shelfBooks", includeChildren = []}]
+                    }
+                ]
+        validateSchema schema
+          `shouldBe` [LeftoverIncludeDeclaration "ShelfBooksOnly"]
 
       it "rejects a unique constraint on an unknown model" $ do
         let schema =

@@ -28,7 +28,7 @@ emitIncludeSpec =
       T.strip (emitIncludeADTs shelfSchema incl)
         `shouldBe` T.strip expectedShelfIncludeADTs
 
-    it "emits ShelfWithBooks and BookWithChapters result ADTs" $ do
+    it "emits ShelfWithBooksTags and nested result ADTs" $ do
       let incl = head (schemaIncludes shelfSchema)
       T.strip (emitResultADTs shelfSchema incl)
         `shouldBe` T.strip expectedShelfResultADTs
@@ -60,21 +60,27 @@ emitIncludeSpec =
           actual = emitIncludeModule "ORM.Schema.RecipeInclude" recipeSchema incl
       T.strip actual `shouldBe` T.strip expected
 
-    it "emits sibling IncludesJoin for ShelfGraphInclude" $ do
-      let incl = schemaIncludes shelfSchema !! 1
+    it "emits sibling IncludesJoin for ShelfInclude" $ do
+      let incl = head (schemaIncludes shelfSchema)
       T.strip (emitIncludesJoin shelfSchema incl)
-        `shouldBe` T.strip expectedGraphIncludesJoin
+        `shouldBe` T.strip expectedSiblingIncludesJoin
 
 expectedShelfIncludeADTs :: T.Text
 expectedShelfIncludeADTs =
   T.unlines
-    [ "newtype BookInclude = BookInclude",
-      "  { chapters :: Bool",
+    [ "newtype ChapterInclude = ChapterInclude",
+      "  { sections :: Bool",
       "  }",
       "  deriving (Show, Eq)",
       "",
-      "newtype ShelfInclude = ShelfInclude",
-      "  { books :: Maybe BookInclude",
+      "newtype BookInclude = BookInclude",
+      "  { chapters :: Maybe ChapterInclude",
+      "  }",
+      "  deriving (Show, Eq)",
+      "",
+      "data ShelfInclude = ShelfInclude",
+      "  { books :: Maybe BookInclude,",
+      "    tags :: Bool",
       "  }",
       "  deriving (Show, Eq)"
     ]
@@ -82,15 +88,22 @@ expectedShelfIncludeADTs =
 expectedShelfResultADTs :: T.Text
 expectedShelfResultADTs =
   T.unlines
-    [ "data BookWithChapters = BookWithChapters",
-      "  { book :: BookRow,",
-      "    chapters :: [ChapterRow]",
+    [ "data ChapterWithSections = ChapterWithSections",
+      "  { chapter :: ChapterRow,",
+      "    sections :: [SectionRow]",
       "  }",
       "  deriving (Show, Eq)",
       "",
-      "data ShelfWithBooks = ShelfWithBooks",
+      "data BookWithChapters = BookWithChapters",
+      "  { book :: BookRow,",
+      "    chapters :: [ChapterWithSections]",
+      "  }",
+      "  deriving (Show, Eq)",
+      "",
+      "data ShelfWithBooksTags = ShelfWithBooksTags",
       "  { shelf :: ShelfRow,",
-      "    books :: [BookWithChapters]",
+      "    books :: [BookWithChapters],",
+      "    tags :: [TagRow]",
       "  }",
       "  deriving (Show, Eq)"
     ]
@@ -99,28 +112,28 @@ expectedIncludesJoin :: T.Text
 expectedIncludesJoin =
   T.unlines
     [ "instance IncludesJoin ShelfInclude where",
-      "  includesJoin ShelfInclude {books} = isJust books"
+      "  includesJoin ShelfInclude {books, tags} = isJust books || tags"
     ]
 
-expectedGraphIncludesJoin :: T.Text
-expectedGraphIncludesJoin =
+expectedSiblingIncludesJoin :: T.Text
+expectedSiblingIncludesJoin =
   T.unlines
-    [ "instance IncludesJoin ShelfGraphInclude where",
-      "  includesJoin ShelfGraphInclude {books, tags} = isJust books || tags"
+    [ "instance IncludesJoin ShelfInclude where",
+      "  includesJoin ShelfInclude {books, tags} = isJust books || tags"
     ]
 
 expectedNestInclude :: T.Text
 expectedNestInclude =
   T.unlines
-    [ "instance NestInclude ShelfInclude ShelfWithBooks where",
+    [ "instance NestInclude ShelfInclude ShelfWithBooksTags where",
       "  type RootRow ShelfInclude = ShelfRow",
-      "  wrapRoot _ shelf = ShelfWithBooks {shelf, books = []}"
+      "  wrapRoot _ shelf = ShelfWithBooksTags {shelf, books = [], tags = []}"
     ]
 
 expectedExecuteInclude :: T.Text
 expectedExecuteInclude =
   T.unlines
-    [ "instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfInclude ShelfWithBooks where",
+    [ "instance {-# OVERLAPPING #-} ExecuteInclude ShelfTable ShelfInclude ShelfWithBooksTags where",
       "  executeInclude include modifier = do",
       "    roots <- findMany @ShelfTable @ShelfRow (prepareIncludeRootQuery @ShelfTable modifier)",
       "    loadShelfInclude include roots"

@@ -5,21 +5,9 @@ module ORM.Codegen.Spec.ShelfDeep
   )
 where
 
-import ORM.Codegen.IR (Schema (..))
-import ORM.Codegen.Schema (include, schema, tree)
+import ORM.Codegen.IR (Schema)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
 
+-- Same models as Shelf; includes are derived from relations only.
 shelfDeepSchema :: Schema
-shelfDeepSchema =
-  schema
-    (schemaEnums shelfSchema)
-    (schemaModels shelfSchema)
-    [ include
-        "ShelfDeepInclude"
-        "Shelf"
-        [ tree
-            "shelfBooks"
-            [tree "bookChapters" [tree "chapterSections" []]]
-        ]
-    ]
-    (schemaUniques shelfSchema)
+shelfDeepSchema = shelfSchema

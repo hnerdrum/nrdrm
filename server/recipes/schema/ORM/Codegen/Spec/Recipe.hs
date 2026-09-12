@@ -12,7 +12,6 @@ recipeSchema =
   schema
     [unitEnum]
     [recipeModel, ingredientModel, recipeIngredientModel]
-    []
     [unique_ "RecipeIngredient" ["recipeId", "ingredientId"]]
 
 unitEnum :: EnumSpec

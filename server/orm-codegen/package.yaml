@@ -51,6 +51,8 @@ library:
     - ORM.Codegen.Target
     - ORM.Codegen.Validate
   other-modules:
+    - ORM.Codegen.Combinator
+    - ORM.Codegen.Emit.Combinator
     - ORM.Codegen.EmitCommon
     - ORM.Codegen.Lookup
     - ORM.Codegen.TextUtil

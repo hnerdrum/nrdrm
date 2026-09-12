@@ -44,7 +44,6 @@ import ORM.Codegen.IR
 import ORM.Codegen.Lookup (lookupModel)
 import ORM.Codegen.Schema (isFullGraphInclude)
 import ORM.Codegen.Spec.Shelf (shelfSchema)
-import ORM.Codegen.Spec.ShelfDeep (shelfDeepSchema)
 import ORM.Codegen.Spec.Widget (widgetSchema)
 import System.FilePath ((</>))
 
@@ -89,8 +88,7 @@ testTarget =
   CodegenTarget
     { ctSchemas =
         [ TargetSchema widgetSchema True EmitAll,
-          TargetSchema shelfSchema True EmitAll,
-          TargetSchema shelfDeepSchema False EmitIncludesOnly
+          TargetSchema shelfSchema True EmitAll
         ],
       ctLayout = SchemaLayout "Schema." "test/Schema/",
       ctClients = NoClients

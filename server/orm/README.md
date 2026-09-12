@@ -6,7 +6,7 @@ A Haskell library for Postgres-backed apps: you write a **Schema**, run **Codege
 
 ### 1. Write a Schema
 
-A Schema is ordinary Haskell — a value built with the Codegen builder API (`ORM.Codegen.Schema`). It describes models, fields, relations, includes, and unique constraints. The canonical example lives in `ORM.Codegen.Spec.Example`:
+A Schema is ordinary Haskell — a value built with the Codegen builder API (`ORM.Codegen.Schema`). It describes models, fields, relations, and unique constraints. The canonical example lives in `ORM.Codegen.Spec.Example`:
 
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
@@ -17,7 +17,7 @@ import ORM.Codegen.Schema
 
 exampleSchema :: Schema
 exampleSchema =
-  schema [] [taskModel] [] []
+  schema [] [taskModel] []
 
 taskModel :: Model
 taskModel =
@@ -34,7 +34,7 @@ taskModel =
 
 Table and column names default from the model and field names (`Task` → `task`, `createdAt` → `created_at`). Override with `& table "…"` or `& column "…"` when needed.
 
-Larger apps add enums, relations, `includeGraph` for nested reads, and `unique_` for composite lookups. The recipes app (`ORM.Codegen.Spec.Recipe`) is the full-featured reference.
+Larger apps add enums, relations, and `unique_` for composite lookups. Nested reads are combinators on the query record, one function per relation. The recipes app (`ORM.Codegen.Spec.Recipe`) is the full-featured reference.
 
 ### 2. Run Codegen
 
@@ -119,7 +119,6 @@ Typical CI: `make orm-gen-check` ensures committed generated code matches the Sc
 - **No built-in migration handling**
 - **Postgres only**
 - **No relation filters** — `where_` applies to the root model, not nested relations.
-- **No filtered Includes** — Include trees are fixed presets declared on the Schema.
-- **Includes are Schema-declared** — nested read shapes are compiled from `includeGraph` or explicit Include trees.
+- **No filtered Includes** — Include combinators select whole relations, not filtered subsets.
 - **String-backed SQL** — queries are assembled as text with bound parameters
 - **Limited scalars** — currently only support uuid, text, int, bool, timestamptz, and Schema-defined enums.

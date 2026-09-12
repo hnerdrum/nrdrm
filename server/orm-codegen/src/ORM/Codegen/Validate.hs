@@ -9,9 +9,10 @@ where
 import Data.List (find, nub)
 import Data.Maybe (catMaybes, isNothing)
 import Data.Text (Text)
-import ORM.Codegen.IR
+import     ORM.Codegen.IR
 import ORM.Codegen.IncludePath (defaultMaxIncludeDepth, includeMaxDepth)
 import ORM.Codegen.JoinAlias (allocateJoinAlias, includeModelsInOrder)
+import ORM.Codegen.Schema (fullGraphIncludeName, isFullGraphInclude)
 
 data ValidationError
   = DuplicateModelName Text
@@ -32,6 +33,7 @@ data ValidationError
   | UnknownUniqueModel Text
   | UnknownUniqueField Text Text
   | EmptyUniqueConstraint Text
+  | LeftoverIncludeDeclaration Text
   deriving (Show, Eq)
 
 validateSchema :: Schema -> [ValidationError]
@@ -117,8 +119,18 @@ validateInclude schema incl =
     Just root ->
       let treeErrs = validateIncludeTree schema (includeName incl) root (includeTree incl)
        in if null treeErrs
-            then treeErrs ++ validateIncludeJoinAliases schema incl ++ validateIncludeDepth schema incl
+            then
+              leftoverIncludeDeclaration schema incl
+                ++ validateIncludeJoinAliases schema incl
+                ++ validateIncludeDepth schema incl
             else treeErrs
+
+leftoverIncludeDeclaration :: Schema -> ModelInclude -> [ValidationError]
+leftoverIncludeDeclaration schema incl =
+  [ LeftoverIncludeDeclaration (includeName incl)
+    | not (isFullGraphInclude (schemaModels schema) incl)
+        || includeName incl /= fullGraphIncludeName (includeRootModel incl)
+  ]
 
 validateIncludeDepth :: Schema -> ModelInclude -> [ValidationError]
 validateIncludeDepth schema incl =

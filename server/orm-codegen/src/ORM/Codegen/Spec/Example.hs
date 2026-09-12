@@ -11,7 +11,7 @@ import ORM.Codegen.Schema
 
 exampleSchema :: Schema
 exampleSchema =
-  schema [] [taskModel] [] []
+  schema [] [taskModel] []
 
 taskModel :: Model
 taskModel =

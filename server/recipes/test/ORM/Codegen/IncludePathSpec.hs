@@ -24,36 +24,36 @@ import Test.Hspec
 includePathSpec :: Spec
 includePathSpec =
   describe "ORM.Codegen.IncludePath" $ do
-    it "computes longest Shelf path as Shelf → Book → Chapter" $ do
+    it "computes longest Shelf path as Shelf → Book → Chapter → Section" $ do
       let incl = head (schemaIncludes shelfSchema)
           path = includeLongestJoinPath shelfSchema incl
-      map modelName (joinPathModels path) `shouldBe` ["Shelf", "Book", "Chapter"]
+      map modelName (joinPathModels path) `shouldBe` ["Shelf", "Book", "Chapter", "Section"]
 
     it "computes preset paths for shallow and deep joins" $ do
       let incl = head (schemaIncludes shelfSchema)
           paths = includePresetJoinPaths shelfSchema incl
-      length paths `shouldBe` 2
+      length paths `shouldBe` 3
       joinRowName (head paths) `shouldBe` "ShelfBookJoinRow"
-      joinRowName (last paths) `shouldBe` "ShelfBookChapterJoinRow"
+      joinRowName (last paths) `shouldBe` "ShelfBookChapterSectionJoinRow"
 
     it "names join builders from model path" $ do
       let incl = head (schemaIncludes shelfSchema)
           path = includeLongestJoinPath shelfSchema incl
       joinBuilderName (joinPathTake 1 path) `shouldBe` "buildShelfBookJoin"
-      joinBuilderName path `shouldBe` "buildShelfBookChapterJoin"
+      joinBuilderName path `shouldBe` "buildShelfBookChapterSectionJoin"
 
     it "names column lists from model path" $ do
       let incl = head (schemaIncludes shelfSchema)
           path = includeLongestJoinPath shelfSchema incl
       columnListName (joinPathTake 1 path) `shouldBe` "shelfBookColumns"
-      columnListName path `shouldBe` "shelfBookChapterColumns"
+      columnListName path `shouldBe` "shelfBookChapterSectionColumns"
 
     it "reports include depth within default cap" $ do
       let incl = head (schemaIncludes shelfSchema)
-      includeMaxDepth shelfSchema incl `shouldBe` 3
+      includeMaxDepth shelfSchema incl `shouldBe` 4
 
     it "includeMaxDepth uses the deepest sibling branch" $ do
-      includeMaxDepth shelfSchema (schemaIncludes shelfSchema !! 1) `shouldBe` 3
+      includeMaxDepth shelfSchema (head (schemaIncludes shelfSchema)) `shouldBe` 4
       includeMaxDepth siblingDepthSchema siblingDepthInclude `shouldBe` 3
 
 fourLevelPathSpec :: Spec

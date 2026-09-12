@@ -10,7 +10,7 @@ import ORM.Codegen.Schema
 
 flagSchema :: Schema
 flagSchema =
-  schema [] [flagModel] [] []
+  schema [] [flagModel] []
 
 flagModel :: Model
 flagModel =
