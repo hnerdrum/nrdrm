@@ -7,16 +7,18 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module ORM.Schema.RecipeIngredientInclude
   ( RecipeIngredientInclude (..),
-    WithIngredient (..),
     NoInclude (..),
     ResolveInclude,
-    unwrapWithIngredient,
     unwrapNoInclude,
-    RecipeIngredientWithIngredient (..)
+    WithIngredient (..),
+    unwrapWithIngredient,
+    RecipeIngredientWithIngredient (..),
+    IncludeIngredient (..)
   )
 where
 
@@ -50,19 +52,18 @@ data RecipeIngredientWithIngredient = RecipeIngredientWithIngredient
   }
   deriving (Show, Eq)
 
-
-type family ResolveInclude preset :: Type
-type instance ResolveInclude WithIngredient = RecipeIngredientWithIngredient
-type instance ResolveInclude NoInclude = RecipeIngredientRow
-
 newtype WithIngredient = WithIngredient RecipeIngredientInclude
-  deriving (Show, Eq)
-
-newtype NoInclude = NoInclude RecipeIngredientInclude
   deriving (Show, Eq)
 
 unwrapWithIngredient :: WithIngredient -> RecipeIngredientInclude
 unwrapWithIngredient (WithIngredient include) = include
+
+type family ResolveInclude preset :: Type
+type instance ResolveInclude NoInclude = RecipeIngredientRow
+type instance ResolveInclude WithIngredient = RecipeIngredientWithIngredient
+
+newtype NoInclude = NoInclude RecipeIngredientInclude
+  deriving (Show, Eq)
 
 unwrapNoInclude :: NoInclude -> RecipeIngredientInclude
 unwrapNoInclude (NoInclude include) = include
@@ -94,5 +95,15 @@ instance {-# OVERLAPPING #-} ExecuteInclude RecipeIngredientTable RecipeIngredie
   executeInclude include modifier = do
     roots <- findMany @RecipeIngredientTable @RecipeIngredientRow (prepareIncludeRootQuery @RecipeIngredientTable modifier)
     loadRecipeIngredientInclude include roots
+
+instance {-# OVERLAPPING #-} ExecuteInclude RecipeIngredientTable WithIngredient RecipeIngredientWithIngredient where
+  executeInclude (WithIngredient include) modifier = executeInclude include modifier
+
+class IncludeIngredient include where
+  ingredient :: include
+
+instance IncludeIngredient WithIngredient where
+  ingredient =
+    WithIngredient RecipeIngredientInclude {ingredient = True}
 
 

@@ -15,51 +15,53 @@ import qualified ORM.Operations as Ops
 import ORM.Query (OrderDirection (Asc), limit, matching, offset, orderBy)
 import qualified ORM.ShelfFixtures as ShelfFixtures
 import ORM.Where (eq)
+import Prelude hiding ((<>))
 import Schema.Book (BookRow (..))
 import Schema.Chapter (ChapterRow (..))
 import Schema.Section (SectionRow (..))
 import Schema.Shelf (shelfName)
 import qualified Schema.Shelf as Shelf
-import Schema.ShelfDeepInclude (ChapterInclude (..), ShelfDeepInclude (..))
-import qualified Schema.ShelfDeepInclude as ShelfDeepInclude
-import Schema.ShelfGraphInclude
-  ( ShelfGraphInclude (..),
-    ShelfWithBooksTags (..),
-  )
-import qualified Schema.ShelfGraphInclude as ShelfGraphInclude
-import Schema.ShelfInclude
-  ( BookWithChapters (..),
-    ShelfInclude (..),
-    ShelfWithBooks (..),
-  )
-import qualified Schema.ShelfInclude as ShelfInclude
 import Schema.Tag (TagRow (..))
+import Schema.ShelfInclude
+  (     BookWithChapter (..),
+    BookWithChapters (..),
+    Books (..),
+    BooksChapters (..),
+    BooksChaptersSections (..),
+    BooksChaptersTags (..),
+    BooksTags (..),
+    ChapterWithSections (..),
+    Chapters (..),
+    ChaptersSections (..),
+    CombineInclude (..),
+    IncludeBooks (..),
+    IncludeChapters (..),
+    IncludeTags (..),
+    Sections (..),
+    ShelfWithBook (..),
+    ShelfWithBookTag (..),
+    ShelfWithBooksChapter (..),
+    ShelfWithBooksChapterTag (..),
+    ShelfWithBooksChaptersSection (..),
+    Tags (..),
+  )
 import Support.TestDb (TestEnv (..))
 import Test.Hspec (SpecWith, describe, it, shouldBe)
 
-includeBooks :: ShelfInclude
-includeBooks = ShelfInclude {books = Just (ShelfInclude.BookInclude {chapters = False})}
+includeBooks :: Books
+includeBooks = books
 
-includeBooksChapters :: ShelfInclude
-includeBooksChapters = ShelfInclude {books = Just (ShelfInclude.BookInclude {chapters = True})}
+includeBooksChapters :: BooksChapters
+includeBooksChapters = books (chapters :: Chapters)
 
-includeBooksChaptersSections :: ShelfDeepInclude
-includeBooksChaptersSections =
-  ShelfDeepInclude
-    { books =
-        Just
-          ShelfDeepInclude.BookInclude
-            { chapters =
-                Just ChapterInclude {sections = True}
-            }
-    }
+includeBooksAndTags :: BooksTags
+includeBooksAndTags = (books :: Books) <> (tags :: Tags)
 
-includeBooksAndTags :: ShelfGraphInclude
-includeBooksAndTags =
-  ShelfGraphInclude
-    { books = Just (ShelfGraphInclude.BookInclude {chapters = False}),
-      tags = True
-    }
+includeBooksChaptersAndTags :: BooksChaptersTags
+includeBooksChaptersAndTags = books (chapters :: Chapters) <> (tags :: Tags)
+
+includeBooksChaptersSections :: BooksChaptersSections
+includeBooksChaptersSections = books (chapters Sections :: ChaptersSections)
 
 includeSpec :: SpecWith TestEnv
 includeSpec =
@@ -72,9 +74,9 @@ includeSpec =
       results <- runDb pool (findMany @Shelf.ShelfTable includeBooks id)
       length results `shouldBe` 2
       fictionResult <- lookupShelf fiction.id results
-      let bookIds = map ((.id) . (.book)) fictionResult.books
+      let bookIds = map (.id) fictionResult.books
       bookIds `shouldBe` sort bookIds
-      sort (map ((.title) . (.book)) fictionResult.books) `shouldBe` ["Dune", "Neuromancer"]
+      sort (map (.title) fictionResult.books) `shouldBe` ["Dune", "Neuromancer"]
 
     it "findMany includes a shelf with no books as empty list" $ \TestEnv {envPool = pool} -> do
       empty <- ShelfFixtures.insertShelf pool "empty"
@@ -105,7 +107,7 @@ includeSpec =
         runDb pool (findMany @Shelf.ShelfTable includeBooks (matching (eq shelfName "fiction")))
       length results `shouldBe` 1
       (head results).shelf.name `shouldBe` "fiction"
-      map ((.title) . (.book)) (head results).books `shouldBe` ["Dune"]
+      map (.title) (head results).books `shouldBe` ["Dune"]
 
     it "findMany nests chapters under books" $ \TestEnv {envPool = pool} -> do
       shelf <- ShelfFixtures.insertShelf pool "fiction"
@@ -150,9 +152,9 @@ includeSpec =
       _ <- ShelfFixtures.insertBook pool shelf.id "Dune"
       _ <- ShelfFixtures.insertBook pool shelf.id "Neuromancer"
       result <- runDb pool (findUnique @Shelf.ShelfTable includeBooks shelf.id)
-      let bookIds = maybe [] (map ((.id) . (.book)) . (.books)) result
+      let bookIds = maybe [] (map (.id) . (.books)) result
       bookIds `shouldBe` sort bookIds
-      fmap (sort . map ((.title) . (.book)) . (.books)) result
+      fmap (sort . map (.title) . (.books)) result
         `shouldBe` Just ["Dune", "Neuromancer"]
 
     it "findUnique includes a shelf with no books as Just with an empty list" $ \TestEnv {envPool = pool} -> do
@@ -166,7 +168,7 @@ includeSpec =
       result `shouldBe` Nothing
 
     it "findMany with include paginates parent rows" $ \TestEnv {envPool = pool} -> do
-      mapM_ (\n -> ShelfFixtures.insertShelf pool ("shelf-" <> T.pack (show n))) ([1 .. 12] :: [Int])
+      mapM_ (\n -> ShelfFixtures.insertShelf pool ("shelf-" `T.append` T.pack (show n))) ([1 .. 12] :: [Int])
       results <- runDb pool (findMany @Shelf.ShelfTable includeBooks (limit 10))
       length results `shouldBe` 10
 
@@ -198,8 +200,20 @@ includeSpec =
       _ <- ShelfFixtures.insertTag pool shelf.id "classic"
       results <- runDb pool (findMany @Shelf.ShelfTable includeBooksAndTags id)
       [result] <- pure results
-      sort (map ((.title) . (.book)) result.books) `shouldBe` ["Dune", "Neuromancer"]
+      sort (map (.title) result.books) `shouldBe` ["Dune", "Neuromancer"]
       sort (map (.label) result.tags) `shouldBe` ["classic", "scifi"]
+
+    it "findMany combines nested books with sibling tags" $ \TestEnv {envPool = pool} -> do
+      shelf <- ShelfFixtures.insertShelf pool "fiction"
+      book <- ShelfFixtures.insertBook pool shelf.id "Dune"
+      _ <- ShelfFixtures.insertChapter pool book.id "Arrakis"
+      _ <- ShelfFixtures.insertTag pool shelf.id "scifi"
+      results <- runDb pool (findMany @Shelf.ShelfTable includeBooksChaptersAndTags id)
+      [result] <- pure results
+      [bookWithChapters] <- pure result.books
+      (.title) bookWithChapters.book `shouldBe` "Dune"
+      map (.heading) bookWithChapters.chapters `shouldBe` ["Arrakis"]
+      map (.label) result.tags `shouldBe` ["scifi"]
 
     it "findMany nests sections under chapters at four levels deep" $ \TestEnv {envPool = pool} -> do
       shelf <- ShelfFixtures.insertShelf pool "fiction"
@@ -215,13 +229,13 @@ includeSpec =
       sectionIds `shouldBe` sort sectionIds
       sort (map (.label) chapterWithSections.sections) `shouldBe` ["Desert", "Sietch"]
 
-lookupShelf :: UUID -> [ShelfWithBooks] -> IO ShelfWithBooks
+lookupShelf :: UUID -> [ShelfWithBook] -> IO ShelfWithBook
 lookupShelf shelfId results =
   case filter ((== shelfId) . (.id) . (.shelf)) results of
     [shelf] -> pure shelf
     _ -> fail "expected exactly one shelf in results"
 
-lookupBook :: Text -> ShelfWithBooks -> IO BookWithChapters
+lookupBook :: Text -> ShelfWithBooksChapter -> IO BookWithChapter
 lookupBook title result =
   case filter ((== title) . (.title) . (.book)) result.books of
     [book] -> pure book

@@ -26,10 +26,6 @@ module ORM.Codegen.Schema
     belongsTo,
     ModelInclude (..),
     IncludeTree (..),
-    IncludeDecl (..),
-    includeGraph,
-    include,
-    tree,
     EnumSpec (..),
     EnumVariant (..),
     enum_,
@@ -39,6 +35,7 @@ module ORM.Codegen.Schema
     UniqueConstraint (..),
     unique_,
     isFullGraphInclude,
+    fullGraphIncludeName,
   )
 where
 
@@ -72,22 +69,18 @@ import ORM.Codegen.IR
 import qualified ORM.Codegen.IR as IR
 import ORM.Codegen.TextUtil (camelToSnake)
 
-schema :: [EnumSpec] -> [Model] -> [IncludeDecl] -> [UniqueConstraint] -> Schema
-schema enums models includes uniques =
-  let declared = map (resolveInclude models) includes
-      declaredRoots = map includeRootModel declared
-      auto =
-        [ resolveInclude models (IncludeGraph (fullGraphIncludeName (modelName m)) (modelName m))
+schema :: [EnumSpec] -> [Model] -> [UniqueConstraint] -> Schema
+schema enums models uniques =
+  Schema
+    { schemaEnums = enums,
+      schemaModels = models,
+      schemaIncludes =
+        [ fullGraphInclude models m
           | m <- models,
-            not (null (modelRelations m)),
-            modelName m `notElem` declaredRoots
-        ]
-   in Schema
-        { schemaEnums = enums,
-          schemaModels = models,
-          schemaIncludes = declared ++ auto,
-          schemaUniques = uniques
-        }
+            not (null (modelRelations m))
+        ],
+      schemaUniques = uniques
+    }
 
 model :: Text -> [FieldSpec] -> [RelationSpec] -> Model
 model name fields rels =
@@ -138,32 +131,12 @@ hasMany name toModel = IR.hasMany name "" toModel "id"
 belongsTo :: Text -> Text -> Text -> RelationSpec
 belongsTo name toModel foreignFld = IR.belongsTo name "" toModel foreignFld "id"
 
-data IncludeDecl
-  = IncludeGraph Text Text
-  | IncludeExplicit Text Text [IncludeTree]
-  deriving (Show, Eq)
-
-includeGraph :: Text -> Text -> IncludeDecl
-includeGraph = IncludeGraph
-
-include :: Text -> Text -> [IncludeTree] -> IncludeDecl
-include = IncludeExplicit
-
-tree :: Text -> [IncludeTree] -> IncludeTree
-tree = IncludeTree
-
-resolveInclude :: [Model] -> IncludeDecl -> ModelInclude
-resolveInclude models (IncludeGraph name root) =
+fullGraphInclude :: [Model] -> Model -> ModelInclude
+fullGraphInclude models current =
   ModelInclude
-    { includeName = name,
-      includeRootModel = root,
-      includeTree = graphTree models root
-    }
-resolveInclude _ (IncludeExplicit name root edges) =
-  ModelInclude
-    { includeName = name,
-      includeRootModel = root,
-      includeTree = edges
+    { includeName = fullGraphIncludeName (modelName current),
+      includeRootModel = modelName current,
+      includeTree = graphTree models (modelName current)
     }
 
 graphTree :: [Model] -> Text -> [IncludeTree]

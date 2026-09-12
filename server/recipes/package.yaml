@@ -143,8 +143,6 @@ tests:
       - Schema.Section
       - Schema.Tag
       - Schema.ShelfInclude
-      - Schema.ShelfGraphInclude
-      - Schema.ShelfDeepInclude
       - Support.Assert
       - Support.TestDb
       - Support.TestMigrations

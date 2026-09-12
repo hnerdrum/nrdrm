@@ -7,21 +7,24 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module ORM.Schema.RecipeInclude
   ( RecipeInclude (..),
-    WithIngredients (..),
     NoInclude (..),
     ResolveInclude,
-    unwrapWithIngredients,
     unwrapNoInclude,
     Ingredients (..),
     unwrapIngredients,
+    WithIngredients (..),
+    unwrapWithIngredients,
     RecipeWithRecipeIngredient (..),
-    RecipeIngredientInclude (..),
+    RecipeWithIngredients (..),
     RecipeIngredientWithIngredient (..),
-    RecipeWithIngredients (..)
+    IncludeIngredients (..),
+    Ingredient (..),
+    RecipeIngredientInclude (..)
   )
 where
 
@@ -60,9 +63,9 @@ newtype RecipeInclude = RecipeInclude
   }
   deriving (Show, Eq)
 
-data RecipeIngredientWithIngredient = RecipeIngredientWithIngredient
-  { recipeIngredient :: RecipeIngredientRow,
-    ingredient :: Maybe IngredientRow
+data RecipeWithRecipeIngredient = RecipeWithRecipeIngredient
+  { recipe :: RecipeRow,
+    ingredients :: [RecipeIngredientRow]
   }
   deriving (Show, Eq)
 
@@ -72,34 +75,34 @@ data RecipeWithIngredients = RecipeWithIngredients
   }
   deriving (Show, Eq)
 
-data RecipeWithRecipeIngredient = RecipeWithRecipeIngredient
-  { recipe :: RecipeRow,
-    ingredients :: [RecipeIngredientRow]
+data RecipeIngredientWithIngredient = RecipeIngredientWithIngredient
+  { recipeIngredient :: RecipeIngredientRow,
+    ingredient :: Maybe IngredientRow
   }
   deriving (Show, Eq)
-
-type family ResolveInclude preset :: Type
-type instance ResolveInclude WithIngredients = RecipeWithIngredients
-type instance ResolveInclude NoInclude = RecipeRow
-type instance ResolveInclude Ingredients = RecipeWithRecipeIngredient
-
-newtype WithIngredients = WithIngredients RecipeInclude
-  deriving (Show, Eq)
-
-newtype NoInclude = NoInclude RecipeInclude
-  deriving (Show, Eq)
-
-unwrapWithIngredients :: WithIngredients -> RecipeInclude
-unwrapWithIngredients (WithIngredients include) = include
-
-unwrapNoInclude :: NoInclude -> RecipeInclude
-unwrapNoInclude (NoInclude include) = include
 
 newtype Ingredients = Ingredients RecipeInclude
   deriving (Show, Eq)
 
 unwrapIngredients :: Ingredients -> RecipeInclude
 unwrapIngredients (Ingredients include) = include
+
+newtype WithIngredients = WithIngredients RecipeInclude
+  deriving (Show, Eq)
+
+unwrapWithIngredients :: WithIngredients -> RecipeInclude
+unwrapWithIngredients (WithIngredients include) = include
+
+type family ResolveInclude preset :: Type
+type instance ResolveInclude NoInclude = RecipeRow
+type instance ResolveInclude Ingredients = RecipeWithRecipeIngredient
+type instance ResolveInclude WithIngredients = RecipeWithIngredients
+
+newtype NoInclude = NoInclude RecipeInclude
+  deriving (Show, Eq)
+
+unwrapNoInclude :: NoInclude -> RecipeInclude
+unwrapNoInclude (NoInclude include) = include
 
 instance IncludesJoin RecipeInclude where
   includesJoin RecipeInclude {ingredients} = isJust ingredients
@@ -142,15 +145,26 @@ loadRecipeInclude include roots = do
 
 loadRecipeWithRecipeIngredient :: RecipeInclude -> [RecipeRow] -> Db [RecipeWithRecipeIngredient]
 loadRecipeWithRecipeIngredient include roots = do
-  ingredientsMap <- case include.ingredients of
-    Nothing -> pure emptyGroups
-    Just _ ->
-      indexHasMany (.recipeId) <$> findByIn @RecipeIngredientTable @RecipeIngredientRow RecipeIngredient.recipeIngredientRecipeId (map (.id) roots)
+  ingredientsMap <-
+    indexHasMany (.recipeId) <$> findByIn @RecipeIngredientTable @RecipeIngredientRow RecipeIngredient.recipeIngredientRecipeId (map (.id) roots)
   pure
     [
       RecipeWithRecipeIngredient {
         recipe = root,
         ingredients = lookupGroups root.id ingredientsMap
+      }
+    | root <- roots
+    ]
+
+loadRecipeIngredientWithIngredient :: RecipeInclude -> [RecipeIngredientRow] -> Db [RecipeIngredientWithIngredient]
+loadRecipeIngredientWithIngredient include roots = do
+  ingredientMap <-
+    indexByPk (.id) <$> findByIn @IngredientTable @IngredientRow Ingredient.ingredientId (map (.ingredientId) roots)
+  pure
+    [
+      RecipeIngredientWithIngredient {
+        recipeIngredient = root,
+        ingredient = lookupByPk root.ingredientId ingredientMap
       }
     | root <- roots
     ]
@@ -167,4 +181,21 @@ instance {-# OVERLAPPING #-} ExecuteInclude RecipeTable Ingredients RecipeWithRe
 
 instance {-# OVERLAPPING #-} ExecuteInclude RecipeTable WithIngredients RecipeWithIngredients where
   executeInclude (WithIngredients include) modifier = executeInclude include modifier
+
+data Ingredient = Ingredient
+
+ingredient :: Ingredient
+ingredient = Ingredient
+
+class IncludeIngredients include where
+  ingredients :: include
+
+instance IncludeIngredients Ingredients where
+  ingredients =
+    Ingredients RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = False})}
+
+instance (include ~ WithIngredients) => IncludeIngredients (Ingredient -> include) where
+  ingredients Ingredient =
+    WithIngredients RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = True})}
+
 

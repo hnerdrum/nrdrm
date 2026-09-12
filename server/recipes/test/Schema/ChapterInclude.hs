@@ -7,16 +7,18 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Schema.ChapterInclude
   ( ChapterInclude (..),
-    WithSections (..),
     NoInclude (..),
     ResolveInclude,
-    unwrapWithSections,
     unwrapNoInclude,
-    ChapterWithSections (..)
+    WithSections (..),
+    unwrapWithSections,
+    ChapterWithSections (..),
+    IncludeSections (..)
   )
 where
 
@@ -50,19 +52,18 @@ data ChapterWithSections = ChapterWithSections
   }
   deriving (Show, Eq)
 
-
-type family ResolveInclude preset :: Type
-type instance ResolveInclude WithSections = ChapterWithSections
-type instance ResolveInclude NoInclude = ChapterRow
-
 newtype WithSections = WithSections ChapterInclude
-  deriving (Show, Eq)
-
-newtype NoInclude = NoInclude ChapterInclude
   deriving (Show, Eq)
 
 unwrapWithSections :: WithSections -> ChapterInclude
 unwrapWithSections (WithSections include) = include
+
+type family ResolveInclude preset :: Type
+type instance ResolveInclude NoInclude = ChapterRow
+type instance ResolveInclude WithSections = ChapterWithSections
+
+newtype NoInclude = NoInclude ChapterInclude
+  deriving (Show, Eq)
 
 unwrapNoInclude :: NoInclude -> ChapterInclude
 unwrapNoInclude (NoInclude include) = include
@@ -94,5 +95,15 @@ instance {-# OVERLAPPING #-} ExecuteInclude ChapterTable ChapterInclude ChapterW
   executeInclude include modifier = do
     roots <- findMany @ChapterTable @ChapterRow (prepareIncludeRootQuery @ChapterTable modifier)
     loadChapterInclude include roots
+
+instance {-# OVERLAPPING #-} ExecuteInclude ChapterTable WithSections ChapterWithSections where
+  executeInclude (WithSections include) modifier = executeInclude include modifier
+
+class IncludeSections include where
+  sections :: include
+
+instance IncludeSections WithSections where
+  sections =
+    WithSections ChapterInclude {sections = True}
 
 

@@ -24,9 +24,13 @@ module ORM.Client.Recipe
     IngredientsWrite (..),
     RecipeIngredientNestedOps (..),
     emptyRecipeIngredientNestedOps,
-    ingredients,
-    ingredient,
+    IncludeIngredients (..),
+    Ingredient (..),
     Ingredients (..),
+    unwrapIngredients,
+    WithIngredients (..),
+    unwrapWithIngredients,
+    ingredient,
     ResolveInclude,
     RecipeQuery (..),
     emptyQuery,
@@ -60,7 +64,7 @@ import ORM.Errors (ORMError (..), requireFound)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
 import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow (..), RecipeSelect (..), RecipePicked (..), recipeSelect, recipeSelectColumns, parseRecipePicked, toRecipePicked, RecipeTable, RecipeUpdate (..), recipeId)
-import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients, Ingredients (..), RecipeWithRecipeIngredient (..))
+import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients, Ingredients (..), RecipeWithRecipeIngredient (..), IncludeIngredients (..), Ingredient (..), unwrapIngredients)
 import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientRow (..), RecipeIngredientUpdate (..), RecipeIngredientTable, recipeIngredientId, recipeIngredientRecipeId)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)
@@ -241,21 +245,6 @@ withIngredients =
 noInclude :: NoInclude
 noInclude = NoInclude RecipeInclude {ingredients = Nothing}
 
-data Ingredient = Ingredient
-
-ingredient :: Ingredient
-ingredient = Ingredient
-
-class IncludeIngredients include where
-  ingredients :: include
-
-instance IncludeIngredients Ingredients where
-  ingredients =
-    Ingredients RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = False})}
-
-instance (include ~ WithIngredients) => IncludeIngredients (Ingredient -> include) where
-  ingredients Ingredient = withIngredients
-
 data RecipeWithIngredientsPicked = RecipeWithIngredientsPicked
   { recipe :: RecipePicked,
     ingredients :: [RecipeIngredientWithIngredient]
@@ -281,6 +270,9 @@ toRecipeWithRecipeIngredientPicked select_ nested =
     { recipe = toRecipePicked select_ nested.recipe
     , ingredients = nested.ingredients
     }
+
+ingredient :: Ingredient
+ingredient = Ingredient
 
 data RecipeQuery include select = RecipeQuery
   { include_ :: include

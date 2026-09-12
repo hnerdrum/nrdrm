@@ -12,17 +12,6 @@ shelfSchema =
   schema
     []
     [shelfModel, bookModel, chapterModel, sectionModel, tagModel]
-    [ include
-        "ShelfInclude"
-        "Shelf"
-        [tree "shelfBooks" [tree "bookChapters" []]],
-      include
-        "ShelfGraphInclude"
-        "Shelf"
-        [ tree "shelfBooks" [tree "bookChapters" []],
-          tree "shelfTags" []
-        ]
-    ]
     []
 
 shelfModel :: Model

@@ -13,7 +13,7 @@ import Test.Hspec
 schemaSpec :: Spec
 schemaSpec =
   describe "ORM.Codegen.Schema" $ do
-    it "auto-emits {Model}Include when a model has relations and none is declared" $ do
+    it "auto-emits {Model}Include when a model has relations" $ do
       let parent =
             model
               "Parent"
@@ -24,19 +24,19 @@ schemaSpec =
               "Kid"
               [uuid "id" & pk, uuid "parentId"]
               []
-          built = schema [] [parent, child] [] []
+          built = schema [] [parent, child] []
           incl = head (schemaIncludes built)
       map includeName (schemaIncludes built) `shouldBe` ["ParentInclude"]
       includeRootModel incl `shouldBe` "Parent"
       map includeRelation (includeTree incl) `shouldBe` ["parentKids"]
 
-    it "does not replace an explicit Include for that root with a full-graph Include" $ do
+    it "derives Shelf includes from relations only" $ do
       let names = map includeName (schemaIncludes shelfSchema)
           shelfIncl = head (schemaIncludes shelfSchema)
-      take 2 names `shouldBe` ["ShelfInclude", "ShelfGraphInclude"]
-      filter (== "ShelfInclude") names `shouldBe` ["ShelfInclude"]
-      map includeRelation (includeTree shelfIncl) `shouldBe` ["shelfBooks"]
+      names `shouldBe` ["ShelfInclude", "BookInclude", "ChapterInclude"]
+      includeRootModel shelfIncl `shouldBe` "Shelf"
+      map includeRelation (includeTree shelfIncl) `shouldBe` ["shelfBooks", "shelfTags"]
 
-    it "auto-emits RecipeInclude from relations when the Recipe schema declares none" $ do
+    it "auto-emits RecipeInclude from relations" $ do
       map includeName (schemaIncludes recipeSchema)
         `shouldBe` ["RecipeInclude", "RecipeIngredientInclude"]
