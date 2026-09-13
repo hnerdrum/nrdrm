@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Domain.Unit
@@ -9,6 +8,7 @@ module Domain.Unit
 where
 
 import Data.Aeson (FromJSON (..), ToJSON (..), Value (String), withText)
+import qualified Data.Text as T
 import qualified ORM.Client.Recipe as ORM
 
 data Unit = G | Ml | Tsp | Tbsp | Qty
@@ -23,13 +23,14 @@ instance ToJSON Unit where
 
 instance FromJSON Unit where
   parseJSON =
-    withText "Unit" $ \case
-      "g" -> pure G
-      "ml" -> pure Ml
-      "tsp" -> pure Tsp
-      "tbsp" -> pure Tbsp
-      "qty" -> pure Qty
-      _ -> fail "unknown Unit"
+    withText "Unit" $ \raw ->
+      case T.toLower raw of
+        "g" -> pure G
+        "ml" -> pure Ml
+        "tsp" -> pure Tsp
+        "tbsp" -> pure Tbsp
+        "qty" -> pure Qty
+        _ -> fail "unknown Unit"
 
 toDbUnit :: Unit -> ORM.Unit
 toDbUnit G = ORM.G
