@@ -7,9 +7,8 @@ SvelteKit app. Talks to [`server/uno`](../../server/uno) directly (`PUBLIC_SERVE
 Start databases and the Uno API first (`just uno run`), then:
 
 ```bash
-cp .env.example .env
 npm install
-just web-uno run       # or: just web-uno dev
+just web-uno run       # env bootstrap, then npm run dev
 ```
 
 Vite default port is 5173.

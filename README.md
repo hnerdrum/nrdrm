@@ -11,9 +11,10 @@ Apps in this repo are independent. They share local Postgres via [`docker-databa
 
 ```bash
 just db up
+just env
 ```
 
-`just --list` is the catalog. Every app answers `run`, `test`, `build`, and `migrate` (`just recipes run`, or `cd server/recipes && just run`).
+`just --list` is the catalog. Every app answers `run`, `test`, `build`, and `migrate` (`just recipes run`, or `cd server/recipes && just run`). `just env` copies missing `.env` / `.env.local` from `.env.example` and will not overwrite.
 
 | Host port | Database       | Used by                                                                                  |
 | --------- | -------------- | ---------------------------------------------------------------------------------------- |
@@ -21,8 +22,6 @@ just db up
 | 5433      | `identity`     | [`server/identity`](server/identity)                                                     |
 | 5434      | `uno`          | [`server/uno`](server/uno)                                                               |
 | 5435      | `recipes_test` | recipes tests only ([`docker-compose.test.yml`](server/recipes/docker-compose.test.yml)) |
-
-Copy each app’s `.env.example` to `.env` (or `.env.local` for Next.js) before running it.
 
 ## Apps
 
@@ -54,9 +53,9 @@ The only multi-service path used daily. Start databases first, then one process 
 
 ```bash
 just db up
-just identity migrate   # then, each in its own terminal:
-just identity run       # :8081
-just recipes run        # :8000
+just env
+just identity run       # :8081 — runs Diesel migrations first
+just recipes run        # :8000 — migrations on startup
 just gateway run        # :8080
 just web-recipes run    # :3000 → gateway
 ```

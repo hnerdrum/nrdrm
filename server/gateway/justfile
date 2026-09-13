@@ -2,7 +2,7 @@
 default:
     @just --list
 
-run:
+run: env
     gleam run
 
 test:
@@ -13,3 +13,12 @@ build:
 
 migrate:
     @echo "no database"
+
+env dest=".env":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -e "{{ dest }}" ]]; then
+      exit 0
+    fi
+    cp .env.example "{{ dest }}"
+    echo "created {{ dest }}"

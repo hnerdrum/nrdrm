@@ -5,7 +5,6 @@ TypeScript job that prunes old tags in the Scaleway container registry. Not part
 ## Run
 
 ```bash
-cp .env.example .env
 npm install
 just delete-images run
 ```

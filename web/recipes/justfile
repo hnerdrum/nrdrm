@@ -4,7 +4,7 @@ default:
 
 alias dev := run
 
-run:
+run: env
     npm run dev
 
 test:
@@ -15,3 +15,12 @@ build:
 
 migrate:
     @echo "no database"
+
+env dest=".env.local":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -e "{{ dest }}" ]]; then
+      exit 0
+    fi
+    cp .env.example "{{ dest }}"
+    echo "created {{ dest }}"
