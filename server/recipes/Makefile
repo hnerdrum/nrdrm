@@ -34,7 +34,7 @@ test-db-logs:
 	$(COMPOSE) logs -f
 
 test: test-db-up
-	TEST_DATABASE_URL=$(TEST_DATABASE_URL) $(STACK) test --arch=aarch64
+	TEST_DATABASE_URL=$(TEST_DATABASE_URL) $(STACK) test
 
 test-fast: orm-gen
-	TEST_DATABASE_URL=$(TEST_DATABASE_URL) $(STACK) test --arch=aarch64
+	TEST_DATABASE_URL=$(TEST_DATABASE_URL) $(STACK) test

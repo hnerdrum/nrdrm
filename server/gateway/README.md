@@ -5,8 +5,7 @@ Gleam reverse proxy. No database. Routes `/<service>/...` using `services-dev.js
 ## Run
 
 ```bash
-cp .env.example .env   # if you do not already have one
-just gateway run       # or: cd server/gateway && just run
+just gateway run       # env bootstrap, then gleam run
 ```
 
 Listens on `PORT` (default 8080). Local backends: recipes `:8000`, identity `:8081`. CORS: `ALLOWED_ORIGINS`.

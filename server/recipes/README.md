@@ -8,8 +8,7 @@ From the repo root, start databases, then:
 
 ```bash
 just db up
-cp .env.example .env   # if you do not already have one
-just recipes run       # or: cd server/recipes && just run
+just recipes run       # env bootstrap, then make run
 ```
 
 Listens on `PORT` (default 8000).

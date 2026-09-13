@@ -7,9 +7,8 @@ Next.js app. Talks to the [gateway](../../server/gateway) (`NEXT_PUBLIC_SERVER_U
 Start the [recipes stack](../../README.md#recipes-stack) backends first, then:
 
 ```bash
-cp .env.example .env.local
 npm install
-just web-recipes run   # or: just web-recipes dev
+just web-recipes run   # env bootstrap to .env.local, then npm run dev
 ```
 
 Opens on http://localhost:3000.
