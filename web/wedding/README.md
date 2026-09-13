@@ -5,9 +5,8 @@ Astro wedding site (SSR). RSVP email needs `RESEND_API_KEY` and `RECIPIENT_EMAIL
 ## Run
 
 ```bash
-cd web/wedding
 npm install
-npm run dev
+just wedding run       # or: just wedding dev
 ```
 
 ## Test
@@ -17,7 +16,7 @@ No automated tests.
 ## Build
 
 ```bash
-npm run build
+just wedding build
 ```
 
 ## Migrate

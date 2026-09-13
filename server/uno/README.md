@@ -5,9 +5,9 @@ Go/Gin API for the Uno frontend. Dev Postgres is port **5434** (`uno` in [`docke
 ## Run
 
 ```bash
-cd server/uno
+just db up
 cp .env.example .env   # required; the process exits without it
-go run .
+just uno run           # or: cd server/uno && just run
 ```
 
 Listens on `PORT` (8082 in the example, matching [`web/uno`](../../web/uno)).
@@ -19,7 +19,7 @@ No automated tests yet.
 ## Build
 
 ```bash
-go build .
+just uno build
 ```
 
 ## Migrate

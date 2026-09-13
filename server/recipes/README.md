@@ -7,9 +7,9 @@ Haskell/Servant API. Dev Postgres is port **5432** (`recipes` in [`docker-databa
 From the repo root, start databases, then:
 
 ```bash
-cd server/recipes
+just db up
 cp .env.example .env   # if you do not already have one
-make run               # build + start; applies migrations on startup
+just recipes run       # or: cd server/recipes && just run
 ```
 
 Listens on `PORT` (default 8000).
@@ -19,9 +19,9 @@ Listens on `PORT` (default 8000).
 Integration tests use a dedicated test schema (`test/migrations/`), not the application tables, and a separate database on port **5435**.
 
 ```bash
-make test              # start test DB + run tests
+just recipes test      # start test DB + run tests
 make test-fast         # tests only (DB must already be running)
-make help              # all targets
+make help              # ORM / extra Makefile targets
 ```
 
 Override the URL if needed:
@@ -51,7 +51,7 @@ test/
 ## Build
 
 ```bash
-make build
+just recipes build
 ```
 
 Also regenerates ORM client code (`make orm-gen`).

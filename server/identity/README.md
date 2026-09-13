@@ -11,10 +11,10 @@ cargo install diesel_cli --no-default-features --features postgres
 ## Run
 
 ```bash
-cd server/identity
+just db up
 cp .env.example .env   # if you do not already have one
-diesel migration run
-cargo run
+just identity migrate
+just identity run      # or: cd server/identity && just run
 ```
 
 Listens on `APP_PORT` (default 8081 locally).
@@ -26,7 +26,7 @@ No automated tests yet.
 ## Build
 
 ```bash
-cargo build
+just identity build
 ```
 
 ## Migrate
@@ -34,7 +34,7 @@ cargo build
 Diesel, in `migrations/`. Not run by `cargo run` — apply them first:
 
 ```bash
-diesel migration run
+just identity migrate
 ```
 
 The Docker image runs this in its entrypoint.

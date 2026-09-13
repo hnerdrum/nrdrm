@@ -5,9 +5,8 @@ Astro landing page. No backend.
 ## Run
 
 ```bash
-cd web/home
 npm install
-npm run dev
+just home run          # or: just home dev
 ```
 
 ## Test
@@ -17,7 +16,7 @@ No automated tests. `npm run build` includes `astro check`.
 ## Build
 
 ```bash
-npm run build
+just home build
 ```
 
 ## Migrate

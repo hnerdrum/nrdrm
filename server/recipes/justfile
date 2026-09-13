@@ -1,0 +1,15 @@
+[private]
+default:
+    @just --list
+
+run:
+    make run
+
+test:
+    make test
+
+build:
+    make build
+
+migrate:
+    @echo "migrations apply automatically on run"

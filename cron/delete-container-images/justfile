@@ -1,0 +1,15 @@
+[private]
+default:
+    @just --list
+
+run:
+    npm run dev
+
+test:
+    @echo "no tests yet"
+
+build:
+    npm run build
+
+migrate:
+    @echo "no database"
