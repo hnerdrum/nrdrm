@@ -23,6 +23,8 @@ just recipes test-fast   # tests only (DB must already be running)
 just recipes             # all targets
 ```
 
+CI sets `STACK_ARCH=x86_64`. Local default is `aarch64`.
+
 Override the URL if needed:
 
 ```bash

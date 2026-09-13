@@ -1,34 +1,35 @@
 export TEST_DATABASE_URL := env("TEST_DATABASE_URL", "postgres://nrdrm:nrdrm@localhost:5435/recipes_test")
+stack_arch := env("STACK_ARCH", "aarch64")
 
 [private]
 default:
     @just --list
 
 run: env build
-    stack --arch=aarch64 exec server-exe
+    stack --arch={{ stack_arch }} exec server-exe
 
 test: test-db-up
-    stack --arch=aarch64 test
+    stack --arch={{ stack_arch }} test
 
 test-fast: orm-gen
-    stack --arch=aarch64 test
+    stack --arch={{ stack_arch }} test
 
 build: orm-gen
-    stack --arch=aarch64 build
+    stack --arch={{ stack_arch }} build
 
 migrate:
     @echo "migrations apply automatically on run"
 
 orm-gen:
-    stack --arch=aarch64 build recipes:orm-codegen
-    stack --arch=aarch64 exec orm-codegen
+    stack --arch={{ stack_arch }} build recipes:orm-codegen
+    stack --arch={{ stack_arch }} exec orm-codegen
 
 orm-gen-check:
-    stack --arch=aarch64 build recipes:orm-codegen
-    stack --arch=aarch64 exec orm-codegen -- --check
+    stack --arch={{ stack_arch }} build recipes:orm-codegen
+    stack --arch={{ stack_arch }} exec orm-codegen -- --check
 
 orm-schema-check: test-db-up
-    stack --arch=aarch64 exec orm-codegen -- --check-schema
+    stack --arch={{ stack_arch }} exec orm-codegen -- --check-schema
 
 test-db-up:
     docker compose -f docker-compose.test.yml up -d --wait
