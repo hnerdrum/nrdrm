@@ -7,10 +7,9 @@ Next.js app. Talks to the [gateway](../../server/gateway) (`NEXT_PUBLIC_SERVER_U
 Start the [recipes stack](../../README.md#recipes-stack) backends first, then:
 
 ```bash
-cd web/recipes
 cp .env.example .env.local
 npm install
-npm run dev
+just web-recipes run   # or: just web-recipes dev
 ```
 
 Opens on http://localhost:3000.
@@ -20,13 +19,13 @@ Opens on http://localhost:3000.
 No automated tests. Lint:
 
 ```bash
-npm run lint
+just web-recipes test
 ```
 
 ## Build
 
 ```bash
-npm run build
+just web-recipes build
 ```
 
 ## Migrate

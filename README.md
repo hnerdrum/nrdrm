@@ -10,14 +10,17 @@ Apps in this repo are independent. They share local Postgres via [`docker-databa
 4. Start databases:
 
 ```bash
-docker compose -f docker-databases.yml up -d
+just db up
 ```
 
-| Host port | Database   | Used by                              |
-| --------- | ---------- | ------------------------------------ |
-| 5432      | `recipes`  | [`server/recipes`](server/recipes)   |
-| 5433      | `identity` | [`server/identity`](server/identity) |
-| 5434      | `uno`      | [`server/uno`](server/uno)           |
+`just --list` is the catalog. Every app answers `run`, `test`, `build`, and `migrate` (`just recipes run`, or `cd server/recipes && just run`).
+
+| Host port | Database       | Used by                                                                                  |
+| --------- | -------------- | ---------------------------------------------------------------------------------------- |
+| 5432      | `recipes`      | [`server/recipes`](server/recipes)                                                       |
+| 5433      | `identity`     | [`server/identity`](server/identity)                                                     |
+| 5434      | `uno`          | [`server/uno`](server/uno)                                                               |
+| 5435      | `recipes_test` | recipes tests only ([`docker-compose.test.yml`](server/recipes/docker-compose.test.yml)) |
 
 Copy each app’s `.env.example` to `.env` (or `.env.local` for Next.js) before running it.
 
@@ -50,8 +53,10 @@ Shared Haskell libraries: [`server/orm`](server/orm), [`server/orm-codegen`](ser
 The only multi-service path used daily. Start databases first, then one process per terminal:
 
 ```bash
-# server/identity — diesel migration run, then cargo run   (:8081)
-# server/recipes  — make run                               (:8000)
-# server/gateway  — gleam run                              (:8080)
-# web/recipes     — npm run dev                            (:3000 → gateway)
+just db up
+just identity migrate   # then, each in its own terminal:
+just identity run       # :8081
+just recipes run        # :8000
+just gateway run        # :8080
+just web-recipes run    # :3000 → gateway
 ```

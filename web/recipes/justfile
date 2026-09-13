@@ -1,0 +1,17 @@
+[private]
+default:
+    @just --list
+
+alias dev := run
+
+run:
+    npm run dev
+
+test:
+    npm run lint
+
+build:
+    npm run build
+
+migrate:
+    @echo "no database"

@@ -1,0 +1,15 @@
+[private]
+default:
+    @just --list
+
+run:
+    go run .
+
+test:
+    @echo "no tests yet"
+
+build:
+    go build .
+
+migrate:
+    @echo "GORM AutoMigrate on run"
