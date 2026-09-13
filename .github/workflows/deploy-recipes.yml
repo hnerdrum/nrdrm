@@ -36,7 +36,6 @@ jobs:
         with:
           enable-stack: true
           stack-no-global: true
-          stack-setup-ghc: true
           cabal-update: false
       - name: Install native libraries
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libgmp-dev libpq-dev pkg-config
@@ -47,9 +46,12 @@ jobs:
             server/recipes/.stack-work
             server/orm/.stack-work
             server/orm-codegen/.stack-work
-          key: stack-${{ runner.os }}-${{ hashFiles('server/recipes/stack.yaml.lock') }}
+          key: stack-${{ runner.os }}-${{ hashFiles('server/recipes/stack.yaml.lock', 'server/recipes/package.yaml', 'server/orm/package.yaml', 'server/orm-codegen/package.yaml') }}
           restore-keys: |
             stack-${{ runner.os }}-
+      - name: Build test dependencies
+        working-directory: server/recipes
+        run: stack --arch=x86_64 build --only-dependencies --test --no-run-tests --fast
       - name: just recipes test
         run: just recipes test
 

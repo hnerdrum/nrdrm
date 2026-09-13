@@ -18,7 +18,7 @@ Listens on `PORT` (default 8000).
 Integration tests use a dedicated test schema (`test/migrations/`), not the application tables, and a separate database on port **5435**.
 
 ```bash
-just recipes test        # start test DB + run tests
+just recipes test        # start test DB, generate ORM clients, run tests
 just recipes test-fast   # tests only (DB must already be running)
 just recipes             # all targets
 ```
@@ -36,7 +36,8 @@ For `stack test` without just:
 ```bash
 cp .env.test.example .env.test
 just recipes test-db-up
-stack --arch=aarch64 test
+just recipes orm-gen
+stack --arch=aarch64 test --fast recipes:recipes-test
 ```
 
 `Support.TestDb` loads `.env.test` first, then falls back to `.env`. If you get connection refused, the test database is not running (`just recipes test-db-up`).
