@@ -146,6 +146,7 @@ tests:
       - Support.Assert
       - Support.TestDb
       - Support.TestMigrations
+      - Domain.RecipeSpec
       - ORM.OperationsSpec
       - ORM.RawSpec
       - ORM.ErrorsSpec
