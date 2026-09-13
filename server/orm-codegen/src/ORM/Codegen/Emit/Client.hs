@@ -32,11 +32,11 @@ import ORM.Codegen.EmitCommon
     pickedTypeName,
     primaryKeyField,
     resultTypeName,
-    singlePrefixEdge,
     rowTypeName,
     selectColumnsFnName,
     selectDefaultName,
     selectTypeName,
+    singlePrefixEdge,
     tableTypeName,
     toPickedName,
     updateTypeName,
@@ -843,7 +843,7 @@ includeModuleImportLine moduleName schema incl withPrefix =
       includeTypes =
         nub $
           [includeName incl <> " (..)"]
-            ++ typeExports
+            ++ [item | not withPrefix, item <- typeExports]
             ++ [resultTypeName schema root (includeTree incl) <> " (..)"]
             ++ nestedWithImports
             ++ [withPreset <> " (..)", "NoInclude (..)", "ResolveInclude", "unwrap" <> withPreset]
@@ -903,9 +903,8 @@ nestedIncludeTypeExports schema incl =
 emitIncludeReadDefinitions :: Schema -> ModelInclude -> Bool -> [Text]
 emitIncludeReadDefinitions schema incl emitCombinators =
   let root = lookupModel schema (includeRootModel incl)
-   in [ emitFullIncludePreset schema incl,
-        emitNoIncludePreset schema incl
-      ]
+   in [emitFullIncludePreset schema incl | not emitCombinators]
+        ++ [emitNoIncludePreset schema incl]
         ++ [ emitPickedIncludeType schema root incl emitCombinators
            ]
         ++ [emitPrefixPickedIncludeType schema root incl | emitCombinators]

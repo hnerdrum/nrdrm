@@ -105,7 +105,7 @@ unwrapNoInclude :: NoInclude -> RecipeInclude
 unwrapNoInclude (NoInclude include) = include
 
 instance IncludesJoin RecipeInclude where
-  includesJoin RecipeInclude {ingredients} = isJust ingredients
+  includesJoin include = isJust include.ingredients
 
 instance NestInclude RecipeInclude RecipeWithIngredients where
   type RootRow RecipeInclude = RecipeRow
@@ -144,7 +144,7 @@ loadRecipeInclude include roots = do
     ]
 
 loadRecipeWithRecipeIngredient :: RecipeInclude -> [RecipeRow] -> Db [RecipeWithRecipeIngredient]
-loadRecipeWithRecipeIngredient include roots = do
+loadRecipeWithRecipeIngredient _include roots = do
   ingredientsMap <-
     indexHasMany (.recipeId) <$> findByIn @RecipeIngredientTable @RecipeIngredientRow RecipeIngredient.recipeIngredientRecipeId (map (.id) roots)
   pure
@@ -152,19 +152,6 @@ loadRecipeWithRecipeIngredient include roots = do
       RecipeWithRecipeIngredient {
         recipe = root,
         ingredients = lookupGroups root.id ingredientsMap
-      }
-    | root <- roots
-    ]
-
-loadRecipeIngredientWithIngredient :: RecipeInclude -> [RecipeIngredientRow] -> Db [RecipeIngredientWithIngredient]
-loadRecipeIngredientWithIngredient include roots = do
-  ingredientMap <-
-    indexByPk (.id) <$> findByIn @IngredientTable @IngredientRow Ingredient.ingredientId (map (.ingredientId) roots)
-  pure
-    [
-      RecipeIngredientWithIngredient {
-        recipeIngredient = root,
-        ingredient = lookupByPk root.ingredientId ingredientMap
       }
     | root <- roots
     ]
@@ -183,9 +170,6 @@ instance {-# OVERLAPPING #-} ExecuteInclude RecipeTable WithIngredients RecipeWi
   executeInclude (WithIngredients include) modifier = executeInclude include modifier
 
 data Ingredient = Ingredient
-
-ingredient :: Ingredient
-ingredient = Ingredient
 
 class IncludeIngredients include where
   ingredients :: include

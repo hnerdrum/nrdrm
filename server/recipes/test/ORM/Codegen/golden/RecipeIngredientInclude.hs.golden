@@ -69,7 +69,7 @@ unwrapNoInclude :: NoInclude -> RecipeIngredientInclude
 unwrapNoInclude (NoInclude include) = include
 
 instance IncludesJoin RecipeIngredientInclude where
-  includesJoin RecipeIngredientInclude {ingredient} = ingredient
+  includesJoin include = include.ingredient
 
 instance NestInclude RecipeIngredientInclude RecipeIngredientWithIngredient where
   type RootRow RecipeIngredientInclude = RecipeIngredientRow
