@@ -117,7 +117,7 @@ export const RecipeForm = ({
     }
 
     setRecipeIngredients((recipeIngredients) => [
-      ...recipeIngredients.filter((ri) => ri.id !== selectedIngredient.label),
+      ...recipeIngredients.filter((ri) => ri.id !== selectedIngredient.value),
       {
         id: selectedIngredient.value,
         name: selectedIngredient.label,
@@ -143,9 +143,14 @@ export const RecipeForm = ({
 
   const handleAmountInputChange = (value: string) => {
     if (value === "") {
+      setSelectedAmount("");
       return;
     }
-    setSelectedAmount(parseFloat(value));
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+    setSelectedAmount(parsed);
   };
 
   return (
@@ -200,7 +205,8 @@ export const RecipeForm = ({
               <Label>Ingredient amount</Label>
               <Input
                 type="number"
-                min={0}
+                min={1}
+                step={1}
                 value={selectedAmount}
                 onChange={(e) => handleAmountInputChange(e.target.value)}
               />
@@ -217,11 +223,11 @@ export const RecipeForm = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="G">g</SelectItem>
-                  <SelectItem value="Ml">ml</SelectItem>
-                  <SelectItem value="Tbsp">tbsp</SelectItem>
-                  <SelectItem value="Tsp">tsp</SelectItem>
-                  <SelectItem value="Qty">qty</SelectItem>
+                  <SelectItem value={Unit.G}>g</SelectItem>
+                  <SelectItem value={Unit.Ml}>ml</SelectItem>
+                  <SelectItem value={Unit.Tbsp}>tbsp</SelectItem>
+                  <SelectItem value={Unit.Tsp}>tsp</SelectItem>
+                  <SelectItem value={Unit.Qty}>qty</SelectItem>
                 </SelectContent>
               </Select>
             </div>
