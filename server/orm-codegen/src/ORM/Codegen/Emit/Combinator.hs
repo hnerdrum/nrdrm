@@ -171,18 +171,15 @@ emitCombinatorLoaders schema incl =
 
 partialResults :: Schema -> ModelInclude -> [CombinatorTree]
 partialResults schema incl =
-  filter (not . isModuleFullGraph schema incl) (uniqueResults schema incl)
-
-isModuleFullGraph :: Schema -> ModelInclude -> CombinatorTree -> Bool
-isModuleFullGraph schema incl tree =
-  modelName (ctRoot tree) == includeRootModel incl
-    && isFullGraphTree schema tree
+  nubBy (\a b -> resultADTName schema a == resultADTName schema b) $
+    concatMap (treeAndNested schema) $
+      filter (not . isFullGraphTree schema) (rootCombinatorTrees schema incl)
 
 emitLoader :: Schema -> ModelInclude -> CombinatorTree -> Text
 emitLoader schema incl tree =
   T.unlines $
     [ loadFn <> " :: " <> includeName incl <> " -> [" <> parentRow <> "] -> Db [" <> result <> "]",
-      loadFn <> " include roots = do"
+      loadFn <> " " <> includePat <> " roots = do"
     ]
       ++ map (indent 2) (concatMap (emitEdgeLoad schema parent) (ctEdges tree))
       ++ [indent 2 "pure", indent 4 "["]
@@ -193,6 +190,9 @@ emitLoader schema incl tree =
     parentRow = rowTypeName parent
     result = resultADTName schema tree
     loadFn = "load" <> result
+    includePat
+      | not (all (null . includeChildren) (ctEdges tree)) = "include"
+      | otherwise = "_include"
 
 emitEdgeLoad :: Schema -> Model -> IncludeTree -> [Text]
 emitEdgeLoad schema parent edge =
@@ -327,13 +327,10 @@ allNestTokens schema incl =
 emitNestBindings :: Schema -> ModelInclude -> Text
 emitNestBindings schema incl =
   T.intercalate "\n" $
-    map emitBinding (groupNestTokens (allNestTokens schema incl))
+    filter (not . T.null) $
+      map emitBinding (groupNestTokens (allNestTokens schema incl))
   where
-    emitBinding (name, leafTy, []) =
-      T.unlines
-        [ name <> " :: " <> leafTy,
-          name <> " = " <> leafTy
-        ]
+    emitBinding (_name, _leafTy, []) = ""
     emitBinding (name, leafTy, applied) =
       T.unlines $
         [ "class Include" <> upperFirst name <> " include where",

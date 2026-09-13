@@ -216,7 +216,7 @@ unwrapNoInclude :: NoInclude -> ShelfInclude
 unwrapNoInclude (NoInclude include) = include
 
 instance IncludesJoin ShelfInclude where
-  includesJoin ShelfInclude {books, tags} = isJust books || tags
+  includesJoin include = isJust include.books || include.tags
 
 instance NestInclude ShelfInclude ShelfWithBooksTags where
   type RootRow ShelfInclude = ShelfRow
@@ -277,7 +277,7 @@ loadShelfInclude include roots = do
     ]
 
 loadShelfWithTag :: ShelfInclude -> [ShelfRow] -> Db [ShelfWithTag]
-loadShelfWithTag include roots = do
+loadShelfWithTag _include roots = do
   tagsMap <-
     indexHasMany (.shelfId) <$> findByIn @TagTable @TagRow Tag.tagShelfId (map (.id) roots)
   pure
@@ -290,7 +290,7 @@ loadShelfWithTag include roots = do
     ]
 
 loadShelfWithBook :: ShelfInclude -> [ShelfRow] -> Db [ShelfWithBook]
-loadShelfWithBook include roots = do
+loadShelfWithBook _include roots = do
   booksMap <-
     indexHasMany (.shelfId) <$> findByIn @BookTable @BookRow Book.bookShelfId (map (.id) roots)
   pure
@@ -303,7 +303,7 @@ loadShelfWithBook include roots = do
     ]
 
 loadShelfWithBookTag :: ShelfInclude -> [ShelfRow] -> Db [ShelfWithBookTag]
-loadShelfWithBookTag include roots = do
+loadShelfWithBookTag _include roots = do
   booksMap <-
     indexHasMany (.shelfId) <$> findByIn @BookTable @BookRow Book.bookShelfId (map (.id) roots)
   tagsMap <-
@@ -334,7 +334,7 @@ loadShelfWithBooksChapter include roots = do
     ]
 
 loadBookWithChapter :: ShelfInclude -> [BookRow] -> Db [BookWithChapter]
-loadBookWithChapter include roots = do
+loadBookWithChapter _include roots = do
   chaptersMap <-
     indexHasMany (.bookRef) <$> findByIn @ChapterTable @ChapterRow Chapter.chapterBookRef (map (.id) roots)
   pure
@@ -395,7 +395,7 @@ loadBookWithChapters include roots = do
     ]
 
 loadChapterWithSections :: ShelfInclude -> [ChapterRow] -> Db [ChapterWithSections]
-loadChapterWithSections include roots = do
+loadChapterWithSections _include roots = do
   sectionsMap <-
     indexHasMany (.chapterRef) <$> findByIn @SectionTable @SectionRow Section.sectionChapterRef (map (.id) roots)
   pure
@@ -460,9 +460,6 @@ instance IncludeChapters Chapters where
 instance IncludeChapters (Sections -> ChaptersSections) where
   chapters Sections = ChaptersSections
 
-
-sections :: Sections
-sections = Sections
 
 class IncludeBooks include where
   books :: include

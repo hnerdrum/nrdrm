@@ -64,7 +64,7 @@ import ORM.Errors (ORMError (..), requireFound)
 import qualified ORM.Include as Include
 import qualified ORM.Insert as Insert
 import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow (..), RecipeSelect (..), RecipePicked (..), recipeSelect, recipeSelectColumns, parseRecipePicked, toRecipePicked, RecipeTable, RecipeUpdate (..), recipeId)
-import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeIngredientInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients, Ingredients (..), RecipeWithRecipeIngredient (..), IncludeIngredients (..), Ingredient (..), unwrapIngredients)
+import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients, Ingredients (..), RecipeWithRecipeIngredient (..), IncludeIngredients (..), Ingredient (..), unwrapIngredients)
 import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientRow (..), RecipeIngredientUpdate (..), RecipeIngredientTable, recipeIngredientId, recipeIngredientRecipeId)
 import qualified ORM.Operations as Ops
 import ORM.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)
@@ -237,10 +237,6 @@ connectNested parentId = go
       case result of
         Left err -> pure (Left err)
         Right _ -> go rest
-
-withIngredients :: WithIngredients
-withIngredients =
-  WithIngredients RecipeInclude {ingredients = Just (RecipeIngredientInclude {ingredient = True})}
 
 noInclude :: NoInclude
 noInclude = NoInclude RecipeInclude {ingredients = Nothing}

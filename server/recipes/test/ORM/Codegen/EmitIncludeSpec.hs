@@ -112,14 +112,14 @@ expectedIncludesJoin :: T.Text
 expectedIncludesJoin =
   T.unlines
     [ "instance IncludesJoin ShelfInclude where",
-      "  includesJoin ShelfInclude {books, tags} = isJust books || tags"
+      "  includesJoin include = isJust include.books || include.tags"
     ]
 
 expectedSiblingIncludesJoin :: T.Text
 expectedSiblingIncludesJoin =
   T.unlines
     [ "instance IncludesJoin ShelfInclude where",
-      "  includesJoin ShelfInclude {books, tags} = isJust books || tags"
+      "  includesJoin include = isJust include.books || include.tags"
     ]
 
 expectedNestInclude :: T.Text

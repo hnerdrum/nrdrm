@@ -79,12 +79,11 @@ emitIncludesJoin :: Schema -> ModelInclude -> Text
 emitIncludesJoin schema incl =
   T.unlines
     [ "instance IncludesJoin " <> includeName incl <> " where",
-      "  includesJoin " <> includeName incl <> " {" <> binders <> "} = " <> expr
+      "  includesJoin include = " <> expr
     ]
   where
     root = lookupModel schema (includeRootModel incl)
     edges = includeTree incl
-    binders = T.intercalate ", " (map (edgeField schema root) edges)
     expr = T.intercalate " || " (map (edgeJoinExpr schema root) edges)
 
 edgeField :: Schema -> Model -> IncludeTree -> Text
@@ -94,8 +93,8 @@ edgeField _schema parent edge =
 edgeJoinExpr :: Schema -> Model -> IncludeTree -> Text
 edgeJoinExpr schema parent edge =
   if null (includeChildren edge)
-    then fld
-    else "isJust " <> fld
+    then "include." <> fld
+    else "isJust include." <> fld
   where
     fld = edgeField schema parent edge
 

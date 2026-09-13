@@ -102,7 +102,7 @@ unwrapNoInclude :: NoInclude -> BookInclude
 unwrapNoInclude (NoInclude include) = include
 
 instance IncludesJoin BookInclude where
-  includesJoin BookInclude {chapters} = isJust chapters
+  includesJoin include = isJust include.chapters
 
 instance NestInclude BookInclude BookWithChapters where
   type RootRow BookInclude = BookRow
@@ -141,7 +141,7 @@ loadBookInclude include roots = do
     ]
 
 loadBookWithChapter :: BookInclude -> [BookRow] -> Db [BookWithChapter]
-loadBookWithChapter include roots = do
+loadBookWithChapter _include roots = do
   chaptersMap <-
     indexHasMany (.bookRef) <$> findByIn @ChapterTable @ChapterRow Chapter.chapterBookRef (map (.id) roots)
   pure
@@ -149,19 +149,6 @@ loadBookWithChapter include roots = do
       BookWithChapter {
         book = root,
         chapters = lookupGroups root.id chaptersMap
-      }
-    | root <- roots
-    ]
-
-loadChapterWithSections :: BookInclude -> [ChapterRow] -> Db [ChapterWithSections]
-loadChapterWithSections include roots = do
-  sectionsMap <-
-    indexHasMany (.chapterRef) <$> findByIn @SectionTable @SectionRow Section.sectionChapterRef (map (.id) roots)
-  pure
-    [
-      ChapterWithSections {
-        chapter = root,
-        sections = lookupGroups root.id sectionsMap
       }
     | root <- roots
     ]
@@ -180,9 +167,6 @@ instance {-# OVERLAPPING #-} ExecuteInclude BookTable WithChapters BookWithChapt
   executeInclude (WithChapters include) modifier = executeInclude include modifier
 
 data Sections = Sections
-
-sections :: Sections
-sections = Sections
 
 class IncludeChapters include where
   chapters :: include

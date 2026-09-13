@@ -69,7 +69,7 @@ unwrapNoInclude :: NoInclude -> ChapterInclude
 unwrapNoInclude (NoInclude include) = include
 
 instance IncludesJoin ChapterInclude where
-  includesJoin ChapterInclude {sections} = sections
+  includesJoin include = include.sections
 
 instance NestInclude ChapterInclude ChapterWithSections where
   type RootRow ChapterInclude = ChapterRow
