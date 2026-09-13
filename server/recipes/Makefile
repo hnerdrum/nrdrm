@@ -1,4 +1,4 @@
-.PHONY: help test test-fast test-db-up test-db-down test-db-logs orm-gen orm-gen-check orm-schema-check
+.PHONY: help build run test test-fast test-db-up test-db-down test-db-logs orm-gen orm-gen-check orm-schema-check
 
 TEST_DATABASE_URL ?= postgres://nrdrm:nrdrm@localhost:5435/recipes_test
 COMPOSE := docker compose -f docker-compose.test.yml
@@ -7,8 +7,11 @@ STACK := stack --arch=aarch64
 help: ## Show available commands
 	@grep -E '^[a-zA-Z0-9_-]+:.*##' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*##"}; {printf "  %-16s %s\n", $$1, $$2}'
 
-build: orm-gen
+build: orm-gen ## Build the recipes server
 	$(STACK) build
+
+run: build ## Start the recipes server
+	$(STACK) exec server-exe
 
 orm-gen: ## Regenerate ORM schema, include, and client modules from specs
 	$(STACK) build recipes:orm-codegen
