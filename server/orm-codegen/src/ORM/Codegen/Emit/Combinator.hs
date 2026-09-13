@@ -14,7 +14,7 @@ module ORM.Codegen.Emit.Combinator
   )
 where
 
-import Data.List (nubBy)
+import Data.List (nub, nubBy)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -39,7 +39,7 @@ singleRelationTrees _schema tree =
 
 emitCombinatorExports :: Schema -> ModelInclude -> [Text]
 emitCombinatorExports schema incl =
-  nubBy (==)
+  nub
     ( concatMap (tagExportItems schema) (rootCombinatorTrees schema incl)
         ++ concatMap (resultExportItems schema) (uniqueResults schema incl)
         ++ combinatorNameExports schema incl
@@ -59,8 +59,7 @@ combinatorNameExports schema incl =
   let root = lookupModel schema (includeRootModel incl)
       trees = combinatorTrees schema root
       relClasses =
-        nubBy
-          (==)
+        nub
           [ "Include" <> upperFirst name <> " (..)"
             | tree <- trees,
               singleRelationTrees schema tree,
@@ -68,15 +67,13 @@ combinatorNameExports schema incl =
               let name = combinatorFieldName root edge
           ]
       tokenTypes =
-        nubBy
-          (==)
+        nub
           [ ty <> " (..)"
             | tree <- trees,
               (_, ty) <- nestTokens schema tree
           ]
       tokenClasses =
-        nubBy
-          (==)
+        nub
           [ "Include" <> upperFirst name <> " (..)"
             | (name, _, applied) <- groupNestTokens (concatMap (nestTokens schema) trees),
               not (null applied)
@@ -317,7 +314,7 @@ emitCombinatorAPI schema incl =
 emitTokenTypes :: Schema -> ModelInclude -> Text
 emitTokenTypes schema incl =
   T.intercalate "\n" $
-    map emitTokenType (nubBy (==) (map snd (allNestTokens schema incl)))
+    map emitTokenType (nub (map snd (allNestTokens schema incl)))
   where
     emitTokenType ty =
       T.unlines ["data " <> ty <> " = " <> ty]
@@ -357,8 +354,8 @@ emitNestBindings schema incl =
 groupNestTokens :: [(Text, Text)] -> [(Text, Text, [Text])]
 groupNestTokens pairs =
   [ (name, leafTy, applied)
-    | name <- nubBy (==) (map fst pairs),
-      let types = nubBy (==) [ty | (n, ty) <- pairs, n == name],
+    | name <- nub (map fst pairs),
+      let types = nub [ty | (n, ty) <- pairs, n == name],
       let leafTy = upperFirst name,
       let applied = [ty | ty <- types, ty /= leafTy]
   ]

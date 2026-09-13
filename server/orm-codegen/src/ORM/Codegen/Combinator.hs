@@ -1,5 +1,3 @@
--- Finite Include combinator trees derived from Schema relations.
--- Cycle-safe: a walk stops when it would revisit a model on the current path.
 module ORM.Codegen.Combinator
   ( CombinatorTree (..),
     combinatorTrees,
@@ -18,7 +16,8 @@ module ORM.Codegen.Combinator
   )
 where
 
-import Data.List (nub)
+import Data.List (elemIndex, nub)
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import ORM.Codegen.EmitCommon
@@ -46,7 +45,7 @@ combinatorTrees schema root =
 
 subtrees :: Schema -> [Text] -> Model -> [[IncludeTree]]
 subtrees schema path current =
-  map concat (sequence (map (choices schema nextPath current) (modelRelations current)))
+  map concat (mapM (choices schema nextPath current) (modelRelations current))
   where
     nextPath = modelName current : path
 
@@ -210,9 +209,10 @@ firstRelIndex root tree =
   case ctEdges tree of
     [] -> maxBound
     (edge : _) ->
-      case lookup (includeRelation edge) (zip (map relName (modelRelations root)) [0 ..]) of
-        Just idx -> idx
-        Nothing -> maxBound
+      fromMaybe
+        maxBound
+        ( elemIndex (includeRelation edge) (map relName (modelRelations root))
+        )
 
 disjoint :: [IncludeTree] -> [IncludeTree] -> Bool
 disjoint left right =
@@ -226,7 +226,6 @@ mergeEdges root left right =
       includeRelation edge == relName rel
   ]
 
--- Tokens used as arguments when nesting (chapters, sections, ingredient).
 nestTokens :: Schema -> CombinatorTree -> [(Text, Text)]
 nestTokens schema tree =
   nub (concatMap (tokensIn schema (ctRoot tree)) (ctEdges tree))
