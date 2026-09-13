@@ -10,11 +10,9 @@ import API.Recipe (createRecipeRoute, deleteRecipeHandler, getAllRecipesRoute, g
 import App (AppContext, AppM)
 import Control.Monad.Reader (runReaderT)
 import Data.UUID (UUID)
-import Database.Ingredient (CreateIngredientInput (..), UpdateIngredientInput (..))
-import Database.Recipe (CreateRecipeInput (..), UpdateRecipeInput (..))
 import Domain.Health (HealthCheck (..))
-import Domain.Ingredient (Ingredient (..))
-import Domain.Recipe (Recipe (..))
+import Domain.Ingredient (CreateIngredientInput (..), Ingredient (..), UpdateIngredientInput (..))
+import Domain.Recipe (CreateRecipeInput (..), Recipe (..), UpdateRecipeInput (..))
 import Servant
   ( Capture,
     DeleteNoContent,

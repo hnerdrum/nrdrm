@@ -60,7 +60,7 @@ const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
       </AccordionTrigger>
       <AccordionContent>
         <div className="flex flex-col">
-          {recipe.description}
+          {recipe.description ?? ""}
           {!!recipe.ingredients.length && (
             <div className="flex flex-wrap gap-2 pt-4">
               {recipe.ingredients.map((ingredient) => (

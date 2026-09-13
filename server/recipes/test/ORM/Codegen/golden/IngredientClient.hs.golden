@@ -1,0 +1,121 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+
+module ORM.Client.Ingredient
+  ( create,
+    update,
+    findMany,
+    findUnique,
+    findUniqueOrFail,
+    delete,
+    deleteMany,
+    IngredientCreate (..),
+    IngredientRow (..),
+    IngredientSelect (..),
+    IngredientPicked (..),
+    ingredientSelect,
+    OmitSelect (..),
+    Picked (..),
+    ResolveSelect,
+    IngredientUpdate (..),
+    IngredientTable,
+    IngredientQuery (..),
+    emptyQuery,
+    ingredientId
+  )
+
+where
+
+import Data.UUID (UUID)
+import ORM.Db (Db)
+import ORM.Errors (ORMError (..), requireFound)
+import qualified ORM.Delete as Delete
+import qualified ORM.Insert as Insert
+import qualified ORM.Operations as Ops
+import ORM.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)
+import ORM.Select (OmitSelect (..), Picked (..))
+import ORM.Where (Where)
+import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientSelect (..), IngredientPicked (..), ingredientSelect, ingredientSelectColumns, parseIngredientPicked, IngredientTable, IngredientUpdate (..), ingredientId)
+import qualified ORM.Update as Update
+
+create :: IngredientCreate -> Db (Either ORMError IngredientRow)
+create = Insert.insert @IngredientTable @IngredientRow
+
+
+update :: UUID -> IngredientUpdate -> Db (Either ORMError IngredientRow)
+update = Update.update @IngredientTable @IngredientRow
+
+
+data IngredientQuery select = IngredientQuery
+  { select_ :: select
+  , where_ :: Maybe (Where IngredientTable)
+  , orderBy_ :: Maybe (QueryBuilder IngredientTable -> QueryBuilder IngredientTable)
+  , limit_ :: Maybe Int
+  , offset_ :: Maybe Int
+  }
+
+
+emptyQuery :: IngredientQuery OmitSelect
+emptyQuery =
+  IngredientQuery {select_ = OmitSelect, where_ = Nothing, orderBy_ = Nothing, limit_ = Nothing, offset_ = Nothing}
+
+
+type family ResolveSelect select
+type instance ResolveSelect OmitSelect = IngredientRow
+type instance ResolveSelect IngredientSelect = IngredientPicked
+
+
+class ReadIngredient select where
+  findMany :: IngredientQuery select -> Db [ResolveSelect select]
+  findUnique :: IngredientQuery select -> Db (Either ORMError (Maybe (ResolveSelect select)))
+  findUniqueOrFail :: IngredientQuery select -> Db (Either ORMError (ResolveSelect select))
+
+instance ReadIngredient OmitSelect where
+  findMany q =
+    Ops.findMany @IngredientTable @IngredientRow (applyQuery q)
+  findUnique IngredientQuery {where_} =
+    Ops.findUniqueWhere @IngredientTable @IngredientRow where_
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
+instance ReadIngredient IngredientSelect where
+  findMany q@IngredientQuery {select_} =
+    Ops.findManyWith
+      (parseIngredientPicked select_)
+      (selectColumns (ingredientSelectColumns select_) . applyQuery q)
+  findUnique IngredientQuery {select_, where_} =
+    case Ops.requireUniqueWhere @IngredientTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        rows <-
+          Ops.findManyWith
+            (parseIngredientPicked select_)
+            (selectColumns (ingredientSelectColumns select_) . matching w)
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
+applyQuery :: IngredientQuery select -> QueryBuilder IngredientTable -> QueryBuilder IngredientTable
+applyQuery IngredientQuery {where_, orderBy_, limit_, offset_} =
+  applyQueryModifiers where_ orderBy_ limit_ offset_
+
+
+delete :: UUID -> Db Int
+delete = Ops.delete @IngredientTable
+
+
+deleteMany :: Where IngredientTable -> Db (Either ORMError Int)
+deleteMany = Delete.deleteMany @IngredientTable
+

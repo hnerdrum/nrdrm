@@ -7,6 +7,6 @@ export const formatIngredient = (ingredient: RecipeIngredient) => {
 };
 
 const formatUnit = (unit: Unit) => {
-  if (unit === "Qty") return "";
+  if (unit.toLowerCase() === Unit.Qty) return "";
   return unit.toLowerCase();
 };

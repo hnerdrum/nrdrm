@@ -1,8 +1,12 @@
+**/.orm-gen/*
+!**/.orm-gen/.gitkeep
+.scratch/
 node_modules
 
 .stack-work
 .hspec-failures
 .DS_Store
 *.cabal
+.env.test
 
 **/build/*

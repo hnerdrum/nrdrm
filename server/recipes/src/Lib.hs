@@ -9,10 +9,10 @@ import qualified Config
 import Control.Monad.Reader (liftIO)
 import Data.Aeson (object)
 import Data.Text (pack)
-import Database.Connection (createConnection)
 import Database.Migrations (runDbMigrations)
 import qualified Logger
 import Network.Wai.Handler.Warp (run)
+import ORM.Db (connect)
 import Servant (serve)
 
 startApp :: IO ()
@@ -22,7 +22,7 @@ startApp = do
   runDbMigrations $ Config.databaseUrl config
 
   let appName = "Recipes"
-  pool <- createConnection $ Config.databaseUrl config
+  pool <- connect $ Config.databaseUrl config
 
   let appContext =
         AppContext

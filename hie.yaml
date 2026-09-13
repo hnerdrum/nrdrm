@@ -1,0 +1,40 @@
+cradle:
+  multi:
+    - path: "./server/orm"
+      config:
+        cradle:
+          stack:
+            stackYaml: "./server/recipes/stack.yaml"
+            components:
+              - path: "./server/orm/src"
+                component: "orm:lib"
+    - path: "./server/orm-codegen"
+      config:
+        cradle:
+          stack:
+            stackYaml: "./server/recipes/stack.yaml"
+            components:
+              - path: "./server/orm-codegen/src"
+                component: "orm-codegen:lib"
+    - path: "./server/recipes"
+      config:
+        cradle:
+          stack:
+            stackYaml: "./server/recipes/stack.yaml"
+            components:
+              - path: "./server/recipes/src"
+                component: "recipes:lib"
+              - path: "./server/recipes/.orm-gen"
+                component: "recipes:lib"
+              - path: "./server/recipes/schema"
+                component: "recipes:exe:orm-codegen"
+              - path: "./server/recipes/app"
+                component: "recipes:exe:server-exe"
+              - path: "./server/recipes/tools"
+                component: "recipes:exe:orm-codegen"
+              - path: "./server/recipes/test"
+                component: "recipes:test:recipes-test"
+    - path: "./"
+      config:
+        cradle:
+          none:

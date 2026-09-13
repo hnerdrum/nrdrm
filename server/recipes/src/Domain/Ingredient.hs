@@ -4,8 +4,9 @@
 module Domain.Ingredient
   ( Ingredient (..),
     RecipeIngredient (..),
+    CreateIngredientInput (..),
+    UpdateIngredientInput (..),
     getAllIngredients,
-    fromDbRecipeIngredient,
     getIngredient,
     createIngredient,
     updateIngredient,
@@ -13,19 +14,39 @@ module Domain.Ingredient
   )
 where
 
+import Control.Monad (void)
 import Data.Aeson
 import Data.Aeson.TH (deriveJSON)
-import Data.Either.Combinators (mapLeft)
-import Data.Pool (Pool, withResource)
+import Data.Bifunctor (bimap)
 import Data.Text (Text)
-import Data.Time (getCurrentTime)
 import Data.UUID (UUID)
-import qualified Data.UUID.V4 as V4
-import Database.Ingredient (CreateIngredientInput (..), DbIngredient (..), Unit (..), UpdateIngredientInput (..))
-import qualified Database.PostgreSQL.Simple as PGSimple
-import Database.PostgreSQL.Simple.SqlQQ (sql)
-import Database.Recipe (DbRecipeIngredient (..))
-import Domain.Errors (AppError (..), DomainError (..), addErrorContext)
+import Domain.Errors (AppError (..), DomainError (..))
+import Domain.Unit (Unit (..))
+import ORM (DatabaseErrorInfo (..), ORMError (..))
+import ORM.Client.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
+import qualified ORM.Client.Ingredient as Ingredient
+import ORM.Db (Db)
+import ORM.Where (eq)
+
+newtype CreateIngredientInput = CreateIngredientInput
+  { name :: Text
+  }
+  deriving (Show)
+
+instance FromJSON CreateIngredientInput where
+  parseJSON = withObject "CreateIngredientInput" $ \obj -> do
+    nameValue <- obj .: "name"
+    return $ CreateIngredientInput {name = nameValue}
+
+newtype UpdateIngredientInput = UpdateIngredientInput
+  { name :: Text
+  }
+  deriving (Show)
+
+instance FromJSON UpdateIngredientInput where
+  parseJSON = withObject "UpdateIngredientInput" $ \obj -> do
+    nameValue <- obj .: "name"
+    return $ UpdateIngredientInput {name = nameValue}
 
 data RecipeIngredient = RecipeIngredient
   { id :: UUID,
@@ -45,96 +66,63 @@ data Ingredient = Ingredient
 
 $(deriveJSON defaultOptions ''Ingredient)
 
-getAllIngredients :: Pool PGSimple.Connection -> IO [Ingredient]
-getAllIngredients pool =
-  withResource pool $ \conn -> do
-    dbIngredients <- PGSimple.query_ conn "SELECT * from ingredient"
-    return $ map fromDbIngredient dbIngredients
+getAllIngredients :: Db [Ingredient]
+getAllIngredients =
+  map fromIngredientRow <$> Ingredient.findMany Ingredient.emptyQuery
 
-getIngredient :: Pool PGSimple.Connection -> UUID -> IO (Either AppError Ingredient)
-getIngredient pool ingredientId =
-  withResource pool $ \conn -> getIngredientById conn ingredientId
+getIngredient :: UUID -> Db (Either AppError Ingredient)
+getIngredient ingredientId =
+  bimap fromIngredientError fromIngredientRow
+    <$> Ingredient.findUniqueOrFail
+      Ingredient.emptyQuery {Ingredient.where_ = Just (eq Ingredient.ingredientId ingredientId)}
 
-createIngredient :: Pool PGSimple.Connection -> CreateIngredientInput -> IO (Either AppError Ingredient)
-createIngredient pool ingredient =
-  withResource pool $ \conn ->
-    PGSimple.withTransaction conn $ do
-      ingredientId <- V4.nextRandom
-      _ <-
-        PGSimple.execute
-          conn
-          [sql|
-          INSERT INTO ingredient (id, name)
-          VALUES (?, ?)
-        |]
-          (ingredientId, ingredient.name)
-      getIngredientById conn ingredientId
+createIngredient :: CreateIngredientInput -> Db (Either AppError Ingredient)
+createIngredient input =
+  bimap fromIngredientError fromIngredientRow
+    <$> Ingredient.create (toIngredientCreate input)
 
-updateIngredient :: Pool PGSimple.Connection -> UUID -> UpdateIngredientInput -> IO (Either AppError Ingredient)
-updateIngredient pool ingredientId ingredient =
-  withResource pool $ \conn ->
-    PGSimple.withTransaction conn $ do
-      now <- getCurrentTime
-      _ <-
-        PGSimple.execute
-          conn
-          [sql|
-          UPDATE ingredient SET updated_at = ?, name = ?
-          WHERE id = ?
-        |]
-          (now, ingredient.name, ingredientId)
-      getIngredientById conn ingredientId
+updateIngredient :: UUID -> UpdateIngredientInput -> Db (Either AppError Ingredient)
+updateIngredient ingredientId input =
+  bimap fromIngredientError fromIngredientRow
+    <$> Ingredient.update ingredientId (toIngredientUpdate input)
 
-deleteIngredient :: Pool PGSimple.Connection -> UUID -> IO ()
-deleteIngredient pool ingredientId =
-  withResource pool $ \conn -> do
-    _ <-
-      PGSimple.execute
-        conn
-        [sql|
-        DELETE FROM ingredient
-        WHERE id = ?
-      |]
-        $ PGSimple.Only ingredientId
-    return ()
+deleteIngredient :: UUID -> Db ()
+deleteIngredient ingredientId = void (Ingredient.delete ingredientId)
 
-getIngredientById :: PGSimple.Connection -> UUID -> IO (Either AppError Ingredient)
-getIngredientById conn ingredientId = do
-  dbIngredients <-
-    PGSimple.query
-      conn
-      [sql|
-    SELECT id, created_at, updated_at, name
-    FROM ingredient
-    WHERE id = ?
-  |]
-      $ PGSimple.Only ingredientId
-  return $ mapLeft (addErrorContext (object ["ingredientId" .= ingredientId])) (reduceDbIngredients dbIngredients)
-
-reduceDbIngredients :: [DbIngredient] -> Either AppError Ingredient
-reduceDbIngredients dbIngredients
-  | null dbIngredients = Left (AppError {error = NotFoundError, message = "Ingredient could not be found", context = object []})
-  | length dbIngredients == 1 = Right $ fromDbIngredient (head dbIngredients)
-  | otherwise = Left (AppError {error = MultipleEntitiesError, message = "Found multiple ingredients with matching ID", context = object []})
-
-fromDbIngredient :: DbIngredient -> Ingredient
-fromDbIngredient dbIngredient =
+fromIngredientRow :: IngredientRow -> Ingredient
+fromIngredientRow row =
   Ingredient
-    { id = dbIngredient.id,
-      name = dbIngredient.name
+    { id = row.id,
+      name = row.name
     }
 
-fromDbRecipeIngredient :: DbRecipeIngredient -> Maybe RecipeIngredient
-fromDbRecipeIngredient dbRI = do
-  ingredientId <- dbIngredientId dbRI
-  ingredientAmount <- dbIngredientAmount dbRI
-  ingredientName <- dbIngredientName dbRI
-  ingredientUnit <- dbIngredientUnit dbRI
+toIngredientCreate :: CreateIngredientInput -> IngredientCreate
+toIngredientCreate input =
+  IngredientCreate
+    { id = Nothing,
+      createdAt = Nothing,
+      updatedAt = Nothing,
+      name = input.name
+    }
 
-  return
-    RecipeIngredient
-      { id = ingredientId,
-        name = ingredientName,
-        amount = ingredientAmount,
-        unit = ingredientUnit
-      }
+toIngredientUpdate :: UpdateIngredientInput -> IngredientUpdate
+toIngredientUpdate input =
+  IngredientUpdate
+    { name = Just input.name,
+      createdAt = Nothing,
+      updatedAt = Nothing
+    }
+
+fromIngredientError :: ORMError -> AppError
+fromIngredientError err =
+  case err of
+    RecordNotFound ingredientId -> AppError NotFoundError "Ingredient could not be found" (object ["ingredientId" .= ingredientId])
+    MultipleRecordsFound ingredientId -> AppError MultipleEntitiesError "Found multiple ingredients with matching ID" (object ["ingredientId" .= ingredientId])
+    UniqueViolation message -> AppError ConflictError message (object [])
+    ForeignKeyViolation message -> AppError ConflictError message (object [])
+    NotNullViolation message -> AppError ConflictError message (object [])
+    EmptyWhere message -> AppError InternalError message (object [])
+    InvalidUniqueInput message -> AppError InternalError message (object [])
+    DatabaseError DatabaseErrorInfo {message} -> AppError InternalError message (object [])
+    DriverError _ message -> AppError InternalError message (object [])
+    UnsupportedIncludeModifier message -> AppError InternalError message (object [])

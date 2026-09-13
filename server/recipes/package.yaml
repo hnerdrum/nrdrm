@@ -38,6 +38,9 @@ dependencies:
   - hlint
   - monad-logger-aeson
   - either
+  - directory
+  - filepath
+  - orm
 
 ghc-options:
   - -Wall
@@ -51,7 +54,35 @@ ghc-options:
   - -Wredundant-constraints
 
 library:
-  source-dirs: src
+  source-dirs:
+    - src
+    - .orm-gen
+  exposed-modules:
+    - API.Errors
+    - API.Health
+    - API.Ingredient
+    - API.Recipe
+    - API.Server
+    - API.Utils
+    - App
+    - Config
+    - Database.Migrations
+    - Domain.Errors
+    - Domain.Health
+    - Domain.Ingredient
+    - Domain.Recipe
+    - Domain.Unit
+    - Lib
+    - Logger
+    - ORM.Client.Ingredient
+    - ORM.Client.Recipe
+    - ORM.Client.RecipeIngredient
+    - ORM.Schema.Ingredient
+    - ORM.Schema.Recipe
+    - ORM.Schema.RecipeInclude
+    - ORM.Schema.RecipeIngredient
+    - ORM.Schema.RecipeIngredientInclude
+    - ORM.Schema.Unit
   default-extensions:
     - DataKinds
     - DuplicateRecordFields
@@ -64,6 +95,18 @@ library:
     - TypeOperators
 
 executables:
+  orm-codegen:
+    main: Main.hs
+    source-dirs:
+      - tools/orm-codegen
+      - schema
+    ghc-options:
+      - -Wall
+    dependencies:
+      - base
+      - orm
+      - orm-codegen
+      - text
   server-exe:
     main: Main.hs
     source-dirs: app
@@ -78,13 +121,62 @@ executables:
 tests:
   recipes-test:
     main: Spec.hs
-    source-dirs: test
+    source-dirs:
+      - test
+      - schema
+    default-extensions:
+      - DuplicateRecordFields
+      - NamedFieldPuns
+      - OverloadedRecordDot
+      - OverloadedStrings
+      - TypeApplications
+      - TypeFamilies
+    other-modules:
+      - ORM.Codegen.RecipeTarget
+      - ORM.Codegen.Spec.Recipe
+      - Schema.Widget
+      - Schema.Shelf
+      - Schema.Book
+      - Schema.BookInclude
+      - Schema.Chapter
+      - Schema.ChapterInclude
+      - Schema.Section
+      - Schema.Tag
+      - Schema.ShelfInclude
+      - Support.Assert
+      - Support.TestDb
+      - Support.TestMigrations
+      - Domain.RecipeSpec
+      - ORM.OperationsSpec
+      - ORM.RawSpec
+      - ORM.ErrorsSpec
+      - ORM.GroupSpec
+      - ORM.JoinSpec
+      - ORM.IncludeSpec
+      - ORM.WhereSpec
+      - ORM.SelectSpec
+      - ORM.NestedWriteSpec
+      - ORM.Codegen.ValidateSpec
+      - ORM.Codegen.SchemaSpec
+      - ORM.Codegen.JoinAliasSpec
+      - ORM.Codegen.IncludePathSpec
+      - ORM.Codegen.EmitSpec
+      - ORM.Codegen.EmitFlatRowSpec
+      - ORM.Codegen.EmitIncludeSpec
+      - ORM.Codegen.EmitClientSpec
+      - ORM.Codegen.TargetSpec
+      - ORM.Codegen.DriftSpec
+      - ORM.WidgetFixtures
+      - ORM.ShelfFixtures
     ghc-options:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
       - base
+      - directory
+      - orm
+      - orm-codegen
       - recipes
       - hspec
       - hspec-wai

@@ -1,7 +1,7 @@
 export type Recipe = {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
   ingredients: RecipeIngredient[];
 };
 
@@ -13,11 +13,11 @@ export type RecipeIngredient = {
 };
 
 export const Unit = {
-  G: "G",
-  Ml: "Ml",
-  Tbsp: "Tbsp",
-  Tsp: "Tsp",
-  Qty: "Qty",
+  G: "g",
+  Ml: "ml",
+  Tbsp: "tbsp",
+  Tsp: "tsp",
+  Qty: "qty",
 } as const;
 
 export type Unit = (typeof Unit)[keyof typeof Unit];
