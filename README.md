@@ -27,6 +27,8 @@ just env
 
 Each app README uses the same verbs: **run**, **test**, **build**, **migrate**.
 
+CI runs those same commands on pull requests (`just recipes test`, `just identity build`, `just gateway test`). Scaleway deploy runs only after a green check on `main`.
+
 ### Backends
 
 - [`server/recipes`](server/recipes) — Haskell recipe API

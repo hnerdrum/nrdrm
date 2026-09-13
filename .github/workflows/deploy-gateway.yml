@@ -1,61 +1,54 @@
-name: Deploy Gateway
+name: Gateway
 
 on:
-  push:
+  pull_request:
     paths:
       - "server/gateway/**"
       - ".github/workflows/deploy-gateway.yml"
+      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+  push:
     branches:
       - main
+    paths:
+      - "server/gateway/**"
+      - ".github/workflows/deploy-gateway.yml"
+      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server/gateway
-
     steps:
       - uses: actions/checkout@v4
-      - name: Login to Scaleway Container Registry
-        uses: docker/login-action@v3
+      - uses: taiki-e/install-action@v2
         with:
-          username: nologin
-          password: ${{ secrets.SCALEWAY_API_KEY }}
-          registry: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
-      - name: Build the Docker image
-        env:
-          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
-          GIT_SHA: ${{ github.sha }}
-        run: docker build -t $CONTAINER_REGISTRY/nrdrm-gateway:$GIT_SHA .
-      - name: Push the Docker Image
-        env:
-          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
-          GIT_SHA: ${{ github.sha }}
-        run: docker push $CONTAINER_REGISTRY/nrdrm-gateway:$GIT_SHA
-      - name: Update Scaleway container
-        env:
-          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
-          GIT_SHA: ${{ github.sha }}
-          CONTAINER_ID: ${{ secrets.GATEWAY_CONTAINER_ID }}
-        run: >
-          curl \
-            --request PATCH \
-            --header "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
-            --data "{
-              \"redeploy\": true,
-              \"registry_image\": \"$CONTAINER_REGISTRY/nrdrm-gateway:$GIT_SHA\",
-              \"environment_variables\": {
-                \"BUILD_ID\": \"$GIT_SHA\",
-                \"ENV\": \"${{ vars.PROD_ENV }}\",
-                \"ALLOWED_ORIGINS\": \"${{ vars.ALLOWED_ORIGINS }}\"
-              }
-            }" \
-            https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/$CONTAINER_ID
-      - name: Deploy Scaleway container
-        run: >
-          curl \
-            --request POST \
-            --header "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
-            --data '{}' \
-            https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/${{ secrets.GATEWAY_CONTAINER_ID }}/deploy
+          tool: just@1.58.0
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          gleam-version: "1.10.0"
+      - uses: actions/cache@v4
+        with:
+          path: server/gateway/build
+          key: gleam-${{ runner.os }}-${{ hashFiles('server/gateway/manifest.toml') }}
+          restore-keys: |
+            gleam-${{ runner.os }}-
+      - name: just gateway test
+        run: just gateway test
+
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/reusable-deploy-scaleway-container.yml
+    with:
+      image_name: nrdrm-gateway
+      dockerfile: server/gateway/Dockerfile
+      context: server/gateway
+      extra_environment_variables: '{"ALLOWED_ORIGINS":"${{ vars.ALLOWED_ORIGINS }}"}'
+    secrets:
+      SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
+      CONTAINER_REGISTRY_ENDPOINT: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+      CONTAINER_ID: ${{ secrets.GATEWAY_CONTAINER_ID }}
