@@ -6,7 +6,6 @@ module Domain.Recipe
     CreateRecipeInput (..),
     CreateRecipeIngredientInput (..),
     UpdateRecipeInput (..),
-    UpdateRecipeIngredientInput (..),
     getAllRecipes,
     getRecipe,
     createRecipe,
@@ -62,7 +61,7 @@ instance FromJSON CreateRecipeInput where
 data UpdateRecipeInput = UpdateRecipeInput
   { name :: Maybe Text,
     description :: Maybe Text,
-    ingredients :: Maybe [UpdateRecipeIngredientInput]
+    ingredients :: Maybe [CreateRecipeIngredientInput]
   }
   deriving (Show)
 
@@ -92,25 +91,6 @@ instance FromJSON CreateRecipeIngredientInput where
     unitValue <- obj .: "unit"
     return $
       CreateRecipeIngredientInput
-        { id = ingredientIdValue,
-          amount = amountValue,
-          unit = unitValue
-        }
-
-data UpdateRecipeIngredientInput = UpdateRecipeIngredientInput
-  { id :: UUID,
-    amount :: Maybe Int,
-    unit :: Maybe Unit
-  }
-  deriving (Show)
-
-instance FromJSON UpdateRecipeIngredientInput where
-  parseJSON = withObject "UpdateRecipeIngredientInput" $ \obj -> do
-    ingredientIdValue <- obj .: "id"
-    amountValue <- obj .:? "amount"
-    unitValue <- obj .:? "unit"
-    return $
-      UpdateRecipeIngredientInput
         { id = ingredientIdValue,
           amount = amountValue,
           unit = unitValue
@@ -174,7 +154,7 @@ toRecipeWriteUpdate input =
             updatedAt = Nothing,
             description = maybe Omit Value input.description
           },
-      ingredients = fmap (Recipe.Set . mapMaybe toRecipeIngredientNestedUpdate) input.ingredients
+      ingredients = fmap (Recipe.Set . map toRecipeIngredientNestedCreate) input.ingredients
     }
 
 toRecipeIngredientNestedCreate :: CreateRecipeIngredientInput -> Recipe.RecipeIngredientNestedCreate
@@ -184,17 +164,6 @@ toRecipeIngredientNestedCreate input =
       amount = input.amount,
       unit = toDbUnit input.unit
     }
-
-toRecipeIngredientNestedUpdate :: UpdateRecipeIngredientInput -> Maybe Recipe.RecipeIngredientNestedCreate
-toRecipeIngredientNestedUpdate input = do
-  amount <- input.amount
-  unit <- input.unit
-  pure
-    Recipe.RecipeIngredientNestedCreate
-      { ingredientId = input.id,
-        amount,
-        unit = toDbUnit unit
-      }
 
 deleteRecipe :: UUID -> Db ()
 deleteRecipe recipeId = void (Recipe.delete recipeId)

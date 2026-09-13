@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Domain.RecipeSpec (recipeSpec)
 import ORM.Codegen.DriftSpec (driftDbSpec, driftSpec)
 import ORM.Codegen.EmitClientSpec (emitClientSpec)
 import ORM.Codegen.EmitFlatRowSpec (emitFlatRowSpec)
@@ -24,6 +25,7 @@ import Test.Hspec
 
 main :: IO ()
 main = hspec $ do
+  recipeSpec
   schemaSpec
   validateSpec
   joinAliasSpec
