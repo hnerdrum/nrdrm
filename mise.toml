@@ -1,0 +1,8 @@
+# GHC is not listed. Stack installs it from server/recipes/stack.yaml (LTS 21.22).
+[tools]
+node = "22"
+rust = "1.86"
+go = "1.22"
+gleam = "1.10.0"
+erlang = "27"
+just = "1.58.0"
