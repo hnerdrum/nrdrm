@@ -43,7 +43,7 @@ Codegen reads your Schema value and writes generated modules: table/row types un
 **The app owns the Schema target.** Codegen is a library (`orm-codegen`); each app supplies a thin executable that points at its targets. In recipes:
 
 ```haskell
--- tools/orm-codegen/Main.hs
+-- codegen/Main.hs
 import ORM.Codegen.CLI (mainWith)
 import ORM.Codegen.RecipeTarget (prodTarget)
 import ORM.Codegen.Target (testTarget)
@@ -55,9 +55,9 @@ main = mainWith [testTarget, prodTarget] [prodTarget]
 A `CodegenTarget` bundles one or more Schemas with output layout (module prefix, directories) and whether to emit Clients. Regenerate from the app directory:
 
 ```bash
-make orm-gen          # write generated files
-make orm-gen-check    # fail if generated files are stale (--check)
-make orm-schema-check # compare Schema to live Postgres (--check-schema)
+just recipes orm-gen          # write generated files
+just recipes orm-gen-check    # fail if generated files are stale (--check)
+just recipes orm-schema-check # compare Schema to live Postgres (--check-schema)
 ```
 
 CLI flags:
@@ -112,7 +112,7 @@ Writes keep a separate Include argument for the returned shape: `create include 
 2. **`--check-schema`** introspects live Postgres and reports drift: missing/extra tables or columns, wrong types or nullability, primary keys, uniques, enums.
 3. Fix drift by updating either the Schema or the migrations — whichever side is wrong — then re-run checks.
 
-Typical CI: `make orm-gen-check` ensures committed generated code matches the Schema; `make orm-schema-check` (with a test database) ensures the Schema matches Postgres after migrations.
+Typical CI: `just recipes orm-gen-check` ensures committed generated code matches the Schema; `just recipes orm-schema-check` (with a test database) ensures the Schema matches Postgres after migrations.
 
 ## Scope and limits
 

@@ -1,63 +1,65 @@
 # recipes server
 
-## Integration tests
+Haskell/Servant API. Dev Postgres is port **5432** (`recipes` in [`docker-databases.yml`](../../docker-databases.yml)).
 
-ORM integration tests use a **dedicated test schema** (`test_widget` in `test/migrations/`) — not the application `ingredient` / `recipe` tables. The test database is separate from local dev data.
+## Run
 
-### Quick start
-
-```bash
-make test
-```
-
-This starts the test Postgres container, waits until it is healthy, and runs `stack test`.
-
-### Commands
+From the repo root, start databases, then:
 
 ```bash
-make help          # list all targets
-make test          # start test DB + run tests
-make test-fast     # run tests (DB must already be running)
-make test-db-up    # start test DB only
-make test-db-down  # stop test DB
-make test-db-logs  # tail DB logs
+just db up
+just recipes run
 ```
 
-### Environment
+Listens on `PORT` (default 8000).
 
-The default test database URL is defined in the `Makefile`. Override if needed:
+## Test
+
+Integration tests use a dedicated test schema (`test/migrations/`), not the application tables, and a separate database on port **5435**.
 
 ```bash
-make test TEST_DATABASE_URL=postgres://user:pass@127.0.0.1:5435/recipes_test
+just recipes test        # start test DB, generate ORM clients, run tests
+just recipes test-fast   # tests only (DB must already be running)
+just recipes             # all targets
 ```
 
-For `stack test` without Make, copy the example env file and start the DB first:
+CI sets `STACK_ARCH=x86_64`. Local default is `aarch64`.
+
+Override the URL if needed:
+
+```bash
+just recipes test TEST_DATABASE_URL=postgres://user:pass@127.0.0.1:5435/recipes_test
+```
+
+For `stack test` without just:
 
 ```bash
 cp .env.test.example .env.test
-make test-db-up
-stack test
+just recipes test-db-up
+just recipes orm-gen
+stack --arch=aarch64 test --fast recipes:recipes-test
 ```
 
-Use `make test` to start the database and run tests in one step.
-
-### Connection refused?
-
-The test database is not running. From `server/recipes/`:
-
-```bash
-make test-db-up   # start Postgres on port 5435
-make test-fast    # then run tests
-```
-
-`Support.TestDb` loads `.env.test` first, then falls back to `.env`.
-
-### Test layout
+`Support.TestDb` loads `.env.test` first, then falls back to `.env`. If you get connection refused, the test database is not running (`just recipes test-db-up`).
 
 ```
 test/
   migrations/       # ORM-only schema (not app migrations/)
-  Schema/Widget.hs  # test table instances for Insertable/Updatable/etc.
+  Schema/Widget.hs  # test table instances
   ORM/              # ORM integration specs
   Support/          # harness + test migrations runner
 ```
+
+## Build
+
+```bash
+just recipes build
+```
+
+Also regenerates ORM client code (`just recipes orm-gen`).
+
+## Migrate
+
+Hand-written SQL in `migrations/`. Applied automatically on process start. No separate CLI.
+
+Schema vs live Postgres: `just recipes orm-schema-check` (uses the test DB on 5435).
