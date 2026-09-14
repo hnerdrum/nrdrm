@@ -1,0 +1,86 @@
+name: Reusable Scaleway container deploy
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+      dockerfile:
+        required: true
+        type: string
+      context:
+        required: true
+        type: string
+      extra_environment_variables:
+        required: false
+        type: string
+        default: "{}"
+    secrets:
+      SCALEWAY_API_KEY:
+        required: true
+      CONTAINER_REGISTRY_ENDPOINT:
+        required: true
+      CONTAINER_ID:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Login to Scaleway Container Registry
+        uses: docker/login-action@v3
+        with:
+          username: nologin
+          password: ${{ secrets.SCALEWAY_API_KEY }}
+          registry: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+      - name: Build the Docker image
+        env:
+          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+          GIT_SHA: ${{ github.sha }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+          DOCKERFILE: ${{ inputs.dockerfile }}
+          CONTEXT: ${{ inputs.context }}
+        run: docker build -f "$DOCKERFILE" -t "$CONTAINER_REGISTRY/$IMAGE_NAME:$GIT_SHA" "$CONTEXT"
+      - name: Push the Docker image
+        env:
+          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+          GIT_SHA: ${{ github.sha }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+        run: docker push "$CONTAINER_REGISTRY/$IMAGE_NAME:$GIT_SHA"
+      - name: Update Scaleway container
+        env:
+          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+          GIT_SHA: ${{ github.sha }}
+          CONTAINER_ID: ${{ secrets.CONTAINER_ID }}
+          SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
+          PROD_ENV: ${{ vars.PROD_ENV }}
+          EXTRA_ENV: ${{ inputs.extra_environment_variables }}
+          IMAGE_NAME: ${{ inputs.image_name }}
+        run: |
+          payload=$(jq -n \
+            --arg image "$CONTAINER_REGISTRY/$IMAGE_NAME:$GIT_SHA" \
+            --arg build_id "$GIT_SHA" \
+            --arg env "$PROD_ENV" \
+            --argjson extra "$EXTRA_ENV" \
+            '{
+              redeploy: true,
+              registry_image: $image,
+              environment_variables: ({BUILD_ID: $build_id, ENV: $env} + $extra)
+            }')
+          curl --fail --request PATCH \
+            --header "X-Auth-Token: $SCALEWAY_API_KEY" \
+            --header "Content-Type: application/json" \
+            --data "$payload" \
+            "https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/$CONTAINER_ID"
+      - name: Deploy Scaleway container
+        env:
+          CONTAINER_ID: ${{ secrets.CONTAINER_ID }}
+          SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
+        run: |
+          curl --fail --request POST \
+            --header "X-Auth-Token: $SCALEWAY_API_KEY" \
+            --header "Content-Type: application/json" \
+            --data '{}' \
+            "https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/$CONTAINER_ID/deploy"

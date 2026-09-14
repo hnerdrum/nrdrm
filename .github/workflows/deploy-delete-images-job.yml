@@ -1,58 +1,53 @@
-name: Deploy Delete images job
+name: Delete images job
 
 on:
-  push:
+  pull_request:
     paths:
       - "cron/delete-container-images/**"
       - ".github/workflows/deploy-delete-images-job.yml"
+      - ".github/workflows/reusable-deploy-scaleway-job.yml"
+  push:
     branches:
       - main
-      # TODO: remove this branch after testing
-      - delete-container-images-job
+    paths:
+      - "cron/delete-container-images/**"
+      - ".github/workflows/deploy-delete-images-job.yml"
+      - ".github/workflows/reusable-deploy-scaleway-job.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  check:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: cron/delete-container-images
-
     steps:
       - uses: actions/checkout@v4
-      - name: Login to Scaleway Container Registry
-        uses: docker/login-action@v3
+      - uses: taiki-e/install-action@v2
         with:
-          username: nologin
-          password: ${{ secrets.SCALEWAY_API_KEY }}
-          registry: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
-      - name: Build the Docker image
-        env:
-          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
-          GIT_SHA: ${{ github.sha }}
-        run: docker build -t $CONTAINER_REGISTRY/nrdrm-delete-images-job:$GIT_SHA .
-      - name: Push the Docker Image
-        env:
-          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
-          GIT_SHA: ${{ github.sha }}
-        run: docker push $CONTAINER_REGISTRY/nrdrm-delete-images-job:$GIT_SHA
-      - name: Update Scaleway serverless job definition
-        env:
-          CONTAINER_REGISTRY: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
-          GIT_SHA: ${{ github.sha }}
-          JOB_ID: ${{ secrets.DELETE_CONTAINER_IMAGES_JOB_ID }}
-        run: >
-          curl \
-            --request PATCH \
-            --header "X-Auth-Token: ${{ secrets.SCALEWAY_API_KEY }}" \
-            --data "{
-              \"image_uri\": \"$CONTAINER_REGISTRY/nrdrm-delete-images-job:$GIT_SHA\",
-              \"environment_variables\": {
-                \"SCALEWAY_API_KEY\": \"${{ secrets.SCALEWAY_API_KEY }}\",
-                \"SCALEWAY_CONTAINER_REGISTRY_BASE_URL\": \"${{ vars.SCALEWAY_CONTAINER_REGISTRY_BASE_URL }}\"
-              },
-              \"cron_schedule\": {
-                \"schedule\": \"0 2 * * 1\",
-                \"timezone\": \"Europe/Oslo\"
-              }
-            }" \
-            https://api.scaleway.com/serverless-jobs/v1alpha1/regions/fr-par/job-definitions/$JOB_ID
+          tool: just@1.58.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: cron/delete-container-images/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: cron/delete-container-images
+      - name: just delete-images build
+        run: just delete-images build
+
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/reusable-deploy-scaleway-job.yml
+    with:
+      image_name: nrdrm-delete-images-job
+      dockerfile: cron/delete-container-images/Dockerfile
+      context: cron/delete-container-images
+      cron_schedule: "0 2 * * 1"
+      cron_timezone: Europe/Oslo
+    secrets:
+      SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
+      CONTAINER_REGISTRY_ENDPOINT: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+      JOB_ID: ${{ secrets.DELETE_CONTAINER_IMAGES_JOB_ID }}

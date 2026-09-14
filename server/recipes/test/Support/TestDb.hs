@@ -53,7 +53,7 @@ testDatabaseUrl = do
         unlines
           [ "No test database URL configured.",
             "Set TEST_DATABASE_URL (recommended) or DATABASE_URL.",
-            "Copy .env.test.example to .env.test, or run: make test"
+            "Copy .env.test.example to .env.test, or run: just recipes test"
           ]
     Just url -> return url
 
@@ -77,10 +77,10 @@ connectionErrorMessage databaseUrl err =
       "URL: " <> databaseUrl,
       "",
       "Start the test database with:",
-      "  make test-db-up",
+      "  just recipes test-db-up",
       "",
       "Or run migrations + tests together:",
-      "  make test"
+      "  just recipes test"
     ]
 
 destroyTestEnv :: TestEnv -> IO ()

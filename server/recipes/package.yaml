@@ -95,18 +95,6 @@ library:
     - TypeOperators
 
 executables:
-  orm-codegen:
-    main: Main.hs
-    source-dirs:
-      - tools/orm-codegen
-      - schema
-    ghc-options:
-      - -Wall
-    dependencies:
-      - base
-      - orm
-      - orm-codegen
-      - text
   server-exe:
     main: Main.hs
     source-dirs: app
