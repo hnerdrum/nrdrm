@@ -43,7 +43,7 @@ Codegen reads your Schema value and writes generated modules: table/row types un
 **The app owns the Schema target.** Codegen is a library (`orm-codegen`); each app supplies a thin executable that points at its targets. In recipes:
 
 ```haskell
--- tools/orm-codegen/Main.hs
+-- codegen/Main.hs
 import ORM.Codegen.CLI (mainWith)
 import ORM.Codegen.RecipeTarget (prodTarget)
 import ORM.Codegen.Target (testTarget)

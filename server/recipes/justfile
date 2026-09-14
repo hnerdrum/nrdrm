@@ -21,11 +21,11 @@ migrate:
     @echo "migrations apply automatically on run"
 
 orm-gen:
-    stack --arch={{ stack_arch }} build recipes:orm-codegen
+    stack --arch={{ stack_arch }} build recipes-codegen:exe:orm-codegen
     stack --arch={{ stack_arch }} exec orm-codegen
 
 orm-gen-check:
-    stack --arch={{ stack_arch }} build recipes:orm-codegen
+    stack --arch={{ stack_arch }} build recipes-codegen:exe:orm-codegen
     stack --arch={{ stack_arch }} exec orm-codegen -- --check
 
 orm-schema-check: test-db-up

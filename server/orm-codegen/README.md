@@ -15,7 +15,7 @@ mainWith codegenTargets schemaCheckTargets
 - First argument: targets whose outputs are written and checked with `--check`.
 - Second argument: targets whose Schemas are compared to Postgres with `--check-schema`.
 
-See `ORM.Codegen.Target` and `server/recipes/schema/ORM/Codegen/RecipeTarget.hs` for a production target, and `server/recipes/tools/orm-codegen/Main.hs` for the executable wiring.
+See `ORM.Codegen.Target` and `server/recipes/schema/ORM/Codegen/RecipeTarget.hs` for a production target, and `server/recipes/codegen/Main.hs` for the executable wiring.
 
 ## Canonical example
 

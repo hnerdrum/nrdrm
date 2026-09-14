@@ -1,0 +1,22 @@
+name: recipes-codegen
+version: 0.1.0.0
+github: "hnerdrum/nrdrm"
+license: BSD3
+author: "Henrik Nerdrum"
+maintainer: "henrik.nerdrum@gmail.com"
+copyright: "2023 Henrik Nerdrum"
+
+dependencies:
+  - base >= 4.7 && < 5
+  - orm
+  - orm-codegen
+  - text
+
+executables:
+  orm-codegen:
+    main: Main.hs
+    source-dirs:
+      - .
+      - ../schema
+    ghc-options:
+      - -Wall
