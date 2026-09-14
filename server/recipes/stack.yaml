@@ -31,6 +31,7 @@ resolver:
 #   - wai
 packages:
 - .
+- codegen
 - ../orm
 - ../orm-codegen
 # Dependency packages to be pulled from upstream that are not in the resolver.

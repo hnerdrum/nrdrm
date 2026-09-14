@@ -44,9 +44,10 @@ jobs:
           path: |
             ~/.stack
             server/recipes/.stack-work
+            server/recipes/codegen/.stack-work
             server/orm/.stack-work
             server/orm-codegen/.stack-work
-          key: stack-${{ runner.os }}-${{ hashFiles('server/recipes/stack.yaml.lock', 'server/recipes/package.yaml', 'server/orm/package.yaml', 'server/orm-codegen/package.yaml') }}
+          key: stack-${{ runner.os }}-${{ hashFiles('server/recipes/stack.yaml.lock', 'server/recipes/package.yaml', 'server/recipes/codegen/package.yaml', 'server/orm/package.yaml', 'server/orm-codegen/package.yaml') }}
           restore-keys: |
             stack-${{ runner.os }}-
       - name: Build test dependencies

@@ -7,7 +7,10 @@ COPY orm-codegen/ orm-codegen/
 COPY recipes/ recipes/
 
 WORKDIR /usr/src/app/recipes
-RUN stack setup --install-ghc && stack build --copy-bins
+RUN stack setup --install-ghc \
+ && stack build recipes-codegen:exe:orm-codegen \
+ && stack exec orm-codegen \
+ && stack build --copy-bins
 
 # Runtime stage
 FROM debian:bullseye-slim
