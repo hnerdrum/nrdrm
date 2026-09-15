@@ -76,7 +76,7 @@ jobs:
               },
               cron_schedule: {schedule: $schedule, timezone: $timezone}
             }')
-          curl --fail --request PATCH \
+          curl --fail-with-body --request PATCH \
             --header "X-Auth-Token: $SCALEWAY_API_KEY" \
             --header "Content-Type: application/json" \
             --data "$payload" \

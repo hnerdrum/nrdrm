@@ -69,18 +69,8 @@ jobs:
               registry_image: $image,
               environment_variables: ({BUILD_ID: $build_id, ENV: $env} + $extra)
             }')
-          curl --fail --request PATCH \
+          curl --fail-with-body --request PATCH \
             --header "X-Auth-Token: $SCALEWAY_API_KEY" \
             --header "Content-Type: application/json" \
             --data "$payload" \
             "https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/$CONTAINER_ID"
-      - name: Deploy Scaleway container
-        env:
-          CONTAINER_ID: ${{ secrets.CONTAINER_ID }}
-          SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
-        run: |
-          curl --fail --request POST \
-            --header "X-Auth-Token: $SCALEWAY_API_KEY" \
-            --header "Content-Type: application/json" \
-            --data '{}' \
-            "https://api.scaleway.com/containers/v1beta1/regions/fr-par/containers/$CONTAINER_ID/deploy"
