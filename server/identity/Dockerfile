@@ -1,4 +1,4 @@
-FROM rust:1.86-slim as builder
+FROM rust:1.86-slim AS builder
 
 WORKDIR /app
 
@@ -24,7 +24,7 @@ COPY . .
 # Force a rebuild with the real source code by touching a file
 RUN touch src/main.rs && cargo build --release
 
-RUN cargo install diesel_cli --no-default-features --features postgres
+RUN cargo install diesel_cli --version 2.2.12 --locked --no-default-features --features postgres
 
 FROM debian:bookworm-slim
 
