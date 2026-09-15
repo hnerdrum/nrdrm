@@ -13,7 +13,7 @@ RUN stack setup --install-ghc \
  && stack build --copy-bins
 
 # Runtime stage
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 WORKDIR /app
 
