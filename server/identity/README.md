@@ -5,7 +5,7 @@ Rust/Axum auth API. Dev Postgres is port **5433** (`identity` in [`docker-databa
 Needs [diesel_cli](https://diesel.rs/guides/getting-started) with Postgres:
 
 ```bash
-cargo install diesel_cli --no-default-features --features postgres
+cargo install diesel_cli --version 2.2.12 --locked --no-default-features --features postgres
 ```
 
 ## Run
