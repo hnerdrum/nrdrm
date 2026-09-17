@@ -6,7 +6,7 @@ module ORM.Codegen.RecipeTarget
 where
 
 import ORM.Codegen.Spec.Recipe (recipeSchema)
-import ORM.Codegen.Target
+import Poppy.Codegen.Target
   ( ClientConfig (..),
     ClientLayout (..),
     CodegenTarget (..),

@@ -1,0 +1,151 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TypeApplications #-}
+
+module ORM.Schema.Ingredient
+  ( IngredientTable (..),
+    IngredientRow (..),
+    IngredientSelect (..),
+    IngredientPicked (..),
+    ingredientSelect,
+    ingredientSelectColumns,
+    parseIngredientPicked,
+    toIngredientPicked,
+    IngredientCreate (..),
+    IngredientUpdate (..),
+    ingredientId,
+    ingredientCreatedAt,
+    ingredientUpdatedAt,
+    ingredientName
+  )
+where
+
+import Data.Text (Text)
+import Data.Time (UTCTime)
+import Data.UUID (UUID)
+import Poppy.PG (FromRow (..), RowParser, field)
+import Poppy.Core
+import Poppy.Select (Picked (..), picked)
+import Poppy.Insert (Insertable (..), emptyInsert, set, setMaybe)
+import Poppy.Update (Updatable (..), emptyUpdate, setFieldMaybe)
+
+data IngredientTable = IngredientTable
+
+type instance PrimaryKeyType IngredientTable = UUID
+
+instance Entity IngredientTable where
+  tableName = "ingredient"
+  primaryKey = ingredientId
+  tableColumns = ["id", "created_at", "updated_at", "name"]
+
+instance Insertable IngredientTable where
+  type CreateInput IngredientTable = IngredientCreate
+  toInsertBuilder input =
+    setMaybe ingredientId input.id $
+      setMaybe ingredientCreatedAt input.createdAt $
+      setMaybe ingredientUpdatedAt input.updatedAt $
+      set ingredientName input.name $
+      emptyInsert @IngredientTable
+
+
+instance Updatable IngredientTable where
+  type UpdateInput IngredientTable = IngredientUpdate
+  updatedAtField = Just ingredientUpdatedAt
+  toUpdateBuilder input =
+    setFieldMaybe ingredientCreatedAt input.createdAt $
+      setFieldMaybe ingredientUpdatedAt input.updatedAt $
+      setFieldMaybe ingredientName input.name $
+      emptyUpdate @IngredientTable
+
+
+data IngredientRow = IngredientRow
+  { id :: UUID,
+    createdAt :: UTCTime,
+    updatedAt :: UTCTime,
+    name :: Text
+  }
+  deriving (Show, Eq)
+
+
+data IngredientCreate = IngredientCreate
+  { id :: Maybe UUID,
+    createdAt :: Maybe UTCTime,
+    updatedAt :: Maybe UTCTime,
+    name :: Text
+  }
+  deriving (Show, Eq)
+
+
+data IngredientUpdate = IngredientUpdate
+  { createdAt :: Maybe UTCTime,
+    updatedAt :: Maybe UTCTime,
+    name :: Maybe Text
+  }
+  deriving (Show, Eq)
+
+
+instance FromRow IngredientRow where
+  fromRow = IngredientRow <$> field <*> field <*> field <*> field
+
+
+data IngredientSelect = IngredientSelect
+  { id :: Bool,
+    createdAt :: Bool,
+    updatedAt :: Bool,
+    name :: Bool
+  }
+  deriving (Show, Eq)
+data IngredientPicked = IngredientPicked
+  { id :: UUID,
+    createdAt :: Picked UTCTime,
+    updatedAt :: Picked UTCTime,
+    name :: Picked Text
+  }
+  deriving (Show, Eq)
+ingredientSelect :: IngredientSelect
+ingredientSelect =
+  IngredientSelect
+    { id = False,
+      createdAt = False,
+      updatedAt = False,
+      name = False
+    }
+ingredientSelectColumns :: IngredientSelect -> [Text]
+ingredientSelectColumns select_ =
+  fieldColumn ingredientId
+    : concat
+      [ [fieldColumn ingredientCreatedAt | select_.createdAt]
+      , [fieldColumn ingredientUpdatedAt | select_.updatedAt]
+      , [fieldColumn ingredientName | select_.name]
+      ]
+parseIngredientPicked :: IngredientSelect -> RowParser IngredientPicked
+parseIngredientPicked select_ = do
+  idVal <- field
+  createdAtVal <- if select_.createdAt then Picked <$> field else pure Skipped
+  updatedAtVal <- if select_.updatedAt then Picked <$> field else pure Skipped
+  nameVal <- if select_.name then Picked <$> field else pure Skipped
+  pure IngredientPicked { id = idVal, createdAt = createdAtVal, updatedAt = updatedAtVal, name = nameVal }
+toIngredientPicked :: IngredientSelect -> IngredientRow -> IngredientPicked
+toIngredientPicked select_ row =
+  IngredientPicked
+    { id = row.id,
+      createdAt = picked select_.createdAt row.createdAt,
+      updatedAt = picked select_.updatedAt row.updatedAt,
+      name = picked select_.name row.name
+    }
+
+
+ingredientId :: Field IngredientTable UUID
+ingredientId = Field "id" "id"
+
+ingredientCreatedAt :: Field IngredientTable UTCTime
+ingredientCreatedAt = Field "createdAt" "created_at"
+
+ingredientUpdatedAt :: Field IngredientTable UTCTime
+ingredientUpdatedAt = Field "updatedAt" "updated_at"
+
+ingredientName :: Field IngredientTable Text
+ingredientName = Field "name" "name"
+

@@ -2,12 +2,12 @@ FROM haskell:9.2.8 AS build
 
 WORKDIR /usr/src/app
 
-COPY orm/ orm/
-COPY orm-codegen/ orm-codegen/
 COPY recipes/ recipes/
 
 WORKDIR /usr/src/app/recipes
-RUN stack setup --install-ghc \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git ca-certificates \
+ && stack setup --install-ghc \
  && stack build recipes-codegen:exe:orm-codegen \
  && stack exec orm-codegen \
  && stack build --copy-bins

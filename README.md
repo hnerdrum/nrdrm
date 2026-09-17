@@ -31,12 +31,10 @@ CI runs those same commands on pull requests (`just recipes test`, `just identit
 
 ### Backends
 
-- [`server/recipes`](server/recipes) — Haskell recipe API
+- [`server/recipes`](server/recipes) — Haskell recipe API (uses [Poppy](https://github.com/hnerdrum/poppy) for Postgres)
 - [`server/identity`](server/identity) — Rust auth API
 - [`server/gateway`](server/gateway) — Gleam reverse proxy
 - [`server/uno`](server/uno) — Go Uno API (local only)
-
-Shared Haskell libraries: [`server/orm`](server/orm), [`server/orm-codegen`](server/orm-codegen).
 
 ### Frontends
 

@@ -5,7 +5,7 @@ module ORM.Codegen.Spec.Recipe
   )
 where
 
-import ORM.Codegen.Schema
+import Poppy.Codegen.Schema
 
 recipeSchema :: Schema
 recipeSchema =

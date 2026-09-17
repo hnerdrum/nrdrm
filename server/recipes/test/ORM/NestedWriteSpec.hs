@@ -8,14 +8,14 @@ where
 import Data.List (find, sort)
 import Data.Text (Text)
 import Data.UUID (UUID)
-import ORM (NullableValue (..), runDb)
 import qualified ORM.Client.Ingredient as Ingredient
 import qualified ORM.Client.Recipe as Recipe
-import ORM.Db (DbPool)
 import ORM.Schema.Ingredient (IngredientCreate (..), IngredientRow, IngredientTable)
 import ORM.Schema.Recipe (RecipeTable)
 import ORM.Schema.Unit (Unit (G, Ml))
-import ORM.Where (eq)
+import Poppy (NullableValue (..), runDb)
+import Poppy.Db (DbPool)
+import Poppy.Where (eq)
 import Support.Assert (assertRight)
 import Support.TestDb (TestEnv (..), truncateTable)
 import Test.Hspec (SpecWith, describe, it, shouldBe)

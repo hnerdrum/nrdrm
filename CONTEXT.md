@@ -1,6 +1,6 @@
-# ORM
+# Recipes
 
-A Haskell library: you write a Schema, generate a Client, then query and write through that Client.
+Postgres-backed recipe API. Persistence goes through [Poppy](https://github.com/hnerdrum/poppy): this app owns the Schema, a thin codegen executable, and the generated Client.
 
 ## Language
 

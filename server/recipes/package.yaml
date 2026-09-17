@@ -40,7 +40,7 @@ dependencies:
   - either
   - directory
   - filepath
-  - orm
+  - poppy
 
 ghc-options:
   - -Wall
@@ -122,40 +122,11 @@ tests:
     other-modules:
       - ORM.Codegen.RecipeTarget
       - ORM.Codegen.Spec.Recipe
-      - Schema.Widget
-      - Schema.Shelf
-      - Schema.Book
-      - Schema.BookInclude
-      - Schema.Chapter
-      - Schema.ChapterInclude
-      - Schema.Section
-      - Schema.Tag
-      - Schema.ShelfInclude
       - Support.Assert
       - Support.TestDb
-      - Support.TestMigrations
       - Domain.RecipeSpec
-      - ORM.OperationsSpec
-      - ORM.RawSpec
-      - ORM.ErrorsSpec
-      - ORM.GroupSpec
-      - ORM.JoinSpec
-      - ORM.IncludeSpec
-      - ORM.WhereSpec
-      - ORM.SelectSpec
       - ORM.NestedWriteSpec
-      - ORM.Codegen.ValidateSpec
-      - ORM.Codegen.SchemaSpec
-      - ORM.Codegen.JoinAliasSpec
-      - ORM.Codegen.IncludePathSpec
-      - ORM.Codegen.EmitSpec
-      - ORM.Codegen.EmitFlatRowSpec
-      - ORM.Codegen.EmitIncludeSpec
-      - ORM.Codegen.EmitClientSpec
       - ORM.Codegen.TargetSpec
-      - ORM.Codegen.DriftSpec
-      - ORM.WidgetFixtures
-      - ORM.ShelfFixtures
     ghc-options:
       - -threaded
       - -rtsopts
@@ -163,8 +134,8 @@ tests:
     dependencies:
       - base
       - directory
-      - orm
-      - orm-codegen
+      - poppy
+      - poppy-codegen
       - recipes
       - hspec
       - hspec-wai

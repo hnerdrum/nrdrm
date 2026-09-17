@@ -1,21 +1,5 @@
 cradle:
   multi:
-    - path: "./server/orm"
-      config:
-        cradle:
-          stack:
-            stackYaml: "./server/recipes/stack.yaml"
-            components:
-              - path: "./server/orm/src"
-                component: "orm:lib"
-    - path: "./server/orm-codegen"
-      config:
-        cradle:
-          stack:
-            stackYaml: "./server/recipes/stack.yaml"
-            components:
-              - path: "./server/orm-codegen/src"
-                component: "orm-codegen:lib"
     - path: "./server/recipes"
       config:
         cradle:
