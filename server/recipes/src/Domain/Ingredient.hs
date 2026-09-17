@@ -22,11 +22,11 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Unit (Unit (..))
-import ORM (DatabaseErrorInfo (..), ORMError (..))
 import ORM.Client.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
 import qualified ORM.Client.Ingredient as Ingredient
-import ORM.Db (Db)
-import ORM.Where (eq)
+import Poppy (DatabaseErrorInfo (..), ORMError (..))
+import Poppy.Db (Db)
+import Poppy.Where (eq)
 
 newtype CreateIngredientInput = CreateIngredientInput
   { name :: Text

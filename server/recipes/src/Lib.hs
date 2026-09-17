@@ -12,7 +12,7 @@ import Data.Text (pack)
 import Database.Migrations (runDbMigrations)
 import qualified Logger
 import Network.Wai.Handler.Warp (run)
-import ORM.Db (connect)
+import Poppy.Db (connect)
 import Servant (serve)
 
 startApp :: IO ()

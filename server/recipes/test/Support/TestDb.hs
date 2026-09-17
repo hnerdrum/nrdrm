@@ -19,15 +19,12 @@ import qualified Data.Text.Encoding as TE
 import Database.Migrations (runDbMigrations)
 import qualified Database.PostgreSQL.Simple as PG
 import Database.PostgreSQL.Simple.Types (Query (..))
-import ORM.Core (Entity (..))
-import ORM.Db (DbPool, closePool, connect, withConn)
-import ORM.Sql (quoteIdent)
-import Schema.Book (BookTable)
-import Schema.Chapter (ChapterTable)
-import Schema.Shelf (ShelfTable)
-import Schema.Tag (TagTable)
-import Schema.Widget (WidgetTable)
-import Support.TestMigrations (runTestMigrations)
+import ORM.Schema.Ingredient (IngredientTable)
+import ORM.Schema.Recipe (RecipeTable)
+import ORM.Schema.RecipeIngredient (RecipeIngredientTable)
+import Poppy.Core (Entity (..))
+import Poppy.Db (DbPool, closePool, connect, withConn)
+import Poppy.Sql (quoteIdent)
 import System.Directory (doesFileExist)
 import System.Environment (lookupEnv)
 import Test.Hspec (Spec, SpecWith, afterAll, beforeAll, beforeWith)
@@ -61,7 +58,6 @@ setupTestEnv :: IO TestEnv
 setupTestEnv = do
   databaseUrl <- testDatabaseUrl
   result <- try @SomeException $ do
-    runTestMigrations databaseUrl
     runDbMigrations databaseUrl
     connect databaseUrl
   case result of
@@ -89,11 +85,9 @@ destroyTestEnv TestEnv {envPool = pool} =
 
 resetTestData :: TestEnv -> IO ()
 resetTestData env = do
-  truncateTable @WidgetTable env
-  truncateTable @ChapterTable env
-  truncateTable @BookTable env
-  truncateTable @TagTable env
-  truncateTable @ShelfTable env
+  truncateTable @RecipeIngredientTable env
+  truncateTable @RecipeTable env
+  truncateTable @IngredientTable env
 
 truncateTable ::
   forall table.

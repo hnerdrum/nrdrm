@@ -1,0 +1,177 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TypeApplications #-}
+
+module ORM.Schema.Recipe
+  ( RecipeTable (..),
+    RecipeRow (..),
+    RecipeSelect (..),
+    RecipePicked (..),
+    recipeSelect,
+    recipeSelectColumns,
+    parseRecipePicked,
+    toRecipePicked,
+    RecipeCreate (..),
+    RecipeUpdate (..),
+    recipeId,
+    recipeCreatedAt,
+    recipeUpdatedAt,
+    recipeName,
+    recipeDescription,
+    recipeIngredients
+  )
+where
+
+import Data.Text (Text)
+import Data.Time (UTCTime)
+import Data.UUID (UUID)
+import Poppy.PG (FromRow (..), RowParser, field)
+import Poppy.Core
+import Poppy.Select (Picked (..), picked)
+import Poppy.Insert (Insertable (..), emptyInsert, set, setMaybe, setNullable)
+import Poppy.Update (Updatable (..), emptyUpdate, setFieldMaybe, setFieldNullable)
+import Poppy.Relation (HasMany (..), JoinType (..))
+import ORM.Schema.RecipeIngredient (RecipeIngredientTable, recipeIngredientRecipeId)
+
+data RecipeTable = RecipeTable
+
+type instance PrimaryKeyType RecipeTable = UUID
+
+instance Entity RecipeTable where
+  tableName = "recipe"
+  primaryKey = recipeId
+  tableColumns = ["id", "created_at", "updated_at", "name", "description"]
+
+instance Insertable RecipeTable where
+  type CreateInput RecipeTable = RecipeCreate
+  toInsertBuilder input =
+    setMaybe recipeId input.id $
+      setMaybe recipeCreatedAt input.createdAt $
+      setMaybe recipeUpdatedAt input.updatedAt $
+      set recipeName input.name $
+      setNullable recipeDescription input.description $
+      emptyInsert @RecipeTable
+
+
+instance Updatable RecipeTable where
+  type UpdateInput RecipeTable = RecipeUpdate
+  updatedAtField = Just recipeUpdatedAt
+  toUpdateBuilder input =
+    setFieldMaybe recipeCreatedAt input.createdAt $
+      setFieldMaybe recipeUpdatedAt input.updatedAt $
+      setFieldMaybe recipeName input.name $
+      setFieldNullable recipeDescription input.description $
+      emptyUpdate @RecipeTable
+
+
+data RecipeRow = RecipeRow
+  { id :: UUID,
+    createdAt :: UTCTime,
+    updatedAt :: UTCTime,
+    name :: Text,
+    description :: Maybe Text
+  }
+  deriving (Show, Eq)
+
+
+data RecipeCreate = RecipeCreate
+  { id :: Maybe UUID,
+    createdAt :: Maybe UTCTime,
+    updatedAt :: Maybe UTCTime,
+    name :: Text,
+    description :: NullableValue Text
+  }
+  deriving (Show, Eq)
+
+
+data RecipeUpdate = RecipeUpdate
+  { createdAt :: Maybe UTCTime,
+    updatedAt :: Maybe UTCTime,
+    name :: Maybe Text,
+    description :: NullableValue Text
+  }
+  deriving (Show, Eq)
+
+
+instance FromRow RecipeRow where
+  fromRow = RecipeRow <$> field <*> field <*> field <*> field <*> field
+
+
+data RecipeSelect = RecipeSelect
+  { id :: Bool,
+    createdAt :: Bool,
+    updatedAt :: Bool,
+    name :: Bool,
+    description :: Bool
+  }
+  deriving (Show, Eq)
+data RecipePicked = RecipePicked
+  { id :: UUID,
+    createdAt :: Picked UTCTime,
+    updatedAt :: Picked UTCTime,
+    name :: Picked Text,
+    description :: Picked (Maybe Text)
+  }
+  deriving (Show, Eq)
+recipeSelect :: RecipeSelect
+recipeSelect =
+  RecipeSelect
+    { id = False,
+      createdAt = False,
+      updatedAt = False,
+      name = False,
+      description = False
+    }
+recipeSelectColumns :: RecipeSelect -> [Text]
+recipeSelectColumns select_ =
+  fieldColumn recipeId
+    : concat
+      [ [fieldColumn recipeCreatedAt | select_.createdAt]
+      , [fieldColumn recipeUpdatedAt | select_.updatedAt]
+      , [fieldColumn recipeName | select_.name]
+      , [fieldColumn recipeDescription | select_.description]
+      ]
+parseRecipePicked :: RecipeSelect -> RowParser RecipePicked
+parseRecipePicked select_ = do
+  idVal <- field
+  createdAtVal <- if select_.createdAt then Picked <$> field else pure Skipped
+  updatedAtVal <- if select_.updatedAt then Picked <$> field else pure Skipped
+  nameVal <- if select_.name then Picked <$> field else pure Skipped
+  descriptionVal <- if select_.description then Picked <$> field else pure Skipped
+  pure RecipePicked { id = idVal, createdAt = createdAtVal, updatedAt = updatedAtVal, name = nameVal, description = descriptionVal }
+toRecipePicked :: RecipeSelect -> RecipeRow -> RecipePicked
+toRecipePicked select_ row =
+  RecipePicked
+    { id = row.id,
+      createdAt = picked select_.createdAt row.createdAt,
+      updatedAt = picked select_.updatedAt row.updatedAt,
+      name = picked select_.name row.name,
+      description = picked select_.description row.description
+    }
+
+
+recipeId :: Field RecipeTable UUID
+recipeId = Field "id" "id"
+
+recipeCreatedAt :: Field RecipeTable UTCTime
+recipeCreatedAt = Field "createdAt" "created_at"
+
+recipeUpdatedAt :: Field RecipeTable UTCTime
+recipeUpdatedAt = Field "updatedAt" "updated_at"
+
+recipeName :: Field RecipeTable Text
+recipeName = Field "name" "name"
+
+recipeDescription :: Field RecipeTable Text
+recipeDescription = Field "description" "description"
+
+recipeIngredients :: HasMany RecipeTable RecipeIngredientTable UUID
+recipeIngredients =
+  HasMany
+    { localKey = recipeId,
+      foreignKey = recipeIngredientRecipeId,
+      joinType = LeftJoin
+    }
+

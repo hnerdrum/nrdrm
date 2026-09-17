@@ -9,7 +9,7 @@ where
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Reader (ReaderT, asks)
 import Data.Text (Text)
-import ORM.Db (Db (..), DbPool, runDb, withTransaction)
+import Poppy.Db (Db (..), DbPool, runDb, withTransaction)
 import Servant (Handler)
 
 data AppContext = AppContext

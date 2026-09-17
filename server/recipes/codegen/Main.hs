@@ -1,8 +1,7 @@
 module Main (main) where
 
-import ORM.Codegen.CLI (mainWith)
 import ORM.Codegen.RecipeTarget (prodTarget)
-import ORM.Codegen.Target (testTarget)
+import Poppy.Codegen.CLI (mainWith)
 
 main :: IO ()
-main = mainWith [testTarget, prodTarget] [prodTarget]
+main = mainWith [prodTarget] [prodTarget]

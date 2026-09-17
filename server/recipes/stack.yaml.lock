@@ -3,7 +3,33 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    commit: 9fc2ee6da2106e68b4ff7ab073f916272dbc8639
+    git: https://github.com/hnerdrum/poppy.git
+    name: poppy
+    pantry-tree:
+      sha256: 522cf50a8f1d9166fe95c878e7f10072b4fcf665097b28450a1bad0e5d2f9e23
+      size: 3442
+    subdir: poppy
+    version: 0.1.0.0
+  original:
+    commit: 9fc2ee6da2106e68b4ff7ab073f916272dbc8639
+    git: https://github.com/hnerdrum/poppy.git
+    subdir: poppy
+- completed:
+    commit: 9fc2ee6da2106e68b4ff7ab073f916272dbc8639
+    git: https://github.com/hnerdrum/poppy.git
+    name: poppy-codegen
+    pantry-tree:
+      sha256: a94b0e1b04a412b6ba5abb7e0eeffdaa855503df72295c56e4dc8fe3f8e12666
+      size: 4441
+    subdir: poppy-codegen
+    version: 0.1.0.0
+  original:
+    commit: 9fc2ee6da2106e68b4ff7ab073f916272dbc8639
+    git: https://github.com/hnerdrum/poppy.git
+    subdir: poppy-codegen
 snapshots:
 - completed:
     sha256: afd5ba64ab602cabc2d3942d3d7e7dd6311bc626dcb415b901eaf576cb62f0ea

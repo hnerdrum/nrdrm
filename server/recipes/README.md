@@ -1,6 +1,6 @@
 # recipes server
 
-Haskell/Servant API. Dev Postgres is port **5432** (`recipes` in [`docker-databases.yml`](../../docker-databases.yml)).
+Haskell/Servant API. Dev Postgres is port **5432** (`recipes` in [`docker-databases.yml`](../../docker-databases.yml)). Persistence uses [Poppy](https://github.com/hnerdrum/poppy): this app owns the Schema and generated Client.
 
 ## Run
 
@@ -15,10 +15,10 @@ Listens on `PORT` (default 8000).
 
 ## Test
 
-Integration tests use a dedicated test schema (`test/migrations/`), not the application tables, and a separate database on port **5435**.
+Integration tests use the application schema (after migrations) and a separate database on port **5435**.
 
 ```bash
-just recipes test        # start test DB, generate ORM clients, run tests
+just recipes test        # start test DB, generate Poppy clients, run tests
 just recipes test-fast   # tests only (DB must already be running)
 just recipes             # all targets
 ```
@@ -44,10 +44,9 @@ stack --arch=aarch64 test --fast recipes:recipes-test
 
 ```
 test/
-  migrations/       # ORM-only schema (not app migrations/)
-  Schema/Widget.hs  # test table instances
-  ORM/              # ORM integration specs
-  Support/          # harness + test migrations runner
+  Domain/           # domain unit tests
+  ORM/              # generated-Client integration specs
+  Support/          # harness
 ```
 
 ## Build
@@ -56,7 +55,7 @@ test/
 just recipes build
 ```
 
-Also regenerates ORM client code (`just recipes orm-gen`).
+Also regenerates Poppy client code (`just recipes orm-gen`).
 
 ## Migrate
 

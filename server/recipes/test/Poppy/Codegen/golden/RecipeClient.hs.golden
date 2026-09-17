@@ -1,0 +1,450 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NoFieldSelectors #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
+
+module ORM.Client.Recipe
+  ( findMany,
+    findUnique,
+    findUniqueOrFail,
+    create,
+    update,
+    delete,
+    deleteMany,
+    RecipeWriteCreate (..),
+    RecipeWriteUpdate (..),
+    RecipeIngredientNestedCreate (..),
+    IngredientsWrite (..),
+    RecipeIngredientNestedOps (..),
+    emptyRecipeIngredientNestedOps,
+    IncludeIngredients (..),
+    Ingredient (..),
+    Ingredients (..),
+    unwrapIngredients,
+    WithIngredients (..),
+    unwrapWithIngredients,
+    ingredient,
+    ResolveInclude,
+    RecipeQuery (..),
+    emptyQuery,
+    recipeId,
+    RecipeCreate (..),
+    RecipeRow (..),
+    RecipeSelect (..),
+    RecipePicked (..),
+    recipeSelect,
+    OmitSelect (..),
+    Picked (..),
+    RecipeWithIngredientsPicked (..),
+    RecipeUpdate (..),
+    RecipeWithIngredients (..),
+    RecipeWithRecipeIngredient (..),
+    RecipeWithRecipeIngredientPicked (..),
+    RecipeIngredientWithIngredient (..),
+    RecipeIngredientRow (..),
+    IngredientRow (..),
+    Unit (..),
+  )
+where
+
+import Data.UUID (UUID)
+import qualified Data.UUID.V4 as V4
+import Poppy.PG (toField)
+import Poppy.Core (fieldColumn)
+import Poppy.Db (Db, liftIO, transaction)
+import qualified Poppy.Delete as Delete
+import Poppy.Errors (ORMError (..), requireFound)
+import qualified Poppy.Include as Include
+import qualified Poppy.Insert as Insert
+import ORM.Schema.Recipe ( RecipeCreate (..), RecipeRow (..), RecipeSelect (..), RecipePicked (..), recipeSelect, recipeSelectColumns, parseRecipePicked, toRecipePicked, RecipeTable, RecipeUpdate (..), recipeId)
+import ORM.Schema.RecipeInclude ( RecipeInclude (..), RecipeWithIngredients (..), RecipeIngredientWithIngredient (..), WithIngredients (..), NoInclude (..), ResolveInclude, unwrapWithIngredients, Ingredients (..), RecipeWithRecipeIngredient (..), IncludeIngredients (..), Ingredient (..), unwrapIngredients)
+import ORM.Schema.RecipeIngredient ( RecipeIngredientCreate (..), RecipeIngredientRow (..), RecipeIngredientUpdate (..), RecipeIngredientTable, recipeIngredientId, recipeIngredientRecipeId)
+import qualified Poppy.Operations as Ops
+import Poppy.Query (QueryBuilder, applyQueryModifiers, matching, selectColumns)
+import Poppy.Select (OmitSelect (..), Picked (..))
+import Poppy.Where (Where, and_, eq, in_)
+import qualified Poppy.Update as Update
+import ORM.Schema.Ingredient (IngredientRow (..))
+import ORM.Schema.Unit (Unit (..))
+
+data RecipeIngredientNestedCreate = RecipeIngredientNestedCreate
+  { ingredientId :: UUID, amount :: Int, unit :: Unit
+  }
+  deriving (Show, Eq)
+
+data RecipeIngredientNestedOps = RecipeIngredientNestedOps
+  { create :: [RecipeIngredientNestedCreate]
+  , createMany :: [RecipeIngredientNestedCreate]
+  , connect :: [UUID]
+  , disconnect :: [UUID]
+  , delete :: [UUID]
+  , update :: [(UUID, RecipeIngredientNestedCreate)]
+  , upsert :: [RecipeIngredientNestedCreate]
+  }
+  deriving (Show, Eq)
+
+data IngredientsWrite = Set [RecipeIngredientNestedCreate] | Ops RecipeIngredientNestedOps
+  deriving (Show, Eq)
+
+emptyRecipeIngredientNestedOps :: RecipeIngredientNestedOps
+emptyRecipeIngredientNestedOps =
+  RecipeIngredientNestedOps
+    { create = []
+    , createMany = []
+    , connect = []
+    , disconnect = []
+    , delete = []
+    , update = []
+    , upsert = []
+    }
+
+data RecipeWriteCreate = RecipeWriteCreate
+  { root :: RecipeCreate
+  , ingredients :: IngredientsWrite
+  }
+  deriving (Show, Eq)
+
+data RecipeWriteUpdate = RecipeWriteUpdate
+  { root :: RecipeUpdate
+  , ingredients :: Maybe IngredientsWrite
+  }
+  deriving (Show, Eq)
+
+toRecipeIngredientCreate :: UUID -> RecipeIngredientNestedCreate -> RecipeIngredientCreate
+toRecipeIngredientCreate parentId nested =
+  RecipeIngredientCreate
+    { id = Nothing,
+      ingredientId = nested.ingredientId,
+      amount = nested.amount,
+      unit = nested.unit,
+      recipeId = parentId
+    }
+
+toRecipeIngredientUpdate :: RecipeIngredientNestedCreate -> RecipeIngredientUpdate
+toRecipeIngredientUpdate nested =
+  RecipeIngredientUpdate
+    { recipeId = Nothing,
+      ingredientId = Just nested.ingredientId,
+      amount = Just nested.amount,
+      unit = Just nested.unit
+    }
+
+sequenceNested :: [Db (Either ORMError ())] -> Db (Either ORMError ())
+sequenceNested [] = pure (Right ())
+sequenceNested (action : rest) = do
+  result <- action
+  case result of
+    Left err -> pure (Left err)
+    Right () -> sequenceNested rest
+
+applyIngredientsWrite :: UUID -> IngredientsWrite -> Db (Either ORMError ())
+applyIngredientsWrite parentId write =
+  case write of
+    Set items -> do
+      _ <-
+        Delete.deleteWhere $
+          Delete.whereDelete (fieldColumn recipeIngredientRecipeId <> " = ?") [toField parentId] (Delete.emptyDelete @RecipeIngredientTable)
+      insertNestedCreates parentId items
+    Ops ops -> applyRecipeIngredientNestedOps parentId ops
+
+insertNestedCreates :: UUID -> [RecipeIngredientNestedCreate] -> Db (Either ORMError ())
+insertNestedCreates parentId = go
+  where
+    go [] = pure (Right ())
+    go (nested : rest) = do
+      result <- Insert.insert @RecipeIngredientTable @RecipeIngredientRow (toRecipeIngredientCreate parentId nested)
+      case result of
+        Left err -> pure (Left err)
+        Right _ -> go rest
+
+applyRecipeIngredientNestedOps :: UUID -> RecipeIngredientNestedOps -> Db (Either ORMError ())
+applyRecipeIngredientNestedOps parentId ops =
+  sequenceNested
+    [ deleteNested parentId ops.delete
+    , deleteNested parentId ops.disconnect
+    , updateNested parentId ops.update
+    , upsertNested parentId ops.upsert
+    , insertNestedCreates parentId ops.create
+    , insertNestedCreateMany parentId ops.createMany
+    , connectNested parentId ops.connect
+    ]
+
+deleteNested :: UUID -> [UUID] -> Db (Either ORMError ())
+deleteNested _ [] = pure (Right ())
+deleteNested parentId ids = do
+  result <- Delete.deleteMany @RecipeIngredientTable (in_ recipeIngredientId ids `and_` eq recipeIngredientRecipeId parentId)
+  pure $ case result of
+    Left err -> Left err
+    Right _ -> Right ()
+
+updateNested :: UUID -> [(UUID, RecipeIngredientNestedCreate)] -> Db (Either ORMError ())
+updateNested parentId = go
+  where
+    go [] = pure (Right ())
+    go ((childId, nested) : rest) = do
+      result <-
+        Update.updateBuilder @RecipeIngredientTable @RecipeIngredientRow $
+          Update.whereUpdate (fieldColumn recipeIngredientId <> " = ?") [toField childId] $
+            Update.whereUpdate (fieldColumn recipeIngredientRecipeId <> " = ?") [toField parentId] $
+              Update.toUpdateBuilder @RecipeIngredientTable (toRecipeIngredientUpdate nested)
+      case result of
+        Left err -> pure (Left err)
+        Right _ -> go rest
+
+upsertNested :: UUID -> [RecipeIngredientNestedCreate] -> Db (Either ORMError ())
+upsertNested parentId = go
+  where
+    go [] = pure (Right ())
+    go (nested : rest) = do
+      result <-
+        Insert.insertBuilder @RecipeIngredientTable @RecipeIngredientRow $
+          Insert.onConflictDoUpdate ["recipe_id", "ingredient_id"] ["amount", "unit"] $
+          Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate parentId nested)
+      case result of
+        Left err -> pure (Left err)
+        Right _ -> go rest
+
+insertNestedCreateMany :: UUID -> [RecipeIngredientNestedCreate] -> Db (Either ORMError ())
+insertNestedCreateMany parentId = go
+  where
+    go [] = pure (Right ())
+    go (nested : rest) = do
+      result <-
+        Insert.tryExecuteInsert $
+          Insert.onConflictDoNothing ["recipe_id", "ingredient_id"] $
+          Insert.toInsertBuilder @RecipeIngredientTable (toRecipeIngredientCreate parentId nested)
+      case result of
+        Left err -> pure (Left err)
+        Right () -> go rest
+
+connectNested :: UUID -> [UUID] -> Db (Either ORMError ())
+connectNested parentId = go
+  where
+    go [] = pure (Right ())
+    go (childId : rest) = do
+      result <-
+        Update.updateBuilder @RecipeIngredientTable @RecipeIngredientRow $
+          Update.setField recipeIngredientRecipeId parentId $
+            Update.whereUpdate (fieldColumn recipeIngredientId <> " = ?") [toField childId] $
+              Update.emptyUpdate @RecipeIngredientTable
+      case result of
+        Left err -> pure (Left err)
+        Right _ -> go rest
+
+noInclude :: NoInclude
+noInclude = NoInclude RecipeInclude {ingredients = Nothing}
+
+data RecipeWithIngredientsPicked = RecipeWithIngredientsPicked
+  { recipe :: RecipePicked,
+    ingredients :: [RecipeIngredientWithIngredient]
+  }
+  deriving (Show, Eq)
+
+toRecipeWithIngredientsPicked :: RecipeSelect -> RecipeWithIngredients -> RecipeWithIngredientsPicked
+toRecipeWithIngredientsPicked select_ nested =
+  RecipeWithIngredientsPicked
+    { recipe = toRecipePicked select_ nested.recipe
+    , ingredients = nested.ingredients
+    }
+
+data RecipeWithRecipeIngredientPicked = RecipeWithRecipeIngredientPicked
+  { recipe :: RecipePicked,
+    ingredients :: [RecipeIngredientRow]
+  }
+  deriving (Show, Eq)
+
+toRecipeWithRecipeIngredientPicked :: RecipeSelect -> RecipeWithRecipeIngredient -> RecipeWithRecipeIngredientPicked
+toRecipeWithRecipeIngredientPicked select_ nested =
+  RecipeWithRecipeIngredientPicked
+    { recipe = toRecipePicked select_ nested.recipe
+    , ingredients = nested.ingredients
+    }
+
+ingredient :: Ingredient
+ingredient = Ingredient
+
+data RecipeQuery include select = RecipeQuery
+  { include_ :: include
+  , select_ :: select
+  , where_ :: Maybe (Where RecipeTable)
+  , orderBy_ :: Maybe (QueryBuilder RecipeTable -> QueryBuilder RecipeTable)
+  , limit_ :: Maybe Int
+  , offset_ :: Maybe Int
+  }
+
+emptyQuery :: RecipeQuery NoInclude OmitSelect
+emptyQuery =
+  RecipeQuery {include_ = noInclude, select_ = OmitSelect, where_ = Nothing, orderBy_ = Nothing, limit_ = Nothing, offset_ = Nothing}
+
+type instance ResolveInclude (RecipeQuery WithIngredients OmitSelect) = RecipeWithIngredients
+type instance ResolveInclude (RecipeQuery NoInclude OmitSelect) = RecipeRow
+type instance ResolveInclude (RecipeQuery WithIngredients RecipeSelect) = RecipeWithIngredientsPicked
+type instance ResolveInclude (RecipeQuery NoInclude RecipeSelect) = RecipePicked
+type instance ResolveInclude (RecipeQuery Ingredients OmitSelect) = RecipeWithRecipeIngredient
+type instance ResolveInclude (RecipeQuery Ingredients RecipeSelect) = RecipeWithRecipeIngredientPicked
+
+class ReadRecipe include select where
+  findMany :: RecipeQuery include select -> Db [ResolveInclude (RecipeQuery include select)]
+  findUnique :: RecipeQuery include select -> Db (Either ORMError (Maybe (ResolveInclude (RecipeQuery include select))))
+  findUniqueOrFail :: RecipeQuery include select -> Db (Either ORMError (ResolveInclude (RecipeQuery include select)))
+
+instance ReadRecipe WithIngredients OmitSelect where
+  findMany RecipeQuery {include_, where_, orderBy_, limit_, offset_} =
+    Include.findMany @RecipeTable (unwrapWithIngredients include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
+  findUnique RecipeQuery {include_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        rows <- Include.findMany @RecipeTable (unwrapWithIngredients include_) (matching w)
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
+instance ReadRecipe NoInclude OmitSelect where
+  findMany RecipeQuery {where_, orderBy_, limit_, offset_} =
+    Ops.findMany @RecipeTable @RecipeRow (applyQueryModifiers where_ orderBy_ limit_ offset_)
+  findUnique RecipeQuery {where_} =
+    Ops.findUniqueWhere @RecipeTable @RecipeRow where_
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
+instance ReadRecipe WithIngredients RecipeSelect where
+  findMany RecipeQuery {include_, select_, where_, orderBy_, limit_, offset_} = do
+    rows <- Include.findMany @RecipeTable (unwrapWithIngredients include_) (applyQueryModifiers where_ orderBy_ limit_ offset_)
+    pure $ map (toRecipeWithIngredientsPicked select_) rows
+  findUnique RecipeQuery {include_, select_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        nested <- Include.findMany @RecipeTable (unwrapWithIngredients include_) (matching w)
+        let rows = map (toRecipeWithIngredientsPicked select_) nested
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
+instance ReadRecipe NoInclude RecipeSelect where
+  findMany RecipeQuery {select_, where_, orderBy_, limit_, offset_} =
+    Ops.findManyWith
+      (parseRecipePicked select_)
+      (selectColumns (recipeSelectColumns select_) . applyQueryModifiers where_ orderBy_ limit_ offset_)
+  findUnique RecipeQuery {select_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        rows <-
+          Ops.findManyWith
+            (parseRecipePicked select_)
+            (selectColumns (recipeSelectColumns select_) . matching w)
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
+instance ReadRecipe Ingredients OmitSelect where
+  findMany RecipeQuery {include_, where_, orderBy_, limit_, offset_} =
+    Include.findMany @RecipeTable include_ (applyQueryModifiers where_ orderBy_ limit_ offset_)
+  findUnique RecipeQuery {include_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        rows <- Include.findMany @RecipeTable include_ (matching w)
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
+instance ReadRecipe Ingredients RecipeSelect where
+  findMany RecipeQuery {include_, select_, where_, orderBy_, limit_, offset_} = do
+    rows <- Include.findMany @RecipeTable include_ (applyQueryModifiers where_ orderBy_ limit_ offset_)
+    pure $ map (toRecipeWithRecipeIngredientPicked select_) rows
+  findUnique RecipeQuery {include_, select_, where_} =
+    case Ops.requireUniqueWhere @RecipeTable where_ of
+      Left err -> pure (Left err)
+      Right w -> do
+        nested <- Include.findMany @RecipeTable include_ (matching w)
+        let rows = map (toRecipeWithRecipeIngredientPicked select_) nested
+        pure $ case rows of
+          [] -> Right Nothing
+          [row] -> Right (Just row)
+          _ -> Left (MultipleRecordsFound "findUnique matched multiple rows")
+  findUniqueOrFail q = do
+    result <- findUnique q
+    case result of
+      Left err -> pure (Left err)
+      Right found -> pure $ requireFound found (RecordNotFound "No record found matching query")
+
+create ::
+  (Include.ExecuteInclude RecipeTable include result) =>
+  include ->
+  RecipeWriteCreate ->
+  Db (Either ORMError result)
+create include input = transaction $ do
+  rootId <- liftIO $ maybe V4.nextRandom pure input.root.id
+  let rootInput =
+        RecipeCreate { id = Just rootId, createdAt = input.root.createdAt, updatedAt = input.root.updatedAt, name = input.root.name, description = input.root.description }
+  rootResult <-
+    Insert.insert @RecipeTable @RecipeRow rootInput
+  case rootResult of
+    Left err -> pure (Left err)
+    Right _ -> do
+      nestedResult <- applyIngredientsWrite rootId input.ingredients
+      case nestedResult of
+        Left err -> pure (Left err)
+        Right () -> Include.findUniqueOrFail @RecipeTable include rootId
+
+update ::
+  (Include.ExecuteInclude RecipeTable include result) =>
+  include ->
+  UUID ->
+  RecipeWriteUpdate ->
+  Db (Either ORMError result)
+update include rootId input = transaction $ do
+  updateResult <-
+    Update.update @RecipeTable @RecipeRow rootId input.root
+  case updateResult of
+    Left err -> pure (Left err)
+    Right _ -> do
+      nestedResult <- case input.ingredients of
+        Nothing -> pure (Right ())
+        Just write -> applyIngredientsWrite rootId write
+      case nestedResult of
+        Left err -> pure (Left err)
+        Right () -> Include.findUniqueOrFail @RecipeTable include rootId
+
+delete :: UUID -> Db Int
+delete = Ops.delete @RecipeTable
+
+deleteMany :: Where RecipeTable -> Db (Either ORMError Int)
+deleteMany = Delete.deleteMany @RecipeTable
