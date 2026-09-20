@@ -3,7 +3,7 @@ module Logger (info, warn, Logger.error, loggingMiddleware) where
 import Control.Monad.Logger.Aeson
 import Data.Aeson (Value (Object), object)
 import qualified Data.Aeson.KeyMap as KM
-import Data.Text hiding (map)
+import Data.Text hiding (map, show)
 import Network.Wai (Middleware, rawPathInfo, requestMethod)
 
 loggingMiddleware :: Middleware

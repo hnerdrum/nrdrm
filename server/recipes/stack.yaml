@@ -18,7 +18,7 @@
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
 resolver:
-  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/22.yaml
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/59.yaml
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -34,7 +34,7 @@ packages:
   - codegen
 extra-deps:
   - git: https://github.com/hnerdrum/poppy.git
-    commit: 4c13ec1ec473e5896bb8d1435ef53a5942624621
+    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
     subdirs:
       - poppy
       - poppy-codegen

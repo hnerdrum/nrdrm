@@ -4,11 +4,11 @@ module Config
   )
 where
 
-import Configuration.Dotenv (defaultConfig, loadFile)
 import Control.Exception (catch)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text, pack)
 import Data.Time
+import qualified LoadEnv
 import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
 
@@ -21,7 +21,7 @@ data AppConfig = AppConfig
   deriving (Show)
 
 loadEnv :: IO ()
-loadEnv = catch (loadFile defaultConfig) handleError
+loadEnv = catch LoadEnv.loadEnv handleError
   where
     handleError :: IOError -> IO ()
     handleError _ = putStrLn "Warning: .env file not found, using environment variables only"

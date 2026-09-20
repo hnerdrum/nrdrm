@@ -5,35 +5,35 @@
 
 packages:
 - completed:
-    commit: 4c13ec1ec473e5896bb8d1435ef53a5942624621
+    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
     git: https://github.com/hnerdrum/poppy.git
     name: poppy
     pantry-tree:
-      sha256: 522cf50a8f1d9166fe95c878e7f10072b4fcf665097b28450a1bad0e5d2f9e23
+      sha256: be47935ea90b5087be7bfb185e63043bd19db01e6d9afe35370bf34b2a2152a6
       size: 3442
     subdir: poppy
     version: 0.1.0.0
   original:
-    commit: 4c13ec1ec473e5896bb8d1435ef53a5942624621
+    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
     git: https://github.com/hnerdrum/poppy.git
     subdir: poppy
 - completed:
-    commit: 4c13ec1ec473e5896bb8d1435ef53a5942624621
+    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
     git: https://github.com/hnerdrum/poppy.git
     name: poppy-codegen
     pantry-tree:
-      sha256: 1aa43061ca5afd270ff57d6086fb7eab989ed4a0bedeee97ab0175afe684e1d0
+      sha256: 4bdeb40f09559b5b2de4c7b0a254479737f32f57df07f69f2c897bb03b698bb4
       size: 4442
     subdir: poppy-codegen
     version: 0.1.0.0
   original:
-    commit: 4c13ec1ec473e5896bb8d1435ef53a5942624621
+    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
     git: https://github.com/hnerdrum/poppy.git
     subdir: poppy-codegen
 snapshots:
 - completed:
-    sha256: afd5ba64ab602cabc2d3942d3d7e7dd6311bc626dcb415b901eaf576cb62f0ea
-    size: 640060
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/22.yaml
+    sha256: 0f728e30e843d7f00460ad56858b995a3b227fca683659c7df9f2fc3988a3ce1
+    size: 732465
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/59.yaml
   original:
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/21/22.yaml
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/59.yaml
