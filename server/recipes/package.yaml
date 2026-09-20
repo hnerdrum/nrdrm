@@ -27,7 +27,7 @@ dependencies:
   - containers
   - unordered-containers
   - katip
-  - dotenv
+  - load-env
   - bytestring
   - split
   - random
@@ -35,7 +35,6 @@ dependencies:
   - memory
   - base64-bytestring
   - bcrypt
-  - hlint
   - monad-logger-aeson
   - either
   - directory

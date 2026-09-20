@@ -1,4 +1,4 @@
-FROM haskell:9.2.8 AS build
+FROM haskell:9.10.3-bookworm AS build
 
 WORKDIR /usr/src/app
 
