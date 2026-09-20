@@ -28,7 +28,7 @@ recipeSpec =
             "{\"ingredients\":[{\"id\":\"00000000-0000-0000-0000-000000000000\",\"amount\":100,\"unit\":\"g\"}]}"
       case eitherDecode json :: Either String UpdateRecipeInput of
         Right input -> do
-          let ingredients = fromMaybe [] input.ingredients
-          map (.amount) ingredients `shouldBe` [100]
-          map (.unit) ingredients `shouldBe` [G]
+          let dbIngredients = fromMaybe [] input.ingredients
+          map (.amount) dbIngredients `shouldBe` [100]
+          map (.unit) dbIngredients `shouldBe` [G]
         Left err -> expectationFailure err

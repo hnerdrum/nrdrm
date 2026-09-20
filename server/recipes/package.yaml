@@ -109,35 +109,18 @@ executables:
 tests:
   recipes-test:
     main: Spec.hs
-    source-dirs:
-      - test
-      - schema
+    source-dirs: test
     default-extensions:
-      - DuplicateRecordFields
-      - NamedFieldPuns
       - OverloadedRecordDot
       - OverloadedStrings
-      - TypeApplications
-      - TypeFamilies
     other-modules:
-      - ORM.Codegen.RecipeTarget
-      - ORM.Codegen.Spec.Recipe
-      - Support.Assert
-      - Support.TestDb
       - Domain.RecipeSpec
-      - ORM.NestedWriteSpec
-      - ORM.Codegen.TargetSpec
     ghc-options:
       - -threaded
       - -rtsopts
       - -with-rtsopts=-N
     dependencies:
       - base
-      - directory
-      - poppy
-      - poppy-codegen
       - recipes
       - hspec
-      - hspec-wai
-      - hspec-wai-json
       - aeson

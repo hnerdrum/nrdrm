@@ -8,10 +8,10 @@ default:
 run: env build
     stack --arch={{ stack_arch }} exec server-exe
 
-test: test-db-up orm-gen
+test: orm-gen
     stack --arch={{ stack_arch }} test --fast recipes:recipes-test
 
-test-fast: orm-gen
+test-fast:
     stack --arch={{ stack_arch }} test --fast recipes:recipes-test
 
 build: orm-gen

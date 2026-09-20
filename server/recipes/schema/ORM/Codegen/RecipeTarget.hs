@@ -25,6 +25,6 @@ prodTarget =
           ClientLayout
             { clModulePrefix = "ORM.Client.",
               clOutputDir = ".orm-gen/ORM/Client/",
-              clGolden = True
+              clGolden = False
             }
     }
