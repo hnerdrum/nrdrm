@@ -1,5 +1,4 @@
-**/.orm-gen/*
-!**/.orm-gen/.gitkeep
+**/.poppy/*
 .scratch/
 node_modules
 
