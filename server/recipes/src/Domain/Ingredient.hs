@@ -22,8 +22,8 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Unit (Unit (..))
-import ORM.Client.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
-import qualified ORM.Client.Ingredient as Ingredient
+import Schema.Client.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
+import qualified Schema.Client.Ingredient as Ingredient
 import Poppy (DatabaseErrorInfo (..), ORMError (..))
 import Poppy.Db (Db)
 import Poppy.Where (eq)

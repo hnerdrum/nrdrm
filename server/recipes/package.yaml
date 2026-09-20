@@ -56,7 +56,7 @@ ghc-options:
 library:
   source-dirs:
     - src
-    - .orm-gen
+    - .poppy
   exposed-modules:
     - API.Errors
     - API.Health

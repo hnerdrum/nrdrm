@@ -24,7 +24,7 @@ import Data.UUID (UUID)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..))
 import Domain.Unit (Unit (..), fromDbUnit, toDbUnit)
-import ORM.Client.Recipe
+import Schema.Client.Recipe
   ( IngredientRow (..),
     RecipeCreate (..),
     RecipeIngredientRow (..),
@@ -33,7 +33,7 @@ import ORM.Client.Recipe
     RecipeUpdate (..),
     RecipeWithIngredients (..),
   )
-import qualified ORM.Client.Recipe as Recipe
+import qualified Schema.Client.Recipe as Recipe
 import Poppy (DatabaseErrorInfo (..), ORMError (..))
 import Poppy.Core (NullableValue (..))
 import Poppy.Db (Db)

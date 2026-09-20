@@ -13,10 +13,8 @@ dependencies:
   - text
 
 executables:
-  orm-codegen:
+  poppy-gen:
     main: Main.hs
-    source-dirs:
-      - .
-      - ../schema
+    source-dirs: .
     ghc-options:
       - -Wall

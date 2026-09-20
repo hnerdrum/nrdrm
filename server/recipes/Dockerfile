@@ -8,8 +8,8 @@ WORKDIR /usr/src/app/recipes
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git ca-certificates \
  && stack setup --install-ghc \
- && stack build recipes-codegen:exe:orm-codegen \
- && stack exec orm-codegen \
+ && stack build recipes-codegen:exe:poppy-gen \
+ && stack exec poppy-gen \
  && stack build --copy-bins
 
 # Runtime stage

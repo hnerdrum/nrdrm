@@ -9,7 +9,7 @@ where
 
 import Data.Aeson (FromJSON (..), ToJSON (..), Value (String), withText)
 import qualified Data.Text as T
-import qualified ORM.Client.Recipe as ORM
+import qualified Schema.Client.Recipe as Schema
 
 data Unit = G | Ml | Tsp | Tbsp | Qty
   deriving (Show, Eq)
@@ -32,16 +32,16 @@ instance FromJSON Unit where
         "qty" -> pure Qty
         _ -> fail "unknown Unit"
 
-toDbUnit :: Unit -> ORM.Unit
-toDbUnit G = ORM.G
-toDbUnit Ml = ORM.Ml
-toDbUnit Tsp = ORM.Tsp
-toDbUnit Tbsp = ORM.Tbsp
-toDbUnit Qty = ORM.Qty
+toDbUnit :: Unit -> Schema.Unit
+toDbUnit G = Schema.G
+toDbUnit Ml = Schema.Ml
+toDbUnit Tsp = Schema.Tsp
+toDbUnit Tbsp = Schema.Tbsp
+toDbUnit Qty = Schema.Qty
 
-fromDbUnit :: ORM.Unit -> Unit
-fromDbUnit ORM.G = G
-fromDbUnit ORM.Ml = Ml
-fromDbUnit ORM.Tsp = Tsp
-fromDbUnit ORM.Tbsp = Tbsp
-fromDbUnit ORM.Qty = Qty
+fromDbUnit :: Schema.Unit -> Unit
+fromDbUnit Schema.G = G
+fromDbUnit Schema.Ml = Ml
+fromDbUnit Schema.Tsp = Tsp
+fromDbUnit Schema.Tbsp = Tbsp
+fromDbUnit Schema.Qty = Qty

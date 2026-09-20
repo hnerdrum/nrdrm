@@ -8,28 +8,28 @@ default:
 run: env build
     stack --arch={{ stack_arch }} exec server-exe
 
-test: orm-gen
+test: poppy-gen
     stack --arch={{ stack_arch }} test --fast recipes:recipes-test
 
 test-fast:
     stack --arch={{ stack_arch }} test --fast recipes:recipes-test
 
-build: orm-gen
+build: poppy-gen
     stack --arch={{ stack_arch }} build
 
 migrate:
     @echo "migrations apply automatically on run"
 
-orm-gen:
-    stack --arch={{ stack_arch }} build recipes-codegen:exe:orm-codegen
-    stack --arch={{ stack_arch }} exec orm-codegen
+poppy-gen:
+    stack --arch={{ stack_arch }} build recipes-codegen:exe:poppy-gen
+    stack --arch={{ stack_arch }} exec poppy-gen
 
-orm-gen-check:
-    stack --arch={{ stack_arch }} build recipes-codegen:exe:orm-codegen
-    stack --arch={{ stack_arch }} exec orm-codegen -- --check
+poppy-check:
+    stack --arch={{ stack_arch }} build recipes-codegen:exe:poppy-gen
+    stack --arch={{ stack_arch }} exec poppy-gen -- --check
 
-orm-schema-check: test-db-up
-    stack --arch={{ stack_arch }} exec orm-codegen -- --check-schema
+schema-check: test-db-up
+    stack --arch={{ stack_arch }} exec poppy-gen -- --check-schema
 
 test-db-up:
     docker compose -f docker-compose.test.yml up -d --wait

@@ -1,14 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module ORM.Codegen.Spec.Recipe
-  ( recipeSchema,
+module Schema
+  ( recipesSchema,
   )
 where
 
 import Poppy.Codegen.Schema
 
-recipeSchema :: Schema
-recipeSchema =
+recipesSchema :: Schema
+recipesSchema =
   schema
     [unitEnum]
     [recipeModel, ingredientModel, recipeIngredientModel]
