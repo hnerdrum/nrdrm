@@ -16,12 +16,12 @@ just env
 
 `just --list` is the catalog. Every app answers `run`, `test`, `build`, and `migrate` (`just recipes run`, or `cd server/recipes && just run`). `just env` copies missing `.env` / `.env.local` from `.env.example` and will not overwrite.
 
-| Host port | Database       | Used by                                                                                  |
-| --------- | -------------- | ---------------------------------------------------------------------------------------- |
-| 5432      | `recipes`      | [`server/recipes`](server/recipes)                                                       |
-| 5433      | `identity`     | [`server/identity`](server/identity)                                                     |
-| 5434      | `uno`          | [`server/uno`](server/uno)                                                               |
-| 5435      | `recipes_test` | recipes tests only ([`docker-compose.test.yml`](server/recipes/docker-compose.test.yml)) |
+| Host port | Database       | Used by                                                                                                                     |
+| --------- | -------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 5432      | `recipes`      | [`server/recipes`](server/recipes)                                                                                          |
+| 5433      | `identity`     | [`server/identity`](server/identity)                                                                                        |
+| 5434      | `uno`          | [`server/uno`](server/uno)                                                                                                  |
+| 5435      | `recipes_test` | recipes schema check (`just recipes orm-schema-check`, [`docker-compose.test.yml`](server/recipes/docker-compose.test.yml)) |
 
 ## Apps
 
