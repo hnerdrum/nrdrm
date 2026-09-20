@@ -74,15 +74,6 @@ library:
     - Domain.Unit
     - Lib
     - Logger
-    - ORM.Client.Ingredient
-    - ORM.Client.Recipe
-    - ORM.Client.RecipeIngredient
-    - ORM.Schema.Ingredient
-    - ORM.Schema.Recipe
-    - ORM.Schema.RecipeInclude
-    - ORM.Schema.RecipeIngredient
-    - ORM.Schema.RecipeIngredientInclude
-    - ORM.Schema.Unit
   default-extensions:
     - DataKinds
     - DuplicateRecordFields
