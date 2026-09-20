@@ -30,14 +30,14 @@ resolver:
 #   - auto-update
 #   - wai
 packages:
-- .
-- codegen
+  - .
+  - codegen
 extra-deps:
-- git: https://github.com/hnerdrum/poppy.git
-  commit: 9fc2ee6da2106e68b4ff7ab073f916272dbc8639
-  subdirs:
-  - poppy
-  - poppy-codegen
+  - git: https://github.com/hnerdrum/poppy.git
+    commit: 4c13ec1ec473e5896bb8d1435ef53a5942624621
+    subdirs:
+      - poppy
+      - poppy-codegen
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

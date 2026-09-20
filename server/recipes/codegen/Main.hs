@@ -1,7 +1,7 @@
 module Main (main) where
 
-import ORM.Codegen.RecipeTarget (prodTarget)
-import Poppy.Codegen.CLI (mainWith)
+import ORM.Codegen.Spec.Recipe (recipeSchema)
+import Poppy.Codegen.CLI (generate)
 
 main :: IO ()
-main = mainWith [prodTarget] [prodTarget]
+main = generate ".orm-gen/ORM" recipeSchema
