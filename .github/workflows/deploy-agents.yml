@@ -45,7 +45,6 @@ jobs:
       image_name: nrdrm-agents
       dockerfile: server/agents/Dockerfile
       context: server/agents
-      extra_environment_variables: '{"PORT":"8080"}'
     secrets:
       SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
       CONTAINER_REGISTRY_ENDPOINT: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
