@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 module Domain.Ingredient
   ( Ingredient (..),
@@ -22,11 +21,9 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Unit (Unit (..))
+import Poppy (DatabaseErrorInfo (..), Db, ORMError (..))
 import Schema.Client.Ingredient (IngredientCreate (..), IngredientRow (..), IngredientUpdate (..))
 import qualified Schema.Client.Ingredient as Ingredient
-import Poppy (DatabaseErrorInfo (..), ORMError (..))
-import Poppy.Db (Db)
-import Poppy.Where (eq)
 
 newtype CreateIngredientInput = CreateIngredientInput
   { name :: Text
@@ -73,8 +70,7 @@ getAllIngredients =
 getIngredient :: UUID -> Db (Either AppError Ingredient)
 getIngredient ingredientId =
   bimap fromIngredientError fromIngredientRow
-    <$> Ingredient.findUniqueOrFail
-      Ingredient.emptyQuery {Ingredient.where_ = Just (eq Ingredient.ingredientId ingredientId)}
+    <$> Ingredient.findUniqueOrFail (Ingredient.uniqueQuery (Ingredient.ById ingredientId))
 
 createIngredient :: CreateIngredientInput -> Db (Either AppError Ingredient)
 createIngredient input =
@@ -84,10 +80,10 @@ createIngredient input =
 updateIngredient :: UUID -> UpdateIngredientInput -> Db (Either AppError Ingredient)
 updateIngredient ingredientId input =
   bimap fromIngredientError fromIngredientRow
-    <$> Ingredient.update ingredientId (toIngredientUpdate input)
+    <$> Ingredient.update (Ingredient.ById ingredientId) (toIngredientUpdate input)
 
 deleteIngredient :: UUID -> Db ()
-deleteIngredient ingredientId = void (Ingredient.delete ingredientId)
+deleteIngredient ingredientId = void (Ingredient.delete (Ingredient.ById ingredientId))
 
 fromIngredientRow :: IngredientRow -> Ingredient
 fromIngredientRow row =
@@ -116,13 +112,12 @@ toIngredientUpdate input =
 fromIngredientError :: ORMError -> AppError
 fromIngredientError err =
   case err of
-    RecordNotFound ingredientId -> AppError NotFoundError "Ingredient could not be found" (object ["ingredientId" .= ingredientId])
-    MultipleRecordsFound ingredientId -> AppError MultipleEntitiesError "Found multiple ingredients with matching ID" (object ["ingredientId" .= ingredientId])
+    RecordNotFound message -> AppError NotFoundError "Ingredient could not be found" (object ["message" .= message])
+    MultipleRecordsFound message -> AppError MultipleEntitiesError "Found multiple ingredients with matching ID" (object ["message" .= message])
     UniqueViolation message -> AppError ConflictError message (object [])
     ForeignKeyViolation message -> AppError ConflictError message (object [])
     NotNullViolation message -> AppError ConflictError message (object [])
     EmptyWhere message -> AppError InternalError message (object [])
-    InvalidUniqueInput message -> AppError InternalError message (object [])
     DatabaseError DatabaseErrorInfo {message} -> AppError InternalError message (object [])
     DriverError _ message -> AppError InternalError message (object [])
     UnsupportedIncludeModifier message -> AppError InternalError message (object [])

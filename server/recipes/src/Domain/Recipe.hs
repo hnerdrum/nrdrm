@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE TypeApplications #-}
 
 module Domain.Recipe
   ( Recipe (..),
@@ -18,26 +17,18 @@ import Control.Monad (void)
 import Data.Aeson (FromJSON (parseJSON), object, withObject, (.:), (.:?))
 import Data.Aeson.TH (defaultOptions, deriveJSON)
 import Data.Bifunctor (bimap)
-import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import Data.UUID (UUID)
 import Domain.Errors (AppError (..), DomainError (..))
 import Domain.Ingredient (RecipeIngredient (..))
 import Domain.Unit (Unit (..), fromDbUnit, toDbUnit)
-import Schema.Client.Recipe
-  ( IngredientRow (..),
-    RecipeCreate (..),
-    RecipeIngredientRow (..),
-    RecipeIngredientWithIngredient (..),
-    RecipeRow (..),
-    RecipeUpdate (..),
-    RecipeWithIngredients (..),
-  )
+import Poppy (DatabaseErrorInfo (..), Db, Load, NullableValue (..), ORMError (..), load, loadWith)
 import qualified Schema.Client.Recipe as Recipe
-import Poppy (DatabaseErrorInfo (..), ORMError (..))
-import Poppy.Core (NullableValue (..))
-import Poppy.Db (Db)
-import Poppy.Where (eq)
+import Schema.Include.Recipe (RecipeInclude (..), RecipeWith (..))
+import Schema.Include.RecipeIngredient (RecipeIngredientInclude (..), RecipeIngredientWith (..))
+import Schema.Ingredient (IngredientRow (..), IngredientTable)
+import Schema.Recipe (RecipeRow (..))
+import Schema.RecipeIngredient (RecipeIngredientRow (..), RecipeIngredientTable)
 
 data CreateRecipeInput = CreateRecipeInput
   { name :: Text,
@@ -108,65 +99,73 @@ $(deriveJSON defaultOptions ''Recipe)
 
 getAllRecipes :: Db [Recipe]
 getAllRecipes =
-  map fromRecipeWithIngredients
-    <$> Recipe.findMany Recipe.emptyQuery {Recipe.include_ = Recipe.ingredients Recipe.ingredient}
+  map fromRecipeWith
+    <$> Recipe.findMany Recipe.emptyQuery {Recipe.include_ = ingredientsInclude}
 
 getRecipe :: UUID -> Db (Either AppError Recipe)
 getRecipe recipeId =
-  bimap fromRecipeError fromRecipeWithIngredients
+  bimap fromRecipeError fromRecipeWith
     <$> Recipe.findUniqueOrFail
-      Recipe.emptyQuery
-        { Recipe.include_ = Recipe.ingredients Recipe.ingredient,
-          Recipe.where_ = Just (eq Recipe.recipeId recipeId)
-        }
+      (Recipe.uniqueQuery (Recipe.ById recipeId)) {Recipe.include_ = ingredientsInclude}
 
 createRecipe :: CreateRecipeInput -> Db (Either AppError Recipe)
-createRecipe input =
-  bimap fromRecipeError fromRecipeWithIngredients
-    <$> Recipe.create (Recipe.ingredients Recipe.ingredient) (toRecipeWriteCreate input)
+createRecipe input = do
+  created <- Recipe.create (toRecipeCreate input)
+  case created of
+    Left err -> pure (Left (fromRecipeError err))
+    Right row -> getRecipe row.id
 
 updateRecipe :: UUID -> UpdateRecipeInput -> Db (Either AppError Recipe)
-updateRecipe recipeId input =
-  bimap fromRecipeError fromRecipeWithIngredients
-    <$> Recipe.update (Recipe.ingredients Recipe.ingredient) recipeId (toRecipeWriteUpdate input)
+updateRecipe recipeId input = do
+  updated <- Recipe.update (Recipe.ById recipeId) (toRecipeUpdate input)
+  case updated of
+    Left err -> pure (Left (fromRecipeError err))
+    Right _row -> getRecipe recipeId
 
-toRecipeWriteCreate :: CreateRecipeInput -> Recipe.RecipeWriteCreate
-toRecipeWriteCreate input =
-  Recipe.RecipeWriteCreate
-    { root =
-        RecipeCreate
-          { id = Nothing,
-            createdAt = Nothing,
-            updatedAt = Nothing,
-            name = input.name,
-            description = Value input.description
-          },
-      ingredients = Recipe.Set (map toRecipeIngredientNestedCreate input.ingredients)
+toRecipeCreate :: CreateRecipeInput -> Recipe.RecipeCreate
+toRecipeCreate input =
+  Recipe.RecipeCreate
+    { id = Nothing,
+      createdAt = Nothing,
+      updatedAt = Nothing,
+      name = input.name,
+      description = Value input.description,
+      ingredients = map toRecipeIngredientNestedCreate input.ingredients
     }
 
-toRecipeWriteUpdate :: UpdateRecipeInput -> Recipe.RecipeWriteUpdate
-toRecipeWriteUpdate input =
-  Recipe.RecipeWriteUpdate
-    { root =
-        RecipeUpdate
-          { name = input.name,
-            createdAt = Nothing,
-            updatedAt = Nothing,
-            description = maybe Omit Value input.description
-          },
-      ingredients = fmap (Recipe.Set . map toRecipeIngredientNestedCreate) input.ingredients
+toRecipeUpdate :: UpdateRecipeInput -> Recipe.RecipeUpdate
+toRecipeUpdate input =
+  Recipe.RecipeUpdate
+    { name = input.name,
+      createdAt = Nothing,
+      updatedAt = Nothing,
+      description = maybe Omit Value input.description,
+      ingredients =
+        fmap
+          ( \items ->
+              Recipe.emptyIngredientsUpdate
+                { Recipe.replaceWith = Just (map toRecipeIngredientNestedCreate items)
+                }
+          )
+          input.ingredients
     }
 
 toRecipeIngredientNestedCreate :: CreateRecipeIngredientInput -> Recipe.RecipeIngredientNestedCreate
 toRecipeIngredientNestedCreate input =
-  Recipe.RecipeIngredientNestedCreate
-    { ingredientId = input.id,
+  Recipe.CreateRecipeIngredient
+    { id = Nothing,
+      ingredientId = input.id,
       amount = input.amount,
       unit = toDbUnit input.unit
     }
 
 deleteRecipe :: UUID -> Db ()
-deleteRecipe recipeId = void (Recipe.delete recipeId)
+deleteRecipe recipeId = void (Recipe.delete (Recipe.ById recipeId))
+
+ingredientsInclude ::
+  RecipeInclude (Load RecipeIngredientTable (RecipeIngredientInclude (Load IngredientTable ())))
+ingredientsInclude =
+  RecipeInclude {ingredients = loadWith RecipeIngredientInclude {ingredient = load}}
 
 fromRecipeError :: ORMError -> AppError
 fromRecipeError err =
@@ -177,31 +176,34 @@ fromRecipeError err =
     ForeignKeyViolation message -> AppError ConflictError message (object [])
     NotNullViolation message -> AppError ConflictError message (object [])
     EmptyWhere message -> AppError InternalError message (object [])
-    InvalidUniqueInput message -> AppError InternalError message (object [])
     DatabaseError DatabaseErrorInfo {message} -> AppError InternalError message (object [])
     DriverError _ message -> AppError InternalError message (object [])
     UnsupportedIncludeModifier message -> AppError InternalError message (object [])
 
-fromRecipeWithIngredients :: RecipeWithIngredients -> Recipe
-fromRecipeWithIngredients (RecipeWithIngredients (RecipeRow rid _ _ rname rdesc) ingredients) =
+type LoadedRecipe =
+  RecipeWith (Load RecipeIngredientTable (RecipeIngredientInclude (Load IngredientTable ())))
+
+type LoadedRecipeIngredient =
+  RecipeIngredientWith (Load IngredientTable ())
+
+fromRecipeWith :: LoadedRecipe -> Recipe
+fromRecipeWith (RecipeWith RecipeRow {id = rid, name = rname, description = rdesc} ingredients) =
   Recipe
     { id = rid,
       name = rname,
       description = rdesc,
-      ingredients = mapMaybe fromDbRecipeIngredient ingredients
+      ingredients = map fromDbRecipeIngredient ingredients
     }
 
-fromDbRecipeIngredient :: RecipeIngredientWithIngredient -> Maybe RecipeIngredient
+fromDbRecipeIngredient :: LoadedRecipeIngredient -> RecipeIngredient
 fromDbRecipeIngredient
-  ( RecipeIngredientWithIngredient
-      (RecipeIngredientRow _ _ _ amount unit)
-      (Just (IngredientRow iid _ _ iname))
+  ( RecipeIngredientWith
+      RecipeIngredientRow {amount, unit}
+      IngredientRow {id = iid, name = iname}
     ) =
-    Just
-      RecipeIngredient
-        { id = iid,
-          name = iname,
-          amount,
-          unit = fromDbUnit unit
-        }
-fromDbRecipeIngredient _ = Nothing
+    RecipeIngredient
+      { id = iid,
+        name = iname,
+        amount,
+        unit = fromDbUnit unit
+      }

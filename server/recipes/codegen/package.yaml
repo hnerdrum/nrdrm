@@ -8,8 +8,8 @@ copyright: "2023 Henrik Nerdrum"
 
 dependencies:
   - base >= 4.7 && < 5
-  - poppy
-  - poppy-codegen
+  - poppy == 1.0.0
+  - poppy-codegen == 1.0.0
   - text
 
 executables:
