@@ -39,7 +39,7 @@ dependencies:
   - either
   - directory
   - filepath
-  - poppy
+  - poppy == 1.0.0
 
 ghc-options:
   - -Wall

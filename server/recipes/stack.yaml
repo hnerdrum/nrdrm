@@ -33,11 +33,8 @@ packages:
   - .
   - codegen
 extra-deps:
-  - git: https://github.com/hnerdrum/poppy.git
-    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
-    subdirs:
-      - poppy
-      - poppy-codegen
+  - poppy-1.0.0
+  - poppy-codegen-1.0.0
 
 # Override default flag values for local packages and extra-deps
 # flags: {}

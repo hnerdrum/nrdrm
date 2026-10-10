@@ -9,7 +9,7 @@ where
 
 import Data.Aeson (FromJSON (..), ToJSON (..), Value (String), withText)
 import qualified Data.Text as T
-import qualified Schema.Client.Recipe as Schema
+import qualified Schema.Unit as Schema
 
 data Unit = G | Ml | Tsp | Tbsp | Qty
   deriving (Show, Eq)

@@ -35,7 +35,7 @@ recipeModel =
       text "name",
       text "description" & nullable
     ]
-    [ hasMany "recipeIngredients" "RecipeIngredient" "recipeId"
+    [ hasMany "ingredients" "RecipeIngredient" "recipeId"
     ]
 
 ingredientModel :: Model

@@ -5,31 +5,19 @@
 
 packages:
 - completed:
-    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
-    git: https://github.com/hnerdrum/poppy.git
-    name: poppy
+    hackage: poppy-1.0.0@sha256:3517a66978148743eed7bec1bc873a9a3c332a4b789870f4a7cf979f56db83dc,5236
     pantry-tree:
-      sha256: be47935ea90b5087be7bfb185e63043bd19db01e6d9afe35370bf34b2a2152a6
-      size: 3442
-    subdir: poppy
-    version: 0.1.0.0
+      sha256: 2b2a3bc34f042eda97be86319d208053b75e273a1d95642f51e2e885ded78f31
+      size: 6249
   original:
-    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
-    git: https://github.com/hnerdrum/poppy.git
-    subdir: poppy
+    hackage: poppy-1.0.0
 - completed:
-    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
-    git: https://github.com/hnerdrum/poppy.git
-    name: poppy-codegen
+    hackage: poppy-codegen-1.0.0@sha256:ab7a7616ec95ff67ac5b478c94bb31ce94d386f3c5d0fc23f6ad5f9aef605470,4934
     pantry-tree:
-      sha256: 4bdeb40f09559b5b2de4c7b0a254479737f32f57df07f69f2c897bb03b698bb4
-      size: 4442
-    subdir: poppy-codegen
-    version: 0.1.0.0
+      sha256: 94153ada12cdc2dad7ccd57e0dbff06558cf04644baf3f49910362ab8f2bc6cf
+      size: 4573
   original:
-    commit: 0bacc094507ccdfce575f2d02545cb3457e094b1
-    git: https://github.com/hnerdrum/poppy.git
-    subdir: poppy-codegen
+    hackage: poppy-codegen-1.0.0
 snapshots:
 - completed:
     sha256: 0f728e30e843d7f00460ad56858b995a3b227fca683659c7df9f2fc3988a3ce1
