@@ -27,6 +27,7 @@ env:
     @just web-recipes env
     @just web-uno env
     @just delete-images env
+    @just agents env
 
 recipes *args:
     @just fwd server/recipes {{ args }}
@@ -54,6 +55,9 @@ wedding *args:
 
 delete-images *args:
     @just fwd cron/delete-container-images {{ args }}
+
+agents *args:
+    @just fwd server/agents {{ args }}
 
 [private]
 fwd dir *args:

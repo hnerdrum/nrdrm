@@ -35,6 +35,7 @@ CI runs those same commands on pull requests (`just recipes test`, `just identit
 - [`server/identity`](server/identity) — Rust auth API
 - [`server/gateway`](server/gateway) — Gleam reverse proxy
 - [`server/uno`](server/uno) — Go Uno API (local only)
+- [`server/agents`](server/agents) — Agent runner
 
 ### Frontends
 
