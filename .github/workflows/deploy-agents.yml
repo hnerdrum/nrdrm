@@ -1,0 +1,52 @@
+name: Agents
+
+on:
+  pull_request:
+    paths:
+      - "server/agents/**"
+      - ".github/workflows/deploy-agents.yml"
+      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server/agents/**"
+      - ".github/workflows/deploy-agents.yml"
+      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.58.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: server/agents/package-lock.json
+      - name: Install dependencies
+        working-directory: server/agents
+        run: npm ci
+      - name: just agents build
+        run: just agents build
+
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/reusable-deploy-scaleway-container.yml
+    with:
+      image_name: nrdrm-agents
+      dockerfile: server/agents/Dockerfile
+      context: server/agents
+      extra_environment_variables: '{"PORT":"8080"}'
+    secrets:
+      SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
+      CONTAINER_REGISTRY_ENDPOINT: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+      CONTAINER_ID: ${{ secrets.AGENTS_CONTAINER_ID }}
