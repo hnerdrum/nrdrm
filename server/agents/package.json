@@ -9,8 +9,10 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.91",
     "@effect/platform": "0.93.8",
     "@effect/platform-node": "0.99.0",
+    "ai": "^7.0.137",
     "effect": "3.22.2"
   },
   "devDependencies": {
