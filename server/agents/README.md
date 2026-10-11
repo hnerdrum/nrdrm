@@ -8,7 +8,7 @@ Effect HTTP service for the agent runner. Runs are stored in Postgres database `
 just agents run
 ```
 
-Listens on `PORT` (8090 in the example). `GET /health` returns `{ "status": "ok" }` and does not check a caller key. `POST /webhooks/github` returns `{ "ok": true }` and does not check a caller key. It does not start a review. The process requires `AGENTS_API_KEY`, `SCALEWAY_API_KEY`, and `DATABASE_URL`, and does not start when any of them is missing or empty.
+Listens on `PORT` (8090 in the example). `GET /health` returns `{ "status": "ok" }` and does not check a caller key. The process requires `AGENTS_API_KEY`, `SCALEWAY_API_KEY`, `DATABASE_URL`, `GITHUB_APP_ID`, `GITHUB_WEBHOOK_SECRET`, and `GITHUB_PRIVATE_KEY`, and does not start when any of them is missing or empty. `GITHUB_PRIVATE_KEY` is the GitHub App private key. Newlines in that value are written as `\n`.
 
 `POST /complete` and `POST /runs` require `Authorization: Bearer <AGENTS_API_KEY>`. A missing or wrong key returns 401 and does not call a model.
 
@@ -17,6 +17,8 @@ Listens on `PORT` (8090 in the example). `GET /health` returns `{ "status": "ok"
 `POST /runs` takes `{ "skill", "input", "model" }`. `model` is `scaleway` or `openai`. It loads `skills/<skill>.md` as the system prompt and runs that skill's tools. For every skill except `review-pr`, the response is `{ "id", "text", "skill", "actor", "provider", "modelId" }`. `actor` is `agent:<skill>`. A finished run is stored with that id, the model id, token counts, and start and finish times. An unknown skill returns 404 and does not call a model. Input that contains an email, a phone number, or an 11-digit national id returns 400 `{ "error": "input refused", "id" }` and does not call a model. That row is stored with status `refused`, the requested model name, and zero tokens. `skills/ping.md` has no tools and answers in one line.
 
 `skills/review-pr.md` reviews a unified diff. The response is `{ "id", "summary", "comments", "skill", "actor", "provider", "modelId" }`. Each comment is `{ "path", "side", "line", "body" }`. `side` is `LEFT` or `RIGHT`. Comments whose path, side, and line are not an added or removed line in the diff are dropped, and at most 50 comments are returned. On a rename, `LEFT` uses the old path and `RIGHT` uses the new path. A `body` may contain a GitHub suggestion block. Input longer than 100000 characters returns 400 `{ "error": "diff too large", "id" }` and does not call a model. That row is stored with status `too-large`, the requested model name, and zero tokens. A model reply that is not the review object is stored with status `failed` and returns 502.
+
+`POST /webhooks/github` does not check the caller key. It checks `X-Hub-Signature-256` and returns `{ "ok": true }`. A missing or wrong signature returns 401 and does not start a review. A `pull_request` delivery for `hnerdrum/nrdrm` whose action is `opened` on a pull request that is not a draft, or `ready_for_review`, runs `review-pr` after that response and posts one review on the pull request head. The summary is the review body. Inline comments are the ones `review-pr` kept. A repeated `X-GitHub-Delivery` does nothing. A refused or too-large diff posts `Review skipped.` and does not quote the diff.
 
 `GET /runs/:id` requires the same caller key and returns that row: `{ "id", "skill", "actor", "status", "modelId", "inputTokens", "outputTokens", "startedAt", "finishedAt" }`. A missing id returns 404.
 

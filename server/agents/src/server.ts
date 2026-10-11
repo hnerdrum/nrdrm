@@ -4,6 +4,7 @@ import { Config, Layer } from "effect";
 import { createServer } from "node:http";
 import { requireApiKey } from "./auth.js";
 import { complete } from "./complete.js";
+import { githubWebhook } from "./github.js";
 import { getRun, runs } from "./runs.js";
 import { config } from "./config.js";
 import { ModelRegistryLive } from "./models.js";
@@ -18,7 +19,7 @@ const api = HttpRouter.empty.pipe(
 
 export const HttpLive = HttpRouter.empty.pipe(
   HttpRouter.get("/health", HttpServerResponse.json({ status: "ok" })),
-  HttpRouter.post("/webhooks/github", HttpServerResponse.json({ ok: true })),
+  HttpRouter.post("/webhooks/github", githubWebhook),
   HttpRouter.concat(api),
   HttpServer.serve(),
   HttpServer.withLogAddress,

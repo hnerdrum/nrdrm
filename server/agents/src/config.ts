@@ -10,17 +10,39 @@ const optionalSecret = (name: string) =>
     Config.map(Option.map(Redacted.make)),
   );
 
+const privateKey = Config.nonEmptyString("GITHUB_PRIVATE_KEY").pipe(
+  Config.map((value) => Redacted.make(normalizePem(value))),
+);
+
+const normalizePem = (value: string) => {
+  const trimmed = value.trim();
+  const unquoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1)
+      : trimmed;
+  return unquoted.replace(/\\n/g, "\n");
+};
+
 export const config = Config.all({
   port: Config.port("PORT").pipe(Config.withDefault(8090)),
   apiKey: secret("AGENTS_API_KEY"),
   scalewayApiKey: secret("SCALEWAY_API_KEY"),
   openaiApiKey: optionalSecret("OPENAI_API_KEY"),
   databaseUrl: Config.nonEmptyString("DATABASE_URL"),
+  githubAppId: Config.nonEmptyString("GITHUB_APP_ID"),
+  githubWebhookSecret: secret("GITHUB_WEBHOOK_SECRET"),
+  githubPrivateKey: privateKey,
 }).pipe(
   Config.map((env) => ({
     port: env.port,
     apiKey: env.apiKey,
     databaseUrl: env.databaseUrl,
+    github: {
+      appId: env.githubAppId,
+      webhookSecret: env.githubWebhookSecret,
+      privateKey: env.githubPrivateKey,
+    },
     scaleway: {
       apiKey: env.scalewayApiKey,
       baseUrl: "https://api.scaleway.ai/v1",
