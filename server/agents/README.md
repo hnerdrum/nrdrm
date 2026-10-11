@@ -8,7 +8,7 @@ Effect HTTP service for the agent runner. Runs are stored in Postgres database `
 just agents run
 ```
 
-Listens on `PORT` (8090 in the example). `GET /health` returns `{ "status": "ok" }` and does not check a caller key. The process requires `AGENTS_API_KEY`, `SCALEWAY_API_KEY`, and `DATABASE_URL`, and does not start when any of them is missing or empty.
+Listens on `PORT` (8090 in the example). `GET /health` returns `{ "status": "ok" }` and does not check a caller key. `POST /webhooks/github` returns `{ "ok": true }` and does not check a caller key. It does not start a review. The process requires `AGENTS_API_KEY`, `SCALEWAY_API_KEY`, and `DATABASE_URL`, and does not start when any of them is missing or empty.
 
 `POST /complete` and `POST /runs` require `Authorization: Bearer <AGENTS_API_KEY>`. A missing or wrong key returns 401 and does not call a model.
 
