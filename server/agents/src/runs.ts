@@ -265,6 +265,9 @@ export const getRun = HttpRouter.schemaPathParams(RunParams).pipe(
   }),
 );
 
+export const runReview = (input: string) =>
+  startRun({ skill: reviewSkill, input, model: "scaleway" });
+
 const fromDbRun = (row: RunRow) => ({
   id: row.id,
   skill: row.skill,

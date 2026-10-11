@@ -20,3 +20,10 @@ export const agentRuns = pgTable("agent_runs", {
 });
 
 export type RunRow = typeof agentRuns.$inferSelect;
+
+export const githubDeliveries = pgTable("github_deliveries", {
+  id: text("id").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
