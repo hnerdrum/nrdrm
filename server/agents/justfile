@@ -2,7 +2,7 @@
 default:
     @just --list
 
-run: env
+run: env migrate
     npm run dev
 
 test:
@@ -12,7 +12,7 @@ build:
     npm run build
 
 migrate:
-    @echo "no database"
+    npm run migrate
 
 env dest=".env":
     #!/usr/bin/env bash

@@ -1,6 +1,18 @@
 import { ModelProvider } from "./models.js";
 
-export type ApiError = InvalidRequestBodyError | UnknownSkill | ModelError;
+export type ApiError =
+  | InvalidRequestBodyError
+  | UnknownSkill
+  | RunNotFound
+  | DatabaseError
+  | ModelError;
+
+export type RunNotFound = { kind: "RunNotFound" };
+
+export type DatabaseError = {
+  kind: "DatabaseFailed";
+  message: string;
+};
 
 export type InvalidRequestBodyError = { kind: "InvalidRequestBody" };
 

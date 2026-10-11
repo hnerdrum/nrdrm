@@ -14,6 +14,12 @@ export const mapApiError = (error: ApiError) => {
   if (error.kind === "UnknownSkill") {
     return jsonError(404, `unknown skill: ${error.skill}`);
   }
+  if (error.kind === "RunNotFound") {
+    return jsonError(404, "run not found");
+  }
+  if (error.kind === "DatabaseFailed") {
+    return jsonError(500, "database request failed");
+  }
   if (error.kind === "ProviderNotConfigured") {
     return jsonError(400, `provider not configured: ${error.provider}`);
   }

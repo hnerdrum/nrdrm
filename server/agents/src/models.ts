@@ -22,13 +22,18 @@ type Model = {
   readonly provider: ModelProvider;
   readonly modelId: string;
   readonly complete: (prompt: string) => Promise<Completion>;
-  readonly loop: (request: LoopRequest) => Promise<Completion>;
+  readonly loop: (request: LoopRequest) => Promise<LoopResult>;
 };
 
 export type Completion = {
   readonly text: string;
   readonly provider: ModelProvider;
   readonly modelId: string;
+};
+
+export type LoopResult = Completion & {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
 };
 
 export class ModelRegistry extends Effect.Tag("ModelRegistry")<
@@ -41,7 +46,7 @@ export class ModelRegistry extends Effect.Tag("ModelRegistry")<
     readonly loop: (
       provider: ModelProvider,
       request: LoopRequest,
-    ) => Effect.Effect<Completion, ModelError>;
+    ) => Effect.Effect<LoopResult, ModelError>;
   }
 >() {}
 
@@ -57,9 +62,9 @@ export const ModelRegistryLive = Layer.effect(
           })
         : undefined,
     };
-    const call = (
+    const call = <A extends Completion>(
       name: ModelProvider,
-      run: (model: Model) => Promise<Completion>,
+      run: (model: Model) => Promise<A>,
     ) => {
       const model = entries[name];
       if (model === undefined) {
@@ -136,16 +141,23 @@ const loop = async (
   provider: ModelProvider,
   modelId: string,
   request: LoopRequest,
-): Promise<Completion> => {
+): Promise<LoopResult> => {
   const agent = new ToolLoopAgent({
     model,
     instructions: request.instructions,
     tools: request.tools,
   });
   const result = await agent.generate({ prompt: request.prompt });
+  const inputTokens = result.usage.inputTokens;
+  const outputTokens = result.usage.outputTokens;
+  if (inputTokens === undefined || outputTokens === undefined) {
+    throw new Error("model response did not include token counts");
+  }
   return {
     text: result.text,
     provider,
     modelId,
+    inputTokens,
+    outputTokens,
   };
 };
