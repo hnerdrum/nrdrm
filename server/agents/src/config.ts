@@ -15,10 +15,12 @@ export const config = Config.all({
   apiKey: secret("AGENTS_API_KEY"),
   scalewayApiKey: secret("SCALEWAY_API_KEY"),
   openaiApiKey: optionalSecret("OPENAI_API_KEY"),
+  databaseUrl: Config.nonEmptyString("DATABASE_URL"),
 }).pipe(
   Config.map((env) => ({
     port: env.port,
     apiKey: env.apiKey,
+    databaseUrl: env.databaseUrl,
     scaleway: {
       apiKey: env.scalewayApiKey,
       baseUrl: "https://api.scaleway.ai/v1",

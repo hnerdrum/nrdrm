@@ -6,17 +6,22 @@
   "scripts": {
     "dev": "node --env-file=.env --import tsx src/main.ts",
     "build": "tsc",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "migrate": "node --env-file=.env ./node_modules/drizzle-kit/bin.cjs migrate"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.91",
     "@effect/platform": "0.93.8",
     "@effect/platform-node": "0.99.0",
     "ai": "^7.0.137",
-    "effect": "3.22.2"
+    "drizzle-orm": "^0.45.4",
+    "effect": "3.22.2",
+    "pg": "^8.23.1"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
     "tsx": "^4.20.3",
     "typescript": "^5.5.0"
   }
