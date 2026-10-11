@@ -18,6 +18,7 @@ const api = HttpRouter.empty.pipe(
 
 export const HttpLive = HttpRouter.empty.pipe(
   HttpRouter.get("/health", HttpServerResponse.json({ status: "ok" })),
+  HttpRouter.post("/webhooks/github", HttpServerResponse.json({ ok: true })),
   HttpRouter.concat(api),
   HttpServer.serve(),
   HttpServer.withLogAddress,
