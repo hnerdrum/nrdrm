@@ -4,11 +4,14 @@ export type ApiError =
   | InvalidRequestBodyError
   | UnknownSkill
   | InputRefused
+  | DiffTooLarge
   | RunNotFound
   | DatabaseError
   | ModelError;
 
 export type InputRefused = { kind: "InputRefused"; id: string };
+
+export type DiffTooLarge = { kind: "DiffTooLarge"; id: string };
 
 export type RunNotFound = { kind: "RunNotFound" };
 
