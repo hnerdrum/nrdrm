@@ -8,14 +8,26 @@ import { Effect, Schema } from "effect";
 import { Database } from "./database.js";
 import {
   type DatabaseError,
+  type DiffTooLarge,
   type InputRefused,
   type ModelError,
   type UnknownSkill,
 } from "./errors.js";
-import { modelProviders, type ModelProvider, ModelRegistry } from "./models.js";
+import {
+  type LoopResult,
+  modelProviders,
+  type ModelProvider,
+  ModelRegistry,
+} from "./models.js";
 import { sensitiveData } from "./policy.js";
+import {
+  diffTooLarge,
+  readReview,
+  type ReviewComment,
+  reviewSkill,
+} from "./review.js";
 import { agentRuns, type RunRow } from "./schema.js";
-import { loadSkill } from "./skills.js";
+import { type Skill, loadSkill } from "./skills.js";
 import { mapApiError } from "./utils.js";
 
 const RunRequest = Schema.Struct({
@@ -28,14 +40,20 @@ const RunParams = Schema.Struct({
   id: Schema.UUID,
 });
 
-type RunResult = {
+type RunIdentity = {
   readonly id: string;
-  readonly text: string;
   readonly skill: string;
   readonly actor: string;
   readonly provider: ModelProvider;
   readonly modelId: string;
 };
+
+type RunResult =
+  | (RunIdentity & { readonly text: string })
+  | (RunIdentity & {
+      readonly summary: string;
+      readonly comments: readonly ReviewComment[];
+    });
 
 type NewRun = {
   readonly skill: string;
@@ -51,7 +69,7 @@ const startRun = (
   body: typeof RunRequest.Type,
 ): Effect.Effect<
   RunResult,
-  UnknownSkill | InputRefused | ModelError | DatabaseError,
+  UnknownSkill | InputRefused | DiffTooLarge | ModelError | DatabaseError,
   ModelRegistry | Database
 > => {
   const skill = loadSkill(body.skill);
@@ -61,18 +79,31 @@ const startRun = (
   const startedAt = new Date();
   const actor = `agent:${skill.name}`;
   if (sensitiveData(body.input)) {
-    return recordRun({
-      skill: skill.name,
-      actor,
-      status: "refused",
-      modelId: body.model,
-      inputTokens: 0,
-      outputTokens: 0,
-      startedAt,
-    }).pipe(
-      Effect.flatMap((row) =>
-        Effect.fail({ kind: "InputRefused" as const, id: row.id }),
-      ),
+    return refuseRun(
+      {
+        skill: skill.name,
+        actor,
+        status: "refused",
+        modelId: body.model,
+        inputTokens: 0,
+        outputTokens: 0,
+        startedAt,
+      },
+      (id) => ({ kind: "InputRefused" as const, id }),
+    );
+  }
+  if (skill.name === reviewSkill && diffTooLarge(body.input)) {
+    return refuseRun(
+      {
+        skill: skill.name,
+        actor,
+        status: "too-large",
+        modelId: body.model,
+        inputTokens: 0,
+        outputTokens: 0,
+        startedAt,
+      },
+      (id) => ({ kind: "DiffTooLarge" as const, id }),
     );
   }
   return ModelRegistry.pipe(
@@ -103,25 +134,70 @@ const startRun = (
         ),
     ),
     Effect.flatMap((completion) =>
-      recordRun({
-        skill: skill.name,
-        actor,
-        status: "finished",
-        modelId: completion.modelId,
-        inputTokens: completion.inputTokens,
-        outputTokens: completion.outputTokens,
-        startedAt,
-      }).pipe(
-        Effect.map((row) => ({
-          id: row.id,
-          text: completion.text,
-          skill: skill.name,
-          actor,
-          provider: completion.provider,
-          modelId: completion.modelId,
-        })),
-      ),
+      finishRun(skill, body.input, actor, startedAt, completion),
     ),
+  );
+};
+
+const refuseRun = <E extends InputRefused | DiffTooLarge>(
+  row: NewRun,
+  fail: (id: string) => E,
+) =>
+  recordRun(row).pipe(Effect.flatMap((stored) => Effect.fail(fail(stored.id))));
+
+const finishRun = (
+  skill: Skill,
+  input: string,
+  actor: string,
+  startedAt: Date,
+  completion: LoopResult,
+): Effect.Effect<RunResult, ModelError | DatabaseError, Database> => {
+  const row = {
+    skill: skill.name,
+    actor,
+    modelId: completion.modelId,
+    inputTokens: completion.inputTokens,
+    outputTokens: completion.outputTokens,
+    startedAt,
+  };
+  const identity = {
+    skill: skill.name,
+    actor,
+    provider: completion.provider,
+    modelId: completion.modelId,
+  };
+  if (skill.name !== reviewSkill) {
+    return recordRun({ ...row, status: "finished" }).pipe(
+      Effect.map((stored) => ({
+        ...identity,
+        id: stored.id,
+        text: completion.text,
+      })),
+    );
+  }
+  return readReview(input, completion.text).pipe(
+    Effect.matchEffect({
+      onFailure: () =>
+        Effect.logError("review did not match the schema").pipe(
+          Effect.flatMap(() => recordRun({ ...row, status: "failed" })),
+          Effect.flatMap(() =>
+            Effect.fail({
+              kind: "ModelRequestFailed" as const,
+              name: completion.modelId,
+              message: "review did not match the schema",
+            }),
+          ),
+        ),
+      onSuccess: (review) =>
+        recordRun({ ...row, status: "finished" }).pipe(
+          Effect.map((stored) => ({
+            ...identity,
+            id: stored.id,
+            summary: review.summary,
+            comments: review.comments,
+          })),
+        ),
+    }),
   );
 };
 

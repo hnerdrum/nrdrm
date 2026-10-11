@@ -20,6 +20,12 @@ export const mapApiError = (error: ApiError) => {
       id: error.id,
     }).pipe(Effect.map(HttpServerResponse.setStatus(400)));
   }
+  if (error.kind === "DiffTooLarge") {
+    return HttpServerResponse.json({
+      error: "diff too large",
+      id: error.id,
+    }).pipe(Effect.map(HttpServerResponse.setStatus(400)));
+  }
   if (error.kind === "RunNotFound") {
     return jsonError(404, "run not found");
   }
