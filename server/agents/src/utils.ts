@@ -14,6 +14,12 @@ export const mapApiError = (error: ApiError) => {
   if (error.kind === "UnknownSkill") {
     return jsonError(404, `unknown skill: ${error.skill}`);
   }
+  if (error.kind === "InputRefused") {
+    return HttpServerResponse.json({
+      error: "input refused",
+      id: error.id,
+    }).pipe(Effect.map(HttpServerResponse.setStatus(400)));
+  }
   if (error.kind === "RunNotFound") {
     return jsonError(404, "run not found");
   }

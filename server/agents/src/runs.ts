@@ -8,10 +8,12 @@ import { Effect, Schema } from "effect";
 import { Database } from "./database.js";
 import {
   type DatabaseError,
+  type InputRefused,
   type ModelError,
   type UnknownSkill,
 } from "./errors.js";
 import { modelProviders, type ModelProvider, ModelRegistry } from "./models.js";
+import { sensitiveData } from "./policy.js";
 import { agentRuns, type RunRow } from "./schema.js";
 import { loadSkill } from "./skills.js";
 import { mapApiError } from "./utils.js";
@@ -49,7 +51,7 @@ const startRun = (
   body: typeof RunRequest.Type,
 ): Effect.Effect<
   RunResult,
-  UnknownSkill | ModelError | DatabaseError,
+  UnknownSkill | InputRefused | ModelError | DatabaseError,
   ModelRegistry | Database
 > => {
   const skill = loadSkill(body.skill);
@@ -58,6 +60,21 @@ const startRun = (
   }
   const startedAt = new Date();
   const actor = `agent:${skill.name}`;
+  if (sensitiveData(body.input)) {
+    return recordRun({
+      skill: skill.name,
+      actor,
+      status: "refused",
+      modelId: body.model,
+      inputTokens: 0,
+      outputTokens: 0,
+      startedAt,
+    }).pipe(
+      Effect.flatMap((row) =>
+        Effect.fail({ kind: "InputRefused" as const, id: row.id }),
+      ),
+    );
+  }
   return ModelRegistry.pipe(
     Effect.flatMap((registry) =>
       registry

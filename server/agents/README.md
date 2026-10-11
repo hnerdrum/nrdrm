@@ -14,7 +14,7 @@ Listens on `PORT` (8090 in the example). `GET /health` returns `{ "status": "ok"
 
 `POST /complete` takes `{ "model", "prompt" }`. `model` is `scaleway` or `openai`. The response is `{ "text", "provider", "modelId" }`. `scaleway` is `mistral-small-3.2-24b-instruct-2506` at `https://api.scaleway.ai/v1`. `openai` (`gpt-4.1-mini`) is available only when `OPENAI_API_KEY` is set.
 
-`POST /runs` takes `{ "skill", "input", "model" }`. `model` is `scaleway` or `openai`. It loads `skills/<skill>.md` as the system prompt and runs that skill's tools. The response is `{ "id", "text", "skill", "actor", "provider", "modelId" }`. `actor` is `agent:<skill>`. A finished run is stored with that id, the model id, token counts, and start and finish times. An unknown skill returns 404 and does not call a model. `skills/ping.md` has no tools and answers in one line.
+`POST /runs` takes `{ "skill", "input", "model" }`. `model` is `scaleway` or `openai`. It loads `skills/<skill>.md` as the system prompt and runs that skill's tools. The response is `{ "id", "text", "skill", "actor", "provider", "modelId" }`. `actor` is `agent:<skill>`. A finished run is stored with that id, the model id, token counts, and start and finish times. An unknown skill returns 404 and does not call a model. Input that contains an email, a phone number, or an 11-digit national id returns 400 `{ "error": "input refused", "id" }` and does not call a model. That row is stored with status `refused`, the requested model name, and zero tokens. `skills/ping.md` has no tools and answers in one line.
 
 `GET /runs/:id` requires the same caller key and returns that row: `{ "id", "skill", "actor", "status", "modelId", "inputTokens", "outputTokens", "startedAt", "finishedAt" }`. A missing id returns 404.
 

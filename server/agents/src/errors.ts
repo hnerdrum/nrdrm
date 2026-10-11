@@ -3,9 +3,12 @@ import { ModelProvider } from "./models.js";
 export type ApiError =
   | InvalidRequestBodyError
   | UnknownSkill
+  | InputRefused
   | RunNotFound
   | DatabaseError
   | ModelError;
+
+export type InputRefused = { kind: "InputRefused"; id: string };
 
 export type RunNotFound = { kind: "RunNotFound" };
 
