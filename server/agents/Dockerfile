@@ -20,6 +20,7 @@ RUN npm ci --omit=dev
 
 COPY --from=build /app/dist ./dist
 COPY skills ./skills
+COPY drizzle ./drizzle
 
 EXPOSE 8080
 

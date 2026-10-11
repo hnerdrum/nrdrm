@@ -46,4 +46,4 @@ just agents build
 just agents migrate
 ```
 
-Applies the Drizzle migrations in `drizzle/`. `just agents run` does this first. `DATABASE_URL` comes from `.env`. The example points at the local agents database.
+The server applies the SQL in `drizzle/` when it starts, including the deployed container. `just agents migrate` applies those same files without starting the server, and `just agents run` does that first. Local commands read `DATABASE_URL` from `.env`. The deployed container reads it from its environment.
