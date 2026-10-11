@@ -4,11 +4,13 @@ import { Config, Layer } from "effect";
 import { createServer } from "node:http";
 import { requireApiKey } from "./auth.js";
 import { complete } from "./complete.js";
+import { runs } from "./runs.js";
 import { config } from "./config.js";
 import { ModelRegistryLive } from "./models.js";
 
 const api = HttpRouter.empty.pipe(
   HttpRouter.post("/complete", complete),
+  HttpRouter.post("/runs", runs),
   HttpRouter.use(requireApiKey),
 );
 
