@@ -1,8 +1,8 @@
 import { HttpServerRequest, HttpServerResponse } from "@effect/platform";
 import { Effect, Schema } from "effect";
+import { ApiError } from "./errors.js";
 import { modelProviders, ModelRegistry } from "./models.js";
 import { jsonError } from "./utils.js";
-import { ApiError } from "./errors.js";
 
 const CompleteRequest = Schema.Struct({
   prompt: Schema.NonEmptyString,
