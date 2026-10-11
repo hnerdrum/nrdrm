@@ -12,11 +12,13 @@ const optionalSecret = (name: string) =>
 
 export const config = Config.all({
   port: Config.port("PORT").pipe(Config.withDefault(8090)),
+  apiKey: secret("AGENTS_API_KEY"),
   scalewayApiKey: secret("SCALEWAY_API_KEY"),
   openaiApiKey: optionalSecret("OPENAI_API_KEY"),
 }).pipe(
   Config.map((env) => ({
     port: env.port,
+    apiKey: env.apiKey,
     scaleway: {
       apiKey: env.scalewayApiKey,
       baseUrl: "https://api.scaleway.ai/v1",
