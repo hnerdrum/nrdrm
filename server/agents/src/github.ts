@@ -39,6 +39,8 @@ const Webhook = Schema.Struct({
     Schema.Struct({
       number: Schema.Number.pipe(Schema.int(), Schema.positive()),
       draft: Schema.optional(Schema.Boolean),
+      title: Schema.optional(Schema.String),
+      body: Schema.optional(Schema.NullOr(Schema.String)),
     }),
   ),
   issue: Schema.optional(
@@ -53,11 +55,29 @@ const Webhook = Schema.Struct({
     Schema.Struct({
       body: Schema.String,
       author_association: Schema.optional(Schema.String),
+      in_reply_to_id: Schema.optional(
+        Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.positive())),
+      ),
+      diff_hunk: Schema.optional(Schema.NullOr(Schema.String)),
       user: Schema.optional(
         Schema.Struct({
+          login: Schema.optional(Schema.String),
           type: Schema.optional(Schema.String),
         }),
       ),
+    }),
+  ),
+});
+
+const ReviewNote = Schema.Struct({
+  id: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  in_reply_to_id: Schema.optional(
+    Schema.NullOr(Schema.Number.pipe(Schema.int(), Schema.positive())),
+  ),
+  user: Schema.optional(
+    Schema.Struct({
+      login: Schema.optional(Schema.String),
+      type: Schema.optional(Schema.String),
     }),
   ),
 });
@@ -87,6 +107,11 @@ type MentionTarget = ReviewTarget & {
   readonly comment: string;
   readonly title: string;
   readonly issueBody: string;
+  readonly hunk?: string;
+};
+
+type ThreadTarget = MentionTarget & {
+  readonly rootId: number;
 };
 
 const MentionAction = Schema.Struct({
@@ -194,6 +219,59 @@ const mentionTarget = (
     comment: payload.comment.body,
     title: payload.issue.title ?? "",
     issueBody: payload.issue.body ?? "",
+  };
+};
+
+const appBot = `${appSlug}[bot]`;
+
+const isAppBot = (
+  user:
+    | {
+        readonly login?: string | undefined;
+        readonly type?: string | undefined;
+      }
+    | undefined,
+) => user?.type === "Bot" && user.login?.toLowerCase() === appBot;
+
+const threadTarget = (
+  event: string | undefined,
+  payload: typeof Webhook.Type,
+): ThreadTarget | undefined => {
+  if (event !== "pull_request_review_comment" || payload.action !== "created") {
+    return undefined;
+  }
+  if (payload.repository?.full_name !== repository) {
+    return undefined;
+  }
+  if (
+    payload.installation === undefined ||
+    payload.pull_request === undefined ||
+    payload.comment === undefined
+  ) {
+    return undefined;
+  }
+  if (isAppBot(payload.comment.user)) {
+    return undefined;
+  }
+  const association = payload.comment.author_association;
+  if (association === undefined || !writers.has(association)) {
+    return undefined;
+  }
+  const rootId = payload.comment.in_reply_to_id;
+  if (rootId === undefined || rootId === null) {
+    return undefined;
+  }
+  const hunk = payload.comment.diff_hunk;
+  return {
+    installationId: payload.installation.id,
+    number: payload.pull_request.number,
+    comment: payload.comment.body,
+    title: payload.pull_request.title ?? "",
+    issueBody: payload.pull_request.body ?? "",
+    rootId,
+    ...(hunk === undefined || hunk === null || hunk.length === 0
+      ? {}
+      : { hunk }),
   };
 };
 
@@ -394,6 +472,22 @@ const postComment = (token: string, number: number, body: string) =>
     body: JSON.stringify({ body }),
   }).pipe(Effect.asVoid);
 
+const postThreadReply = (
+  token: string,
+  number: number,
+  rootId: number,
+  body: string,
+) =>
+  github(
+    token,
+    `/repos/${repository}/pulls/${number}/comments/${rootId}/replies`,
+    {
+      method: "POST",
+      accept: "application/vnd.github+json",
+      body: JSON.stringify({ body }),
+    },
+  ).pipe(Effect.asVoid);
+
 const replyBody = (text: string) => {
   const stripped = text.replace(mentionExpression("gi"), "").trim();
   const body = stripped.length === 0 ? failedAnswer : stripped;
@@ -405,6 +499,9 @@ const mentionInput = (target: MentionTarget, diff: string | undefined) =>
     `Comment:\n${target.comment}`,
     `Pull request:\n${target.title}`,
     target.issueBody,
+    target.hunk !== undefined && target.hunk.length > 0
+      ? `Hunk:\n${target.hunk}`
+      : "",
     diff === undefined
       ? "Diff:\nThe diff is too large to include."
       : `Diff:\n${diff}`,
@@ -444,7 +541,11 @@ const loggedFailure = (error: { kind: string; message?: string }) => {
   return Effect.logError(message);
 };
 
-const answerMention = (token: string, target: MentionTarget) =>
+const answerMention = (
+  token: string,
+  target: MentionTarget,
+  say: (body: string) => Effect.Effect<void, GithubFailed>,
+) =>
   pullDiff(token, target.number).pipe(
     Effect.flatMap((diff) =>
       runMention(
@@ -453,18 +554,14 @@ const answerMention = (token: string, target: MentionTarget) =>
         Effect.matchEffect({
           onFailure: (error) => {
             if (error.kind === "InputRefused") {
-              return postComment(token, target.number, cannotAnswer);
+              return say(cannotAnswer);
             }
             return loggedFailure(error).pipe(
-              Effect.flatMap(() =>
-                postComment(token, target.number, failedAnswer),
-              ),
+              Effect.flatMap(() => say(failedAnswer)),
             );
           },
           onSuccess: (result) =>
-            "text" in result
-              ? postComment(token, target.number, replyBody(result.text))
-              : postComment(token, target.number, failedAnswer),
+            "text" in result ? say(replyBody(result.text)) : say(failedAnswer),
         }),
       ),
     ),
@@ -493,14 +590,68 @@ const respondToMention = (cfg: GithubConfig, target: MentionTarget) =>
             }
             return readMentionAction(result.text).pipe(
               Effect.matchEffect({
-                onFailure: () => answerMention(token, target),
+                onFailure: () =>
+                  answerMention(token, target, (body) =>
+                    postComment(token, target.number, body),
+                  ),
                 onSuccess: (action) =>
                   action.action === "review"
                     ? reviewPullRequest(cfg, target)
-                    : answerMention(token, target),
+                    : answerMention(token, target, (body) =>
+                        postComment(token, target.number, body),
+                      ),
               }),
             );
           },
+        }),
+      ),
+    ),
+    Effect.catchAll((error: GithubFailed) =>
+      Effect.logError(`github request failed: ${error.status}`),
+    ),
+  );
+
+const reviewNotes = (token: string, number: number, page: number) =>
+  github(
+    token,
+    `/repos/${repository}/pulls/${number}/comments?per_page=100&page=${page}`,
+  ).pipe(Effect.flatMap((text) => decodeJson(Schema.Array(ReviewNote), text)));
+
+const reviewThread = (token: string, number: number) => {
+  const pages = (
+    page: number,
+  ): Effect.Effect<ReadonlyArray<typeof ReviewNote.Type>, GithubFailed> =>
+    reviewNotes(token, number, page).pipe(
+      Effect.flatMap((notes) =>
+        notes.length < 100 || page >= 10
+          ? Effect.succeed(notes)
+          : pages(page + 1).pipe(Effect.map((rest) => [...notes, ...rest])),
+      ),
+    );
+  return pages(1);
+};
+
+const threadIncludesApp = (
+  notes: ReadonlyArray<typeof ReviewNote.Type>,
+  rootId: number,
+) =>
+  notes.some(
+    (note) =>
+      (note.id === rootId || note.in_reply_to_id === rootId) &&
+      isAppBot(note.user),
+  );
+
+const respondToThread = (cfg: GithubConfig, target: ThreadTarget) =>
+  installationToken(cfg, target.installationId).pipe(
+    Effect.flatMap((token) =>
+      reviewThread(token, target.number).pipe(
+        Effect.flatMap((notes) => {
+          if (!threadIncludesApp(notes, target.rootId)) {
+            return Effect.void;
+          }
+          return answerMention(token, target, (body) =>
+            postThreadReply(token, target.number, target.rootId, body),
+          );
         }),
       ),
     ),
@@ -573,12 +724,18 @@ export const githubWebhook = HttpServerRequest.HttpServerRequest.pipe(
               ).pipe(Effect.flatMap(() => ok()));
             }
             const mention = mentionTarget(event, payload);
-            if (mention === undefined) {
+            if (mention !== undefined) {
+              return Effect.forkDaemon(
+                respondToMention(cfg.github, mention),
+              ).pipe(Effect.flatMap(() => ok()));
+            }
+            const thread = threadTarget(event, payload);
+            if (thread === undefined) {
               return ok();
             }
-            return Effect.forkDaemon(
-              respondToMention(cfg.github, mention),
-            ).pipe(Effect.flatMap(() => ok()));
+            return Effect.forkDaemon(respondToThread(cfg.github, thread)).pipe(
+              Effect.flatMap(() => ok()),
+            );
           }),
         ),
       ),
