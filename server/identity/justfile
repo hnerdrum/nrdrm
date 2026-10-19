@@ -14,6 +14,9 @@ build:
 migrate:
     diesel migration run
 
+create-client name audience: env migrate
+    cargo run --bin create-client -- {{ name }} {{ audience }}
+
 env dest=".env":
     #!/usr/bin/env bash
     set -euo pipefail
