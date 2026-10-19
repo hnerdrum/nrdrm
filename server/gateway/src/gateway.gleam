@@ -11,7 +11,8 @@ pub fn main() {
   wisp.configure_logger()
 
   let config = config.load_config()
-  let assert Ok(services) = service.load_services(config.env)
+  let assert Ok(services) =
+    service.load_services(config.env, config.agents_api_key)
   let assert Ok(identity_service) = service.find(services, "identity")
   let ctx = Context(services, identity_service, config)
 

@@ -42,6 +42,8 @@ pub struct Introspection {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_id: Option<Uuid>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub aud: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exp: Option<i64>,
@@ -144,9 +146,19 @@ pub async fn introspect_access_token(
         return Ok(inactive());
     }
 
+    let client = match find_client_by_id(db, token.client_id).await {
+        Ok(client) => client,
+        Err(DatabaseError::NotFoundError) => return Ok(inactive()),
+        Err(err) => {
+            error!("Encountered unexpected database error: {:?}", err);
+            return Err(DomainError::UnknownError);
+        }
+    };
+
     Ok(Introspection {
         active: true,
         client_id: Some(token.client_id),
+        client_name: Some(client.name),
         aud: Some(token.audience),
         exp: Some(token.expires_at.timestamp()),
     })
@@ -169,6 +181,7 @@ fn inactive() -> Introspection {
     Introspection {
         active: false,
         client_id: None,
+        client_name: None,
         aud: None,
         exp: None,
     }

@@ -1,10 +1,11 @@
 import {
+  Headers,
   HttpRouter,
   HttpServerRequest,
   HttpServerResponse,
 } from "@effect/platform";
 import { eq } from "drizzle-orm";
-import { Effect, Schema } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { Database } from "./database.js";
 import {
   type DatabaseError,
@@ -44,6 +45,7 @@ type RunIdentity = {
   readonly id: string;
   readonly skill: string;
   readonly actor: string;
+  readonly caller: string | null;
   readonly provider: ModelProvider;
   readonly modelId: string;
 };
@@ -58,6 +60,7 @@ type RunResult =
 type NewRun = {
   readonly skill: string;
   readonly actor: string;
+  readonly caller: string | null;
   readonly status: string;
   readonly modelId: string;
   readonly inputTokens: number;
@@ -67,6 +70,7 @@ type NewRun = {
 
 const startRun = (
   body: typeof RunRequest.Type,
+  caller: string | null,
 ): Effect.Effect<
   RunResult,
   UnknownSkill | InputRefused | DiffTooLarge | ModelError | DatabaseError,
@@ -83,6 +87,7 @@ const startRun = (
       {
         skill: skill.name,
         actor,
+        caller,
         status: "refused",
         modelId: body.model,
         inputTokens: 0,
@@ -97,6 +102,7 @@ const startRun = (
       {
         skill: skill.name,
         actor,
+        caller,
         status: "too-large",
         modelId: body.model,
         inputTokens: 0,
@@ -123,6 +129,7 @@ const startRun = (
               return recordRun({
                 skill: skill.name,
                 actor,
+                caller,
                 status: "failed",
                 modelId: error.name,
                 inputTokens: 0,
@@ -134,7 +141,7 @@ const startRun = (
         ),
     ),
     Effect.flatMap((completion) =>
-      finishRun(skill, body.input, actor, startedAt, completion),
+      finishRun(skill, body.input, actor, caller, startedAt, completion),
     ),
   );
 };
@@ -149,12 +156,14 @@ const finishRun = (
   skill: Skill,
   input: string,
   actor: string,
+  caller: string | null,
   startedAt: Date,
   completion: LoopResult,
 ): Effect.Effect<RunResult, ModelError | DatabaseError, Database> => {
   const row = {
     skill: skill.name,
     actor,
+    caller,
     modelId: completion.modelId,
     inputTokens: completion.inputTokens,
     outputTokens: completion.outputTokens,
@@ -163,6 +172,7 @@ const finishRun = (
   const identity = {
     skill: skill.name,
     actor,
+    caller,
     provider: completion.provider,
     modelId: completion.modelId,
   };
@@ -225,9 +235,19 @@ const recordRun = (row: NewRun) =>
     ),
   );
 
-export const runs = HttpServerRequest.schemaBodyJson(RunRequest).pipe(
-  Effect.mapError(() => ({ kind: "InvalidRequestBody" }) as const),
-  Effect.flatMap(startRun),
+const callerFrom = (request: HttpServerRequest.HttpServerRequest) =>
+  Option.match(Headers.get(request.headers, "x-nrdrm-client"), {
+    onNone: () => null,
+    onSome: (caller) => (caller === "" ? null : caller),
+  });
+
+export const runs = Effect.gen(function* () {
+  const request = yield* HttpServerRequest.HttpServerRequest;
+  const body = yield* HttpServerRequest.schemaBodyJson(RunRequest).pipe(
+    Effect.mapError(() => ({ kind: "InvalidRequestBody" }) as const),
+  );
+  return yield* startRun(body, callerFrom(request));
+}).pipe(
   Effect.matchEffect({
     onFailure: (error) => mapApiError(error),
     onSuccess: (result) => HttpServerResponse.json(result),
@@ -266,18 +286,19 @@ export const getRun = HttpRouter.schemaPathParams(RunParams).pipe(
 );
 
 export const runReview = (input: string) =>
-  startRun({ skill: reviewSkill, input, model: "scaleway" });
+  startRun({ skill: reviewSkill, input, model: "scaleway" }, null);
 
 export const runMention = (input: string) =>
-  startRun({ skill: "mention", input, model: "scaleway" });
+  startRun({ skill: "mention", input, model: "scaleway" }, null);
 
 export const runMentionRoute = (input: string) =>
-  startRun({ skill: "mention-route", input, model: "scaleway" });
+  startRun({ skill: "mention-route", input, model: "scaleway" }, null);
 
 const fromDbRun = (row: RunRow) => ({
   id: row.id,
   skill: row.skill,
   actor: row.actor,
+  caller: row.caller,
   status: row.status,
   modelId: row.modelId,
   inputTokens: row.inputTokens,

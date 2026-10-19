@@ -4,6 +4,7 @@ export const agentRuns = pgTable("agent_runs", {
   id: uuid("id").primaryKey().defaultRandom(),
   skill: text("skill").notNull(),
   actor: text("actor").notNull(),
+  caller: text("caller"),
   status: text("status").notNull(),
   modelId: text("model_id").notNull(),
   inputTokens: integer("input_tokens").notNull(),

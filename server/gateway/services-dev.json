@@ -33,5 +33,38 @@
     "security": {
       "auth": []
     }
+  },
+  {
+    "name": "agents",
+    "base_url": "http://localhost:8090",
+    "request": {
+      "forward_headers": ["content-type", "x-nrdrm-client"],
+      "authorization": true
+    },
+    "response": {
+      "forward_headers": []
+    },
+    "security": {
+      "auth": [
+        {
+          "path": "complete",
+          "methods": ["post"],
+          "scheme": "bearer",
+          "audience": "agents"
+        },
+        {
+          "path": "runs",
+          "methods": ["post"],
+          "scheme": "bearer",
+          "audience": "agents"
+        },
+        {
+          "path": "runs/*",
+          "methods": ["get"],
+          "scheme": "bearer",
+          "audience": "agents"
+        }
+      ]
+    }
   }
 ]
