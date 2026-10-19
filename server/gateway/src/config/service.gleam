@@ -1,7 +1,8 @@
 import config/env.{type Environment}
 import gleam/dynamic/decode
-import gleam/list
 import gleam/json
+import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import simplifile
 
@@ -11,12 +12,12 @@ pub type Service {
     base_url: String,
     request: RequestConfig,
     response: ResponseConfig,
-    security: SecurityConfig
+    security: SecurityConfig,
   )
 }
 
 pub type RequestConfig {
-  RequestConfig(forward_headers: List(String))
+  RequestConfig(forward_headers: List(String), authorization: Option(String))
 }
 
 pub type ResponseConfig {
@@ -27,8 +28,13 @@ pub type SecurityConfig {
   SecurityConfig(auth: List(AuthConfig))
 }
 
+pub type Scheme {
+  Cookie
+  Bearer(audience: String)
+}
+
 pub type AuthConfig {
-  AuthConfig(path: String, methods: List(String))
+  AuthConfig(path: String, methods: List(String), scheme: Scheme)
 }
 
 pub fn create_url(service: Service, path: String) -> String {
@@ -39,31 +45,57 @@ pub fn find(services: List(Service), name: String) -> Result(Service, Nil) {
   list.find(services, fn(service) { service.name == name })
 }
 
-pub fn find_request_forward_header(service: Service, header_key: String) -> Result(String, Nil) {
+pub fn find_request_forward_header(
+  service: Service,
+  header_key: String,
+) -> Result(String, Nil) {
   list.find(service.request.forward_headers, fn(header) { header == header_key })
 }
 
-pub fn find_response_forward_header(service: Service, header_key: String) -> Result(String, Nil) {
-  list.find(service.response.forward_headers, fn(header) { header == header_key })
+pub fn find_response_forward_header(
+  service: Service,
+  header_key: String,
+) -> Result(String, Nil) {
+  list.find(service.response.forward_headers, fn(header) {
+    header == header_key
+  })
 }
 
-pub fn load_services(env: Environment) -> Result(List(Service), String) {
+pub fn load_services(
+  env: Environment,
+  agents_api_key: String,
+) -> Result(List(Service), String) {
   let config_path = "services-" <> env.to_string(env) <> ".json"
 
-  let contents = simplifile.read(config_path)
+  let contents =
+    simplifile.read(config_path)
     |> result.map_error(fn(_) { "Service config file not found" })
 
-  result.flatten(result.map(contents, services_from_json))
+  result.flatten(
+    result.map(contents, fn(json) { services_from_json(json, agents_api_key) }),
+  )
 }
 
-fn services_from_json(json_string: String) -> Result(List(Service), String) {
-  result.map_error(json.parse(from: json_string, using: decode.list(service_decoder())), fn(_) { "Unable to parse JSON string into service" })
+fn services_from_json(
+  json_string: String,
+  agents_api_key: String,
+) -> Result(List(Service), String) {
+  result.map_error(
+    json.parse(
+      from: json_string,
+      using: decode.list(service_decoder(agents_api_key)),
+    ),
+    fn(_) { "Unable to parse JSON string into service" },
+  )
 }
 
-fn service_decoder() {
+fn service_decoder(agents_api_key: String) {
   use name <- decode.field("name", decode.string)
   use base_url <- decode.field("base_url", decode.string)
-  use request <- decode.field("request", service_request_decoder())
+  use request <- decode.field(
+    "request",
+    service_request_decoder(agents_api_key),
+  )
   use response <- decode.field("response", service_response_decoder())
   use security <- decode.field("security", service_security_decoder())
   decode.success(Service(
@@ -71,17 +103,32 @@ fn service_decoder() {
     base_url: base_url,
     request: request,
     response: response,
-    security: security
+    security: security,
   ))
 }
 
-fn service_request_decoder() {
-  use forward_headers <- decode.field("forward_headers", decode.list(decode.string))
-  decode.success(RequestConfig(forward_headers))
+fn service_request_decoder(agents_api_key: String) {
+  use forward_headers <- decode.field(
+    "forward_headers",
+    decode.list(decode.string),
+  )
+  use authorization <- decode.optional_field(
+    "authorization",
+    False,
+    decode.bool,
+  )
+  let secret = case authorization {
+    True -> Some(agents_api_key)
+    False -> None
+  }
+  decode.success(RequestConfig(forward_headers, secret))
 }
 
 fn service_response_decoder() {
-  use forward_headers <- decode.field("forward_headers", decode.list(decode.string))
+  use forward_headers <- decode.field(
+    "forward_headers",
+    decode.list(decode.string),
+  )
   decode.success(ResponseConfig(forward_headers))
 }
 
@@ -93,5 +140,14 @@ fn service_security_decoder() {
 fn security_auth_decoder() {
   use path <- decode.field("path", decode.string)
   use methods <- decode.field("methods", decode.list(decode.string))
-  decode.success(AuthConfig(path, methods))
+  use scheme <- decode.optional_field("scheme", "cookie", decode.string)
+  use audience <- decode.optional_field("audience", "", decode.string)
+  case scheme, audience {
+    "cookie", _ -> decode.success(AuthConfig(path, methods, Cookie))
+    "bearer", "" ->
+      decode.failure(AuthConfig(path, methods, Cookie), "audience")
+    "bearer", audience ->
+      decode.success(AuthConfig(path, methods, Bearer(audience)))
+    _, _ -> decode.failure(AuthConfig(path, methods, Cookie), "scheme")
+  }
 }
