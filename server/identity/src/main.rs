@@ -1,10 +1,6 @@
-mod config;
-use config::load_config;
-mod database;
-use database::connection::create_connection_pool;
-mod domain;
-mod router;
-use router::main::{init_router, AppState};
+use identity::config::load_config;
+use identity::database::connection::create_connection_pool;
+use identity::router::main::{init_router, AppState};
 use tracing::info;
 
 #[tokio::main]
@@ -20,7 +16,9 @@ async fn main() {
     let pool = create_connection_pool(config.database_url.clone());
 
     let app = init_router(AppState { db: pool, config });
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}")).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
+        .await
+        .unwrap();
 
     info!("Starting server on 0.0.0.0:{port}");
     axum::serve(listener, app).await.unwrap();
