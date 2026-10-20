@@ -44,8 +44,7 @@
         "x-hub-signature-256",
         "x-github-delivery",
         "x-github-event"
-      ],
-      "authorization": true
+      ]
     },
     "response": {
       "forward_headers": []

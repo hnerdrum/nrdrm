@@ -15,7 +15,6 @@ pub type Config {
     allowed_origins: List(String),
     boot_time: String,
     api_version: String,
-    agents_api_key: String,
   )
 }
 
@@ -26,7 +25,6 @@ pub fn load_config() -> Config {
   let assert Ok(secret_key_base) = envoy.get("SECRET_KEY_BASE")
   let assert Ok(allowed_origins) =
     result.map(envoy.get("ALLOWED_ORIGINS"), parse_origins)
-  let assert Ok(agents_api_key) = envoy.get("AGENTS_API_KEY")
 
   Config(
     port,
@@ -38,7 +36,6 @@ pub fn load_config() -> Config {
       calendar.utc_offset,
     ),
     api_version: string.slice(result.unwrap(envoy.get("BUILD_ID"), "dev"), 0, 7),
-    agents_api_key: agents_api_key,
   )
 }
 
