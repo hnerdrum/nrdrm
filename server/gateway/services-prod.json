@@ -38,7 +38,13 @@
     "name": "agents",
     "base_url": "http://d1b9226b-e1c0-452b-84d4-969163c48fc7.10483531-bf02-44f9-8832-1d3e6e768a10.internal",
     "request": {
-      "forward_headers": ["content-type", "x-nrdrm-client"],
+      "forward_headers": [
+        "content-type",
+        "x-nrdrm-client",
+        "x-hub-signature-256",
+        "x-github-delivery",
+        "x-github-event"
+      ],
       "authorization": true
     },
     "response": {

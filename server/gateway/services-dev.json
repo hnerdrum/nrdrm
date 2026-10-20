@@ -38,7 +38,13 @@
     "name": "agents",
     "base_url": "http://localhost:8090",
     "request": {
-      "forward_headers": ["content-type", "x-nrdrm-client"],
+      "forward_headers": [
+        "content-type",
+        "x-nrdrm-client",
+        "x-hub-signature-256",
+        "x-github-delivery",
+        "x-github-event"
+      ],
       "authorization": true
     },
     "response": {
