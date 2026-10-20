@@ -26,7 +26,6 @@ const normalizePem = (value: string) => {
 
 export const config = Config.all({
   port: Config.port("PORT").pipe(Config.withDefault(8090)),
-  apiKey: secret("AGENTS_API_KEY"),
   scalewayApiKey: secret("SCALEWAY_API_KEY"),
   openaiApiKey: optionalSecret("OPENAI_API_KEY"),
   databaseUrl: Config.nonEmptyString("DATABASE_URL"),
@@ -36,7 +35,6 @@ export const config = Config.all({
 }).pipe(
   Config.map((env) => ({
     port: env.port,
-    apiKey: env.apiKey,
     databaseUrl: env.databaseUrl,
     github: {
       appId: env.githubAppId,

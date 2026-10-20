@@ -6,9 +6,10 @@ import gleam/http/request
 import gleam/list
 import gleam/option.{None, Some}
 import gleeunit/should
+import wisp/testing
 
 pub fn cookie_rules_use_validate_token_test() {
-  let assert Ok(services) = service.load_services(Dev, "hop-secret")
+  let assert Ok(services) = service.load_services(Dev)
   let assert Ok(recipes) = service.find(services, "recipes")
 
   middleware.required_scheme(recipes, "pancakes", "PUT")
@@ -42,7 +43,7 @@ pub fn active_bearer_for_another_audience_is_rejected_test() {
 }
 
 pub fn github_webhook_is_not_introspected_test() {
-  let assert Ok(services) = service.load_services(Dev, "hop-secret")
+  let assert Ok(services) = service.load_services(Dev)
   let assert Ok(agents) = service.find(services, "agents")
 
   middleware.required_scheme(agents, "webhooks/github", "POST")
@@ -53,16 +54,21 @@ pub fn github_webhook_is_not_introspected_test() {
   |> should.equal("oauth/introspect")
 }
 
-pub fn hop_secret_replaces_caller_authorization_test() {
-  let assert Ok(services) = service.load_services(Dev, "hop-secret")
+pub fn caller_authorization_is_not_forwarded_test() {
+  let assert Ok(services) = service.load_services(Dev)
   let assert Ok(agents) = service.find(services, "agents")
-  let assert Ok(req) = request.to("http://localhost:8090/runs")
-  let req = request.set_header(req, "authorization", "Bearer caller-token")
+  let incoming =
+    testing.post(
+      "/agents/runs",
+      [#("authorization", "Bearer caller-token")],
+      "",
+    )
+  let assert Ok(upstream) = request.to("http://localhost:8090/runs")
 
-  let forwarded = forward.set_hop_authorization(req, agents)
+  let forwarded = forward.set_request_headers(upstream, incoming, agents)
 
   request.get_header(forwarded, "authorization")
-  |> should.equal(Ok("Bearer hop-secret"))
+  |> should.equal(Error(Nil))
   list.contains(agents.request.forward_headers, "authorization")
   |> should.equal(False)
 }
