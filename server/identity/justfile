@@ -14,7 +14,7 @@ build:
 migrate:
     diesel migration run
 
-create-client name audience: env migrate
+create-client name audience:
     cargo run --bin create-client -- {{ name }} {{ audience }}
 
 env dest=".env":
