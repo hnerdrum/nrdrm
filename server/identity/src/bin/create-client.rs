@@ -1,13 +1,8 @@
-use identity::database::connection::create_connection_pool;
-use identity::database::error::DatabaseError;
-use identity::domain::oauth::register_client;
+use identity::domain::oauth::new_client_credentials;
 use std::env;
 use std::process::exit;
 
-#[tokio::main]
-async fn main() {
-    let _ = dotenvy::dotenv();
-
+fn main() {
     let mut args = env::args().skip(1);
     let Some(name) = args.next() else {
         usage();
@@ -19,24 +14,12 @@ async fn main() {
         usage();
     }
 
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let pool = create_connection_pool(database_url);
-
-    match register_client(&pool, name, audience).await {
-        Ok(client) => {
-            println!("client_id={}", client.client_id);
-            println!("client_secret={}", client.client_secret);
-            eprintln!("Store the client secret now. It is not shown again.");
-        }
-        Err(DatabaseError::AlreadyExists) => {
-            eprintln!("A client with that name already exists.");
-            exit(1);
-        }
-        Err(err) => {
-            eprintln!("Failed to create client: {err:?}");
-            exit(1);
-        }
-    }
+    let credentials = new_client_credentials();
+    println!("name={name}");
+    println!("audience={audience}");
+    println!("client_id={}", credentials.client_id);
+    println!("client_secret={}", credentials.client_secret);
+    println!("secret_hash={}", credentials.secret_hash);
 }
 
 fn usage() -> ! {
