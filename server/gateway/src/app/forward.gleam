@@ -5,7 +5,6 @@ import gleam/http/request
 import gleam/http/response
 import gleam/httpc
 import gleam/list
-import gleam/option.{None, Some}
 import gleam/string
 import gleam/string_tree
 import wisp.{type Request, type Response}
@@ -69,18 +68,6 @@ pub fn set_request_headers(
   list.fold(forward_headers, to, fn(acc, header) {
     request.set_header(acc, header.0, header.1)
   })
-  |> set_hop_authorization(service)
-}
-
-pub fn set_hop_authorization(
-  req: request.Request(String),
-  service: Service,
-) -> request.Request(String) {
-  case service.request.authorization {
-    Some(secret) ->
-      request.set_header(req, "authorization", "Bearer " <> secret)
-    None -> req
-  }
 }
 
 fn map_response(service: Service, from: response.Response(String)) -> Response {
