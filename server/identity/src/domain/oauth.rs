@@ -54,6 +54,21 @@ pub struct RegisteredClient {
     pub client_secret: String,
 }
 
+pub struct ClientCredentials {
+    pub client_id: Uuid,
+    pub client_secret: String,
+    pub secret_hash: String,
+}
+
+pub fn new_client_credentials() -> ClientCredentials {
+    let client_secret = format!("nrdrm_{}", random_token());
+    ClientCredentials {
+        client_id: Uuid::new_v4(),
+        client_secret: client_secret.clone(),
+        secret_hash: hash_credential(&client_secret),
+    }
+}
+
 pub async fn issue_access_token(
     db: &DBClient,
     input: TokenRequest,
@@ -169,11 +184,11 @@ pub async fn register_client(
     name: String,
     audience: String,
 ) -> Result<RegisteredClient, DatabaseError> {
-    let client_secret = format!("nrdrm_{}", random_token());
-    let client = insert_client(db, name, hash_credential(&client_secret), audience).await?;
+    let credentials = new_client_credentials();
+    let client = insert_client(db, name, credentials.secret_hash, audience).await?;
     Ok(RegisteredClient {
         client_id: client.id,
-        client_secret,
+        client_secret: credentials.client_secret,
     })
 }
 

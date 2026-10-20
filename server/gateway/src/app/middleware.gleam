@@ -12,7 +12,6 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import gleam/uri
 import utils
 import wisp.{type Request}
 
@@ -139,10 +138,13 @@ fn introspect(
   use token <- result.try(bearer_token(incoming_request))
   let url = service.create_url(identity_service, identity_path(Bearer("")))
   use req <- result.try(result.replace_error(request.to(url), Nil))
+  let body =
+    json.object([#("token", json.string(token))])
+    |> json.to_string
   let req =
     request.set_method(req, http.Post)
-    |> request.set_header("content-type", "application/x-www-form-urlencoded")
-    |> request.set_body("token=" <> uri.percent_encode(token))
+    |> request.set_header("content-type", "application/json")
+    |> request.set_body(body)
   use response <- result.try(result.replace_error(httpc.send(req), Nil))
   parse_introspection(response)
 }

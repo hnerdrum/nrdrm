@@ -12,7 +12,7 @@ use crate::domain::oauth::{
 };
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
-use axum::{extract::State, routing::get, routing::post, Form, Json, Router};
+use axum::{extract::State, routing::get, routing::post, Json, Router};
 use axum::{middleware, Extension};
 use deadpool_diesel::postgres::Pool;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
@@ -97,7 +97,7 @@ async fn login_handler(
 
 async fn oauth_token_handler(
     State(state): State<AppState>,
-    Form(input): Form<TokenRequest>,
+    Json(input): Json<TokenRequest>,
 ) -> Result<Json<TokenResponse>, DomainError> {
     let token = issue_access_token(&state.db, input).await?;
     Ok(Json(token))
@@ -105,7 +105,7 @@ async fn oauth_token_handler(
 
 async fn oauth_introspect_handler(
     State(state): State<AppState>,
-    Form(input): Form<IntrospectRequest>,
+    Json(input): Json<IntrospectRequest>,
 ) -> Result<Json<Introspection>, DomainError> {
     let introspection = introspect_access_token(&state.db, input).await?;
     Ok(Json(introspection))
