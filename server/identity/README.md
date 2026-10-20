@@ -17,13 +17,13 @@ just identity run      # env bootstrap, Diesel migrations, then cargo run
 
 Listens on `APP_PORT` (default 8081 locally).
 
-`POST /api/v1/oauth/token` takes form fields `grant_type=client_credentials`, `client_id`, `client_secret`, and `audience`. A valid client receives a one-hour bearer token. `POST /api/v1/oauth/introspect` takes form field `token` and returns whether it is active, plus the client id, client name, and audience when it is. Password login is unchanged.
+`POST /api/v1/oauth/token` takes JSON `{ "grant_type": "client_credentials", "client_id", "client_secret", "audience" }`. A valid client receives a one-hour bearer token. `POST /api/v1/oauth/introspect` takes JSON `{ "token" }` and returns whether it is active, plus the client id, client name, and audience when it is. Password login is unchanged.
 
 ```bash
 just identity create-client agents-caller agents
 ```
 
-That prints `client_id` and `client_secret` once. The secret is stored only as a hash.
+That prints `name`, `audience`, `client_id`, `client_secret`, and `secret_hash`. It does not write to the database. Store the secret. Insert `secret_hash`, not the secret.
 
 ## Test
 
