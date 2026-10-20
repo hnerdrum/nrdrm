@@ -2,7 +2,6 @@ import config/env.{type Environment}
 import gleam/dynamic/decode
 import gleam/json
 import gleam/list
-import gleam/option.{type Option, None, Some}
 import gleam/result
 import simplifile
 
@@ -17,7 +16,7 @@ pub type Service {
 }
 
 pub type RequestConfig {
-  RequestConfig(forward_headers: List(String), authorization: Option(String))
+  RequestConfig(forward_headers: List(String))
 }
 
 pub type ResponseConfig {
@@ -61,41 +60,27 @@ pub fn find_response_forward_header(
   })
 }
 
-pub fn load_services(
-  env: Environment,
-  agents_api_key: String,
-) -> Result(List(Service), String) {
+pub fn load_services(env: Environment) -> Result(List(Service), String) {
   let config_path = "services-" <> env.to_string(env) <> ".json"
 
   let contents =
     simplifile.read(config_path)
     |> result.map_error(fn(_) { "Service config file not found" })
 
-  result.flatten(
-    result.map(contents, fn(json) { services_from_json(json, agents_api_key) }),
-  )
+  result.flatten(result.map(contents, services_from_json))
 }
 
-fn services_from_json(
-  json_string: String,
-  agents_api_key: String,
-) -> Result(List(Service), String) {
+fn services_from_json(json_string: String) -> Result(List(Service), String) {
   result.map_error(
-    json.parse(
-      from: json_string,
-      using: decode.list(service_decoder(agents_api_key)),
-    ),
+    json.parse(from: json_string, using: decode.list(service_decoder())),
     fn(_) { "Unable to parse JSON string into service" },
   )
 }
 
-fn service_decoder(agents_api_key: String) {
+fn service_decoder() {
   use name <- decode.field("name", decode.string)
   use base_url <- decode.field("base_url", decode.string)
-  use request <- decode.field(
-    "request",
-    service_request_decoder(agents_api_key),
-  )
+  use request <- decode.field("request", service_request_decoder())
   use response <- decode.field("response", service_response_decoder())
   use security <- decode.field("security", service_security_decoder())
   decode.success(Service(
@@ -107,21 +92,12 @@ fn service_decoder(agents_api_key: String) {
   ))
 }
 
-fn service_request_decoder(agents_api_key: String) {
+fn service_request_decoder() {
   use forward_headers <- decode.field(
     "forward_headers",
     decode.list(decode.string),
   )
-  use authorization <- decode.optional_field(
-    "authorization",
-    False,
-    decode.bool,
-  )
-  let secret = case authorization {
-    True -> Some(agents_api_key)
-    False -> None
-  }
-  decode.success(RequestConfig(forward_headers, secret))
+  decode.success(RequestConfig(forward_headers))
 }
 
 fn service_response_decoder() {
