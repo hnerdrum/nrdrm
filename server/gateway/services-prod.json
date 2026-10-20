@@ -1,7 +1,7 @@
 [
   {
     "name": "recipes",
-    "base_url": "https://recipes.api.nrdrm.dev/api/v1",
+    "base_url": "http://a0e6e260-08bc-4aa1-8c11-744a2f819576.10483531-bf02-44f9-8832-1d3e6e768a10.internal/api/v1",
     "request": {
       "forward_headers": ["content-type", "cookie"]
     },
@@ -23,7 +23,7 @@
   },
   {
     "name": "identity",
-    "base_url": "https://identity.api.nrdrm.dev/api/v1",
+    "base_url": "http://3c72a637-8a2e-4dc2-9b2c-1ff0e5a83cc2.10483531-bf02-44f9-8832-1d3e6e768a10.internal/api/v1",
     "request": {
       "forward_headers": ["content-type", "cookie"]
     },
@@ -36,7 +36,7 @@
   },
   {
     "name": "agents",
-    "base_url": "https://agents.api.nrdrm.dev",
+    "base_url": "http://d1b9226b-e1c0-452b-84d4-969163c48fc7.10483531-bf02-44f9-8832-1d3e6e768a10.internal",
     "request": {
       "forward_headers": ["content-type", "x-nrdrm-client"],
       "authorization": true
