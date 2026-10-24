@@ -6,13 +6,14 @@ import config/service.{
   type Service, AuthConfig, Bearer, Cookie, RequestConfig, ResponseConfig,
   SecurityConfig, Service,
 }
+import gleam/bit_array
 import gleam/erlang/process.{type Subject}
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/list
 
 pub type Responder =
-  fn(Request(String)) -> Result(Response(String), TransportError)
+  fn(Request(BitArray)) -> Result(Response(BitArray), TransportError)
 
 pub fn recipes() -> Service {
   Service(
@@ -73,7 +74,7 @@ pub fn context(transport: Transport) -> Context {
 /// A fake transport that answers with `respond` and records every request it
 /// receives on `sent`, so tests can assert what the gateway sent upstream.
 pub fn recording_transport(
-  sent: Subject(Request(String)),
+  sent: Subject(Request(BitArray)),
   respond: Responder,
 ) -> Transport {
   fn(req) {
@@ -82,14 +83,16 @@ pub fn recording_transport(
   }
 }
 
-pub fn sent_requests(sent: Subject(Request(String))) -> List(Request(String)) {
+pub fn sent_requests(
+  sent: Subject(Request(BitArray)),
+) -> List(Request(BitArray)) {
   drain(sent, [])
 }
 
 fn drain(
-  sent: Subject(Request(String)),
-  acc: List(Request(String)),
-) -> List(Request(String)) {
+  sent: Subject(Request(BitArray)),
+  acc: List(Request(BitArray)),
+) -> List(Request(BitArray)) {
   case process.receive(sent, 0) {
     Ok(req) -> drain(sent, [req, ..acc])
     Error(Nil) -> list.reverse(acc)
@@ -99,10 +102,10 @@ fn drain(
 pub fn json(
   status: Int,
   body: String,
-) -> Result(Response(String), TransportError) {
+) -> Result(Response(BitArray), TransportError) {
   Ok(
     response.new(status)
     |> response.set_header("content-type", "application/json")
-    |> response.set_body(body),
+    |> response.set_body(bit_array.from_string(body)),
   )
 }

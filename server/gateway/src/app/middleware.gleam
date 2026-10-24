@@ -2,6 +2,7 @@ import app/context.{type Context}
 import app/forward
 import app/transport.{type Transport}
 import config/service.{type Scheme, type Service, Bearer, Cookie}
+import gleam/bit_array
 import gleam/dynamic/decode
 import gleam/http
 import gleam/http/request
@@ -32,6 +33,7 @@ pub fn auth_middleware(
   ctx: Context,
   handler: fn(wisp.Request) -> wisp.Response,
 ) -> wisp.Response {
+  let req = strip_reserved_headers(req)
   case wisp.path_segments(req) {
     [service_name, ..path_segments] -> {
       case service.find(ctx.services, service_name) {
@@ -86,14 +88,24 @@ pub fn identity_path(scheme: Scheme) -> String {
   }
 }
 
-pub fn bearer_permitted(introspection: Introspection, audience: String) -> Bool {
+pub fn bearer_permitted(
+  introspection: Introspection,
+  audience: String,
+) -> Bool {
   introspection.active && introspection.audience == Some(audience)
 }
 
-pub fn attach_client(req: Request, client_name: Option(String)) -> Request {
+/// `x-nrdrm-*` headers carry identity the gateway vouches for, so callers
+/// must never be able to supply them.
+fn strip_reserved_headers(req: Request) -> Request {
   let headers =
-    list.filter(req.headers, fn(header) { header.0 != "x-nrdrm-client" })
-  let req = request.Request(..req, headers: headers)
+    list.filter(req.headers, fn(header) {
+      !string.starts_with(string.lowercase(header.0), "x-nrdrm-")
+    })
+  request.Request(..req, headers: headers)
+}
+
+pub fn attach_client(req: Request, client_name: Option(String)) -> Request {
   case client_name {
     Some(name) -> request.set_header(req, "x-nrdrm-client", name)
     None -> req
@@ -114,7 +126,7 @@ fn validate_auth(
     Ok(req) -> {
       case
         transport(forward.set_request_headers(
-          req,
+          request.set_body(req, <<>>),
           incoming_request,
           identity_service,
         ))
@@ -143,6 +155,7 @@ fn introspect(
   let body =
     json.object([#("token", json.string(token))])
     |> json.to_string
+    |> bit_array.from_string
   let req =
     request.set_method(req, http.Post)
     |> request.set_header("content-type", "application/json")
@@ -152,29 +165,21 @@ fn introspect(
 }
 
 fn bearer_token(req: Request) -> Result(String, Nil) {
-  use header <- result.try(
-    list.find(req.headers, fn(header) {
-      string.lowercase(header.0) == "authorization"
-    })
-    |> result.map(fn(header) { header.1 }),
-  )
-  let prefix = string.slice(string.lowercase(string.trim(header)), 0, 7)
-  case prefix == "bearer " {
-    False -> Error(Nil)
-    True ->
-      case string.trim(string.drop_start(header, 7)) {
-        "" -> Error(Nil)
-        token -> Ok(token)
-      }
+  use header <- result.try(request.get_header(req, "authorization"))
+  use #(scheme, token) <- result.try(string.split_once(string.trim(header), " "))
+  case string.lowercase(scheme), string.trim(token) {
+    "bearer", "" -> Error(Nil)
+    "bearer", token -> Ok(token)
+    _, _ -> Error(Nil)
   }
 }
 
 fn parse_validation_response(
-  response: response.Response(String),
+  response: response.Response(BitArray),
 ) -> Result(TokenValidation, String) {
   case response.status {
     200 -> {
-      case json.parse(response.body, token_validation_decoder()) {
+      case json.parse_bits(response.body, token_validation_decoder()) {
         Ok(validation) -> Ok(validation)
         Error(_) -> Error("Failed to parse JSON into token validator type")
       }
@@ -187,12 +192,12 @@ fn parse_validation_response(
 }
 
 fn parse_introspection(
-  response: response.Response(String),
+  response: response.Response(BitArray),
 ) -> Result(Introspection, Nil) {
   case response.status {
     200 ->
       result.replace_error(
-        json.parse(response.body, introspection_decoder()),
+        json.parse_bits(response.body, introspection_decoder()),
         Nil,
       )
     _ -> Error(Nil)
