@@ -18,7 +18,7 @@ pub fn forward_request(
   let url = service.create_url(service, path)
   wisp.log_info("Forwarding request to URL: " <> url)
 
-  use body <- wisp.require_string_body(wisp_request)
+  use body <- wisp.require_bit_array_body(wisp_request)
 
   case request.to(url) {
     Ok(req) ->
@@ -37,16 +37,20 @@ pub fn forward_request(
 pub fn send_request(
   transport: Transport,
   service: Service,
-  request: request.Request(String),
+  request: request.Request(BitArray),
 ) -> Response {
   case transport(request) {
     Ok(response) -> map_response(service, response)
     Error(err) -> {
       let url = request.host <> request.path
       wisp.log_error(
-        "Request to " <> url <> "got an error: " <> string.inspect(err),
+        "Request to " <> url <> " got an error: " <> string.inspect(err),
       )
-      wisp.internal_server_error()
+      case err {
+        transport.Timeout -> wisp.response(504)
+        transport.FailedToConnect(_) | transport.InvalidResponse ->
+          wisp.response(502)
+      }
     }
   }
 }
@@ -55,18 +59,19 @@ fn map_request(
   service: Service,
   from: Request,
   to: request.Request(String),
-  body: String,
-) -> request.Request(String) {
-  request.set_method(to, from.method)
+  body: BitArray,
+) -> request.Request(BitArray) {
+  request.Request(..to, query: from.query)
+  |> request.set_method(from.method)
   |> request.set_body(body)
   |> set_request_headers(from, service)
 }
 
 pub fn set_request_headers(
-  to: request.Request(String),
+  to: request.Request(body),
   from: Request,
   service: Service,
-) -> request.Request(String) {
+) -> request.Request(body) {
   let forward_headers =
     list.filter(from.headers, fn(header) {
       list.contains(service.request.forward_headers, header.0)
@@ -76,51 +81,46 @@ pub fn set_request_headers(
   })
 }
 
-fn map_response(service: Service, from: response.Response(String)) -> Response {
-  let json_response =
-    wisp.json_response(string_tree.from_string(from.body), from.status)
-  set_cookie_header(set_response_headers(service, from, json_response))
+fn map_response(service: Service, from: response.Response(BitArray)) -> Response {
+  wisp.response(from.status)
+  |> response.set_body(wisp.Bytes(bytes_tree.from_bit_array(from.body)))
+  |> set_response_headers(service, from, _)
 }
 
 fn set_response_headers(
   service: Service,
-  from: response.Response(String),
+  from: response.Response(BitArray),
   to: Response,
 ) -> Response {
-  let forward_headers =
-    list.filter(from.headers, fn(header) {
-      list.contains(service.response.forward_headers, header.0)
-    })
-  list.fold(forward_headers, to, fn(acc, header) {
-    response.set_header(acc, header.0, header.1)
+  list.fold_right(from.headers, to, fn(acc, header) {
+    let #(name, value) = header
+    let forwarded =
+      name == "content-type"
+      || list.contains(service.response.forward_headers, name)
+    case forwarded {
+      True -> response.prepend_header(acc, name, response_header(name, value))
+      False -> acc
+    }
   })
 }
 
-pub fn set_cookie_header(response: Response) -> Response {
-  let headers = response.headers
+fn response_header(name: String, value: String) -> String {
+  case name {
+    "set-cookie" -> default_cookie_path(value)
+    _ -> value
+  }
+}
 
-  let updated_response =
-    list.fold(headers, response, fn(acc, header) {
-      let header_name = header.0
-      let header_value = header.1
-
-      case string.lowercase(header_name) {
-        "set-cookie" -> {
-          case string.contains(header_value, "path=") {
-            True -> {
-              response
-            }
-            False -> {
-              let new_value = string.concat([header_value, "; Path=/"])
-              response.set_header(acc, header_name, new_value)
-            }
-          }
-        }
-        _ -> acc
-      }
+fn default_cookie_path(cookie: String) -> String {
+  let has_path =
+    string.split(cookie, ";")
+    |> list.any(fn(attribute) {
+      string.trim(attribute) |> string.lowercase |> string.starts_with("path=")
     })
-
-  updated_response
+  case has_path {
+    True -> cookie
+    False -> cookie <> "; Path=/"
+  }
 }
 
 pub fn parse_string_response(response: Response) {
