@@ -1,11 +1,11 @@
 import app/context.{type Context}
 import app/forward
+import app/transport.{type Transport}
 import config/service.{type Scheme, type Service, Bearer, Cookie}
 import gleam/dynamic/decode
 import gleam/http
 import gleam/http/request
 import gleam/http/response
-import gleam/httpc
 import gleam/int
 import gleam/json
 import gleam/list
@@ -42,13 +42,13 @@ pub fn auth_middleware(
           {
             Error(_) -> handler(req)
             Ok(Cookie) -> {
-              case validate_auth(ctx.identity_service, req) {
+              case validate_auth(ctx.transport, ctx.identity_service, req) {
                 TokenValidation(valid: True) -> handler(req)
                 TokenValidation(valid: False) -> unauthorized()
               }
             }
             Ok(Bearer(audience)) -> {
-              case introspect(ctx.identity_service, req) {
+              case introspect(ctx.transport, ctx.identity_service, req) {
                 Ok(introspection) ->
                   case bearer_permitted(introspection, audience) {
                     True ->
@@ -105,6 +105,7 @@ fn unauthorized() -> wisp.Response {
 }
 
 fn validate_auth(
+  transport: Transport,
   identity_service: Service,
   incoming_request: Request,
 ) -> TokenValidation {
@@ -112,7 +113,7 @@ fn validate_auth(
   case request.to(url) {
     Ok(req) -> {
       case
-        httpc.send(forward.set_request_headers(
+        transport(forward.set_request_headers(
           req,
           incoming_request,
           identity_service,
@@ -132,6 +133,7 @@ fn validate_auth(
 }
 
 fn introspect(
+  transport: Transport,
   identity_service: Service,
   incoming_request: Request,
 ) -> Result(Introspection, Nil) {
@@ -145,7 +147,7 @@ fn introspect(
     request.set_method(req, http.Post)
     |> request.set_header("content-type", "application/json")
     |> request.set_body(body)
-  use response <- result.try(result.replace_error(httpc.send(req), Nil))
+  use response <- result.try(result.replace_error(transport(req), Nil))
   parse_introspection(response)
 }
 
