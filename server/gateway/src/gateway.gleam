@@ -1,5 +1,6 @@
 import app/context.{Context}
 import app/router
+import app/transport
 import config/config
 import config/service
 import gleam/erlang/process
@@ -13,7 +14,7 @@ pub fn main() {
   let config = config.load_config()
   let assert Ok(services) = service.load_services(config.env)
   let assert Ok(identity_service) = service.find(services, "identity")
-  let ctx = Context(services, identity_service, config)
+  let ctx = Context(services, identity_service, config, transport.new())
 
   let assert Ok(_) =
     wisp_mist.handler(router.handle_request(_, ctx), config.secret_key_base)

@@ -1,15 +1,16 @@
+import app/transport.{type Transport}
 import config/service.{type Service}
 import gleam/bit_array
 import gleam/bytes_tree
 import gleam/http/request
 import gleam/http/response
-import gleam/httpc
 import gleam/list
 import gleam/string
 import gleam/string_tree
 import wisp.{type Request, type Response}
 
 pub fn forward_request(
+  transport: Transport,
   service: Service,
   path: String,
   wisp_request: Request,
@@ -21,7 +22,11 @@ pub fn forward_request(
 
   case request.to(url) {
     Ok(req) ->
-      send_request(service, map_request(service, wisp_request, req, body))
+      send_request(
+        transport,
+        service,
+        map_request(service, wisp_request, req, body),
+      )
     Error(_) -> {
       wisp.log_error("Could not create request from URL: " <> url)
       wisp.internal_server_error()
@@ -30,10 +35,11 @@ pub fn forward_request(
 }
 
 pub fn send_request(
+  transport: Transport,
   service: Service,
   request: request.Request(String),
 ) -> Response {
-  case httpc.send(request) {
+  case transport(request) {
     Ok(response) -> map_response(service, response)
     Error(err) -> {
       let url = request.host <> request.path
