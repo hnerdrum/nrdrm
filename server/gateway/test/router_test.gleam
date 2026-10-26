@@ -1,3 +1,4 @@
+import app/request_id
 import app/router
 import app/transport
 import fixture
@@ -180,22 +181,199 @@ pub fn method_override_query_is_ignored_test() {
   upstream.method |> should.equal(http.Post)
 }
 
-pub fn health_reports_gateway_and_every_service_test() {
-  let #(response, _) =
-    run(testing.get("/health", []), fn(_) {
-      fixture.json(200, "{\"boot_time\":\"t0\",\"api_version\":\"abc1234\"}")
-    })
+pub fn livez_answers_without_calling_upstreams_test() {
+  let #(response, sent) =
+    run(testing.get("/_gateway/livez", []), fn(_) { fixture.json(200, "{}") })
+
+  response.status |> should.equal(200)
+  testing.string_body(response) |> should.equal("{\"status\":\"ok\"}")
+  sent |> should.equal([])
+}
+
+pub fn status_reports_gateway_and_every_upstream_test() {
+  let #(response, sent) =
+    run(
+      testing.get("/_gateway/status", [#("x-request-id", "probe-1")]),
+      fn(req) {
+        case req.host {
+          "agents.test" -> fixture.json(200, "{\"status\":\"ok\"}")
+          _ ->
+            fixture.json(200, "{\"boot_time\":\"t0\",\"api_version\":\"v1\"}")
+        }
+      },
+    )
 
   response.status |> should.equal(200)
   let body = testing.string_body(response)
-  string.contains(body, "\"gateway\":{\"boot_time\":\"2026-01-01T00:00:00Z\"")
-  |> should.be_true
   string.contains(
     body,
-    "\"recipes\":{\"boot_time\":\"t0\",\"api_version\":\"abc1234\"}",
+    "\"gateway\":{\"boot_time\":\"2026-01-01T00:00:00Z\",\"api_version\":\"test\"}",
   )
   |> should.be_true
-  string.contains(body, "\"agents\":{\"boot_time\":\"t0\"") |> should.be_true
+  string.contains(body, "\"recipes\":{\"up\":true,\"status\":200,")
+  |> should.be_true
+  string.contains(body, "\"boot_time\":\"t0\",\"api_version\":\"v1\"}")
+  |> should.be_true
+  string.contains(body, "\"agents\":{\"up\":true,\"status\":200,")
+  |> should.be_true
+
+  list.map(sent, fn(req) { #(req.host, req.path) })
+  |> list.sort(fn(a, b) { string.compare(a.0, b.0) })
+  |> should.equal([
+    #("agents.test", "/health"),
+    #("identity.test", "/api/v1/health"),
+    #("recipes.test", "/api/v1/health"),
+  ])
+  list.each(sent, fn(req) {
+    request.get_header(req, "x-request-id") |> should.equal(Ok("probe-1"))
+  })
+}
+
+pub fn status_still_answers_when_upstreams_are_down_test() {
+  let #(response, _) =
+    run(testing.get("/_gateway/status", []), fn(_) {
+      Error(transport.FailedToConnect("econnrefused"))
+    })
+
+  response.status |> should.equal(200)
+  string.contains(
+    testing.string_body(response),
+    "\"recipes\":{\"up\":false,\"status\":null,",
+  )
+  |> should.be_true
+}
+
+pub fn health_is_gone_test() {
+  let #(response, sent) =
+    run(testing.get("/health", []), fn(_) { fixture.json(200, "{}") })
+
+  response.status |> should.equal(404)
+  sent |> should.equal([])
+}
+
+pub fn unknown_gateway_endpoint_is_not_found_test() {
+  let #(response, sent) =
+    run(testing.get("/_gateway/readyz", []), fn(_) { fixture.json(200, "{}") })
+
+  response.status |> should.equal(404)
+  sent |> should.equal([])
+}
+
+pub fn valid_request_id_is_kept_echoed_and_forwarded_test() {
+  let #(response, sent) =
+    run(
+      testing.get("/recipes/pancakes", [#("x-request-id", "Abc-1.2_3")]),
+      fn(_) { fixture.json(200, "{}") },
+    )
+
+  response.get_header(response, "x-request-id") |> should.equal(Ok("Abc-1.2_3"))
+  let assert [upstream] = sent
+  request.get_header(upstream, "x-request-id") |> should.equal(Ok("Abc-1.2_3"))
+}
+
+pub fn unsafe_request_id_is_replaced_test() {
+  let too_long = string.repeat("a", 65)
+  list.each(["", "has space", "line\nbreak", "{\"json\":1}", too_long], fn(id) {
+    let #(response, sent) =
+      run(testing.get("/recipes/pancakes", [#("x-request-id", id)]), fn(_) {
+        fixture.json(200, "{}")
+      })
+
+    let assert Ok(echoed) = response.get_header(response, "x-request-id")
+    echoed |> should.not_equal(id)
+    request_id.is_valid(echoed) |> should.be_true
+    let assert [upstream] = sent
+    request.get_header(upstream, "x-request-id") |> should.equal(Ok(echoed))
+  })
+}
+
+pub fn missing_request_id_is_generated_per_request_test() {
+  let #(first, _) =
+    run(testing.get("/recipes/pancakes", []), fn(_) { fixture.json(200, "{}") })
+  let #(second, _) =
+    run(testing.get("/recipes/pancakes", []), fn(_) { fixture.json(200, "{}") })
+
+  let assert Ok(first_id) = response.get_header(first, "x-request-id")
+  let assert Ok(second_id) = response.get_header(second, "x-request-id")
+  request_id.is_valid(first_id) |> should.be_true
+  first_id |> should.not_equal(second_id)
+}
+
+pub fn request_id_is_echoed_on_every_kind_of_response_test() {
+  let id = [#("x-request-id", "edge-1")]
+  let echoed = fn(response: wisp.Response) {
+    response.get_header(response, "x-request-id") |> should.equal(Ok("edge-1"))
+  }
+
+  let #(unauthorized, _) =
+    run(testing.post("/agents/runs", id, "{}"), identity_and_upstream("{}"))
+  unauthorized.status |> should.equal(401)
+  echoed(unauthorized)
+
+  let #(not_found, _) =
+    run(testing.get("/nope", id), fn(_) { fixture.json(200, "{}") })
+  not_found.status |> should.equal(404)
+  echoed(not_found)
+
+  let #(bad_gateway, _) =
+    run(testing.get("/recipes/pancakes", id), fn(_) {
+      Error(transport.FailedToConnect("econnrefused"))
+    })
+  bad_gateway.status |> should.equal(502)
+  echoed(bad_gateway)
+
+  let #(gateway_timeout, _) =
+    run(testing.get("/recipes/pancakes", id), fn(_) { Error(transport.Timeout) })
+  gateway_timeout.status |> should.equal(504)
+  echoed(gateway_timeout)
+
+  let #(crashed, _) =
+    run(testing.get("/recipes/pancakes", id), fn(_) { panic as "boom" })
+  crashed.status |> should.equal(500)
+  echoed(crashed)
+
+  let #(preflight, sent) =
+    run(
+      testing.request(
+        http.Options,
+        "/recipes/pancakes",
+        [
+          #("origin", "http://localhost:3000"),
+          #("access-control-request-method", "PUT"),
+          ..id
+        ],
+        <<>>,
+      ),
+      fn(_) { fixture.json(200, "{}") },
+    )
+  echoed(preflight)
+  sent |> should.equal([])
+}
+
+pub fn request_id_reaches_identity_calls_test() {
+  let id = #("x-request-id", "auth-1")
+
+  let #(_, sent) =
+    run(
+      testing.put("/recipes/pancakes", [#("cookie", "session=abc"), id], "{}"),
+      identity_and_upstream("{\"valid\":true}"),
+    )
+  let assert [validation, _] = sent
+  request.get_header(validation, "x-request-id") |> should.equal(Ok("auth-1"))
+
+  let #(_, sent) =
+    run(
+      testing.post(
+        "/agents/runs",
+        [#("authorization", "Bearer token"), id],
+        "{}",
+      ),
+      identity_and_upstream("{\"active\":true,\"aud\":\"agents\"}"),
+    )
+  let assert [introspection, upstream] = sent
+  request.get_header(introspection, "x-request-id")
+  |> should.equal(Ok("auth-1"))
+  request.get_header(upstream, "x-request-id") |> should.equal(Ok("auth-1"))
 }
 
 pub fn unknown_service_is_not_found_test() {

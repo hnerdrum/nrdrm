@@ -1,4 +1,5 @@
 import app/context.{Context}
+import app/log
 import app/router
 import app/transport
 import config/config
@@ -9,11 +10,10 @@ import gleam/io
 import gleam/list
 import gleam/string
 import mist
-import wisp
 import wisp/wisp_mist
 
 pub fn main() {
-  wisp.configure_logger()
+  log.configure()
 
   let config = config.load_config() |> or_exit
   let routing = routing.load("gateway.json", envoy.get) |> or_exit

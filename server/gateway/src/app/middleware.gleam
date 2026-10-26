@@ -1,5 +1,6 @@
 import app/context.{type Context}
 import app/identity.{type Introspection}
+import app/request_id
 import app/route.{type Match}
 import config/path_pattern
 import config/routing.{type Rule, Bearer, Public, Rule, Session}
@@ -63,9 +64,17 @@ pub fn bearer_permitted(
 pub fn strip_reserved_headers(req: Request) -> Request {
   let headers =
     list.filter(req.headers, fn(header) {
-      !string.starts_with(string.lowercase(header.0), "x-nrdrm-")
+      !is_reserved_header(string.lowercase(header.0))
     })
   request.Request(..req, headers: headers)
+}
+
+pub fn is_gateway_header(name: String) -> Bool {
+  name == request_id.header || is_reserved_header(name)
+}
+
+fn is_reserved_header(name: String) -> Bool {
+  string.starts_with(name, "x-nrdrm-")
 }
 
 pub fn attach_client(req: Request, client_name: Option(String)) -> Request {

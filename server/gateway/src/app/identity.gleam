@@ -1,3 +1,4 @@
+import app/request_id
 import app/transport.{type Transport}
 import config/routing.{type Upstream}
 import gleam/bit_array
@@ -24,7 +25,9 @@ pub fn validate_session(
   identity: Upstream,
   incoming_request: Request,
 ) -> Bool {
-  let req = routing.upstream_request(identity, ["validate-token"])
+  let req =
+    routing.upstream_request(identity, ["validate-token"])
+    |> request_id.propagate(incoming_request)
   let req = case request.get_header(incoming_request, "cookie") {
     Ok(cookie) -> request.set_header(req, "cookie", cookie)
     Error(Nil) -> req
@@ -48,6 +51,7 @@ pub fn introspect(
     |> bit_array.from_string
   let req =
     routing.upstream_request(identity, ["oauth", "introspect"])
+    |> request_id.propagate(incoming_request)
     |> request.set_method(http.Post)
     |> request.set_header("content-type", "application/json")
     |> request.set_body(body)

@@ -57,8 +57,8 @@ pub fn routing() -> Routing {
         prefix: "agents",
         upstream: agents(),
         request_headers: set.from_list([
-          "content-type", "x-nrdrm-client", "x-hub-signature-256",
-          "x-github-delivery", "x-github-event",
+          "content-type", "x-hub-signature-256", "x-github-delivery",
+          "x-github-event",
         ]),
         response_headers: set.new(),
         rules: [
