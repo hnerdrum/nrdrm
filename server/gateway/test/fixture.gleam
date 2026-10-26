@@ -43,6 +43,7 @@ pub fn routing() -> Routing {
         rules: [
           rule("*", [Put, Delete], Session),
           rule("ingredients/*", [Put, Delete], Session),
+          rule("**", [Get, Post], Public),
         ],
       ),
       Route(
@@ -104,8 +105,6 @@ pub fn context_with_routing(routing: Routing, transport: Transport) -> Context {
   )
 }
 
-/// A fake transport that answers with `respond` and records every request it
-/// receives on `sent`, so tests can assert what the gateway sent upstream.
 pub fn recording_transport(
   sent: Subject(Request(BitArray)),
   respond: Responder,

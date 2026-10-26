@@ -1,32 +1,14 @@
 import app/context.{type Context}
+import app/identity.{type Introspection}
 import app/route.{type Match}
-import app/transport.{type Transport}
 import config/path_pattern
-import config/routing.{type Rule, type Upstream, Bearer, Public, Rule, Session}
-import gleam/bit_array
-import gleam/dynamic/decode
+import config/routing.{type Rule, Bearer, Public, Rule, Session}
 import gleam/http.{type Method}
 import gleam/http/request
-import gleam/http/response
-import gleam/int
-import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
-import gleam/result
 import gleam/string
 import wisp.{type Request}
-
-pub type TokenValidation {
-  TokenValidation(valid: Bool)
-}
-
-pub type Introspection {
-  Introspection(
-    active: Bool,
-    audience: Option(String),
-    client_name: Option(String),
-  )
-}
 
 pub fn auth_middleware(
   req: wisp.Request,
@@ -34,17 +16,24 @@ pub fn auth_middleware(
   match: Match,
   handler: fn(wisp.Request) -> wisp.Response,
 ) -> wisp.Response {
-  let identity = ctx.routing.identity
   case matching_rule(match, req.method) {
-    Error(Nil) | Ok(Rule(auth: Public, ..)) -> handler(req)
-    Ok(Rule(auth: Session, ..)) -> {
-      case validate_auth(ctx.transport, identity, req) {
-        TokenValidation(valid: True) -> handler(req)
-        TokenValidation(valid: False) -> unauthorized()
-      }
+    Error(Nil) -> {
+      wisp.log_warning(
+        "No rule found for "
+        <> http.method_to_string(req.method)
+        <> " "
+        <> req.path,
+      )
+      wisp.not_found()
     }
-    Ok(Rule(auth: Bearer(audience), ..)) -> {
-      case introspect(ctx.transport, identity, req) {
+    Ok(Rule(auth: Public, ..)) -> handler(req)
+    Ok(Rule(auth: Session, ..)) ->
+      case identity.validate_session(ctx.transport, ctx.routing.identity, req) {
+        True -> handler(req)
+        False -> unauthorized()
+      }
+    Ok(Rule(auth: Bearer(audience), ..)) ->
+      case identity.introspect(ctx.transport, ctx.routing.identity, req) {
         Ok(introspection) ->
           case bearer_permitted(introspection, audience) {
             True -> handler(attach_client(req, introspection.client_name))
@@ -52,7 +41,6 @@ pub fn auth_middleware(
           }
         Error(_) -> unauthorized()
       }
-    }
   }
 }
 
@@ -89,107 +77,4 @@ pub fn attach_client(req: Request, client_name: Option(String)) -> Request {
 
 fn unauthorized() -> wisp.Response {
   wisp.string_body(wisp.response(401), "Unauthorized")
-}
-
-fn validate_auth(
-  transport: Transport,
-  identity: Upstream,
-  incoming_request: Request,
-) -> TokenValidation {
-  let req = routing.upstream_request(identity, ["validate-token"])
-  let req = case request.get_header(incoming_request, "cookie") {
-    Ok(cookie) -> request.set_header(req, "cookie", cookie)
-    Error(Nil) -> req
-  }
-  case transport(req, identity.timeout_ms) {
-    Ok(response) -> {
-      case parse_validation_response(response) {
-        Ok(token_validation) -> token_validation
-        Error(_) -> TokenValidation(valid: False)
-      }
-    }
-    Error(_) -> TokenValidation(valid: False)
-  }
-}
-
-fn introspect(
-  transport: Transport,
-  identity: Upstream,
-  incoming_request: Request,
-) -> Result(Introspection, Nil) {
-  use token <- result.try(bearer_token(incoming_request))
-  let body =
-    json.object([#("token", json.string(token))])
-    |> json.to_string
-    |> bit_array.from_string
-  let req =
-    routing.upstream_request(identity, ["oauth", "introspect"])
-    |> request.set_method(http.Post)
-    |> request.set_header("content-type", "application/json")
-    |> request.set_body(body)
-  use response <- result.try(result.replace_error(
-    transport(req, identity.timeout_ms),
-    Nil,
-  ))
-  parse_introspection(response)
-}
-
-fn bearer_token(req: Request) -> Result(String, Nil) {
-  use header <- result.try(request.get_header(req, "authorization"))
-  use #(scheme, token) <- result.try(string.split_once(string.trim(header), " "))
-  case string.lowercase(scheme), string.trim(token) {
-    "bearer", "" -> Error(Nil)
-    "bearer", token -> Ok(token)
-    _, _ -> Error(Nil)
-  }
-}
-
-fn parse_validation_response(
-  response: response.Response(BitArray),
-) -> Result(TokenValidation, String) {
-  case response.status {
-    200 -> {
-      case json.parse_bits(response.body, token_validation_decoder()) {
-        Ok(validation) -> Ok(validation)
-        Error(_) -> Error("Failed to parse JSON into token validator type")
-      }
-    }
-    _ ->
-      Error(
-        "Validation service returned status " <> int.to_string(response.status),
-      )
-  }
-}
-
-fn parse_introspection(
-  response: response.Response(BitArray),
-) -> Result(Introspection, Nil) {
-  case response.status {
-    200 ->
-      result.replace_error(
-        json.parse_bits(response.body, introspection_decoder()),
-        Nil,
-      )
-    _ -> Error(Nil)
-  }
-}
-
-fn token_validation_decoder() -> decode.Decoder(TokenValidation) {
-  use valid <- decode.field("valid", decode.bool)
-  decode.success(TokenValidation(valid))
-}
-
-fn introspection_decoder() -> decode.Decoder(Introspection) {
-  use active <- decode.field("active", decode.bool)
-  use audience <- decode.optional_field(
-    "aud",
-    None,
-    decode.optional(decode.string),
-  )
-  use client_name <- decode.optional_field(
-    "client_name",
-    None,
-    decode.optional(decode.string),
-  )
-  decode.success(Introspection(active, audience, client_name))
 }

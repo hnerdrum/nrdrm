@@ -10,11 +10,8 @@ pub opaque type PathPattern {
 }
 
 type Segment {
-  /// Matches exactly this segment.
   Literal(String)
-  /// `*`: matches any single segment.
   Wildcard
-  /// `**`: matches every remaining segment, including none. Last only.
   Rest
 }
 
