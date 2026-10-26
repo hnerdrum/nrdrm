@@ -2,15 +2,18 @@ import app/context.{type Context, Context}
 import app/transport.{type Transport, type TransportError}
 import config/config.{Config}
 import config/env.{Dev}
+import config/path_pattern.{type PathPattern}
 import config/service.{
   type Service, AuthConfig, Bearer, Cookie, RequestConfig, ResponseConfig,
   SecurityConfig, Service,
 }
 import gleam/bit_array
 import gleam/erlang/process.{type Subject}
+import gleam/http.{Delete, Get, Post, Put}
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/list
+import gleam/set
 
 pub type Responder =
   fn(Request(BitArray)) -> Result(Response(BitArray), TransportError)
@@ -18,12 +21,12 @@ pub type Responder =
 pub fn recipes() -> Service {
   Service(
     name: "recipes",
-    base_url: "http://recipes.test/api/v1",
-    request: RequestConfig(["content-type", "cookie"]),
-    response: ResponseConfig(["set-cookie"]),
+    base_request: base_url("http://recipes.test/api/v1"),
+    request: RequestConfig(set.from_list(["content-type", "cookie"])),
+    response: ResponseConfig(set.from_list(["set-cookie"])),
     security: SecurityConfig([
-      AuthConfig("*", ["put", "delete"], Cookie),
-      AuthConfig("ingredients/*", ["put", "delete"], Cookie),
+      AuthConfig(pattern("*"), [Put, Delete], Cookie),
+      AuthConfig(pattern("ingredients/*"), [Put, Delete], Cookie),
     ]),
   )
 }
@@ -31,9 +34,9 @@ pub fn recipes() -> Service {
 pub fn identity() -> Service {
   Service(
     name: "identity",
-    base_url: "http://identity.test/api/v1",
-    request: RequestConfig(["content-type", "cookie"]),
-    response: ResponseConfig(["set-cookie"]),
+    base_request: base_url("http://identity.test/api/v1"),
+    request: RequestConfig(set.from_list(["content-type", "cookie"])),
+    response: ResponseConfig(set.from_list(["set-cookie"])),
     security: SecurityConfig([]),
   )
 }
@@ -41,18 +44,30 @@ pub fn identity() -> Service {
 pub fn agents() -> Service {
   Service(
     name: "agents",
-    base_url: "http://agents.test",
-    request: RequestConfig([
-      "content-type", "x-nrdrm-client", "x-hub-signature-256",
-      "x-github-delivery", "x-github-event",
-    ]),
-    response: ResponseConfig([]),
+    base_request: base_url("http://agents.test"),
+    request: RequestConfig(
+      set.from_list([
+        "content-type", "x-nrdrm-client", "x-hub-signature-256",
+        "x-github-delivery", "x-github-event",
+      ]),
+    ),
+    response: ResponseConfig(set.new()),
     security: SecurityConfig([
-      AuthConfig("complete", ["post"], Bearer("agents")),
-      AuthConfig("runs", ["post"], Bearer("agents")),
-      AuthConfig("runs/*", ["get"], Bearer("agents")),
+      AuthConfig(pattern("complete"), [Post], Bearer("agents")),
+      AuthConfig(pattern("runs"), [Post], Bearer("agents")),
+      AuthConfig(pattern("runs/*"), [Get], Bearer("agents")),
     ]),
   )
+}
+
+fn base_url(url: String) -> Request(BitArray) {
+  let assert Ok(req) = service.parse_base_url(url)
+  req
+}
+
+fn pattern(source: String) -> PathPattern {
+  let assert Ok(compiled) = path_pattern.parse(source)
+  compiled
 }
 
 pub fn context(transport: Transport) -> Context {
