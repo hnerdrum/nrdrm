@@ -46,7 +46,6 @@
       "upstream": "agents",
       "request_headers": [
         "content-type",
-        "x-nrdrm-client",
         "x-hub-signature-256",
         "x-github-delivery",
         "x-github-event"

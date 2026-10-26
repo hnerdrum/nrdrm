@@ -1,3 +1,4 @@
+import app/middleware
 import app/route.{type Match}
 import app/transport.{type Transport}
 import config/routing.{type Route}
@@ -7,7 +8,6 @@ import gleam/http/response
 import gleam/list
 import gleam/set
 import gleam/string
-import gleam/uri
 import wisp.{type Request, type Response}
 
 pub fn forward_request(
@@ -17,9 +17,6 @@ pub fn forward_request(
 ) -> Response {
   let route = match.route
   let req = routing.upstream_request(route.upstream, match.path)
-  wisp.log_info(
-    "Forwarding request to URL: " <> uri.to_string(request.to_uri(req)),
-  )
 
   use body <- wisp.require_bit_array_body(wisp_request)
 
@@ -52,6 +49,7 @@ fn map_request(
   let forward_headers =
     list.filter(from.headers, fn(header) {
       set.contains(route.request_headers, header.0)
+      || middleware.is_gateway_header(header.0)
     })
   request.Request(..to, query: from.query)
   |> request.set_method(from.method)

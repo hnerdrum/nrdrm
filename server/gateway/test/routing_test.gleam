@@ -208,14 +208,14 @@ pub fn malformed_fields_are_all_reported_test() {
     errors_for(config(
       "recipes",
       bad_upstream,
-      route("health", "recipes", bad_rule),
+      route("_gateway", "recipes", bad_rule),
     ))
 
   string.contains(errors, "upstreams.0.timeout_ms: expected a positive integer")
   |> should.be_true
   string.contains(
     errors,
-    "routes.0.prefix: expected a prefix other than the reserved \"health\"",
+    "routes.0.prefix: expected a prefix other than the reserved \"_gateway\"",
   )
   |> should.be_true
   string.contains(

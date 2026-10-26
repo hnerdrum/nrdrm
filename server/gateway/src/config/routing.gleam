@@ -39,7 +39,7 @@ pub type Auth {
   Bearer(audience: String)
 }
 
-const reserved_prefixes = ["health"]
+const reserved_prefixes = ["_gateway"]
 
 pub fn upstream_request(
   upstream: Upstream,
