@@ -1,16 +1,19 @@
-import config/service.{type Service}
+import config/routing.{type Route}
+import gleam/list
 import gleam/result
 
 pub type Match {
-  Match(service: Service, path: List(String))
+  Match(route: Route, path: List(String))
 }
 
 pub fn resolve(
-  services: List(Service),
+  routes: List(Route),
   segments: List(String),
 ) -> Result(Match, Nil) {
   case segments {
-    [name, ..path] -> service.find(services, name) |> result.map(Match(_, path))
+    [prefix, ..path] ->
+      list.find(routes, fn(route) { route.prefix == prefix })
+      |> result.map(Match(_, path))
     [] -> Error(Nil)
   }
 }

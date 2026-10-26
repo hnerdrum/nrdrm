@@ -1,6 +1,6 @@
 # gateway
 
-Gleam reverse proxy. No database. Routes `/<service>/...` using `services-dev.json` (local) or `services-prod.json` (`ENV=prod`).
+Gleam reverse proxy. No database. Routing lives in [`gateway.json`](gateway.json), the same file in every environment.
 
 ## Run
 
@@ -8,11 +8,27 @@ Gleam reverse proxy. No database. Routes `/<service>/...` using `services-dev.js
 just gateway run       # env bootstrap, then gleam run
 ```
 
-Listens on `PORT` (default 8080). Local backends: recipes `:8000`, identity `:8081`, agents `:8090`. CORS: `ALLOWED_ORIGINS`.
+Listens on `PORT`. CORS: `ALLOWED_ORIGINS`. Upstream URLs come from `RECIPES_URL`, `IDENTITY_URL` and `AGENTS_URL` (locally `:8000`, `:8081` and `:8090`, see `.env.example`). Every one of these must be set. If your `.env` predates them, copy the new lines from `.env.example`.
 
-`POST /agents/complete`, `POST /agents/runs`, and `GET /agents/runs/:id` require `Authorization: Bearer` with an identity access token whose audience is `agents`. The gateway asks identity to introspect that token, then calls agents without that token. Other agents paths, including `POST /agents/webhooks/github`, are forwarded without that check. Recipe writes still use the session cookie.
+## Config
 
-An auth rule's `path` is matched segment by segment against the path after `/<service>`: a literal segment matches itself, `*` matches exactly one segment, and `**` (last segment only) matches any remaining segments, including none. Path patterns, methods, and base URLs are checked when the gateway boots, and a bad entry stops it from starting.
+`gateway.json` has three parts:
+
+- `upstreams`: the backends, each with a `name`, a `url` and a `timeout_ms`. A `url` can reference environment variables as `${NAME}`.
+- `routes`: requests for `/<prefix>/...` go to the route's `upstream`. Only headers in `request_headers` reach the upstream, and only headers in `response_headers` (plus `content-type`) come back.
+- `identity_upstream`: the upstream the gateway asks to check sessions and bearer tokens.
+
+Each route lists `rules`. The first rule whose `path` and `methods` match the request decides its `auth`:
+
+- `"public"`: forwarded as is.
+- `"session"`: identity must accept the caller's session cookie.
+- `{"bearer": {"audience": "agents"}}`: identity must introspect the `Authorization: Bearer` token as active for that audience. The gateway then sends the token's client name to the upstream as `x-nrdrm-client`, and does not send the token itself.
+
+A request that matches no rule is currently forwarded without a check. That will change to a 404, so list every path clients use.
+
+A rule's `path` is matched segment by segment against the path after `/<prefix>`: a literal segment matches itself, `*` matches exactly one segment, and `**` (last segment only) matches any remaining segments, including none.
+
+The gateway checks the whole file and its environment variables when it boots. If anything is wrong, it lists every problem and exits.
 
 ## Test
 

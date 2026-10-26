@@ -4,7 +4,7 @@ import gleam/httpc
 import gleam/string
 
 pub type Transport =
-  fn(Request(BitArray)) -> Result(Response(BitArray), TransportError)
+  fn(Request(BitArray), Int) -> Result(Response(BitArray), TransportError)
 
 pub type TransportError {
   FailedToConnect(detail: String)
@@ -12,15 +12,15 @@ pub type TransportError {
   InvalidResponse
 }
 
-pub fn new(timeout_ms timeout_ms: Int) -> Transport {
-  let config = httpc.configure() |> httpc.timeout(timeout_ms)
-  fn(req) { send(config, req) }
+pub fn new() -> Transport {
+  send
 }
 
 fn send(
-  config: httpc.Configuration,
   req: Request(BitArray),
+  timeout_ms: Int,
 ) -> Result(Response(BitArray), TransportError) {
+  let config = httpc.configure() |> httpc.timeout(timeout_ms)
   case httpc.dispatch_bits(config, req) {
     Ok(response) -> Ok(response)
     Error(httpc.FailedToConnect(ip4, ip6)) ->

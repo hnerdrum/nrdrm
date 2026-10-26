@@ -206,6 +206,45 @@ pub fn unknown_service_is_not_found_test() {
   sent |> should.equal([])
 }
 
+pub fn request_matching_no_rule_is_forwarded_test() {
+  let #(response, sent) =
+    run(testing.get("/agents/unlisted", []), fn(_) { fixture.json(200, "{}") })
+
+  response.status |> should.equal(200)
+  let assert [upstream] = sent
+  upstream.path |> should.equal("/unlisted")
+}
+
+pub fn each_upstream_is_called_with_its_own_timeout_test() {
+  let calls = process.new_subject()
+  let ctx =
+    fixture.context(fn(req: Request(BitArray), timeout_ms) {
+      process.send(calls, #(req.host, timeout_ms))
+      case req.host {
+        "identity.test" ->
+          fixture.json(200, "{\"active\":true,\"aud\":\"agents\"}")
+        _ -> fixture.json(200, "{}")
+      }
+    })
+
+  router.handle_request(testing.get("/recipes/pancakes", []), ctx)
+  router.handle_request(
+    testing.get("/agents/runs/42", [#("authorization", "Bearer token")]),
+    ctx,
+  )
+
+  [
+    process.receive(calls, 0),
+    process.receive(calls, 0),
+    process.receive(calls, 0),
+  ]
+  |> should.equal([
+    Ok(#("recipes.test", 30_000)),
+    Ok(#("identity.test", 10_000)),
+    Ok(#("agents.test", 120_000)),
+  ])
+}
+
 pub fn upstream_connection_failure_is_bad_gateway_test() {
   let #(response, _) =
     run(testing.get("/recipes/pancakes", []), fn(_) {

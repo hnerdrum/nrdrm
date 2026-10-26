@@ -3,9 +3,9 @@ import app/transport.{type Transport, type TransportError}
 import config/config.{Config}
 import config/env.{Dev}
 import config/path_pattern.{type PathPattern}
-import config/service.{
-  type Service, AuthConfig, Bearer, Cookie, RequestConfig, ResponseConfig,
-  SecurityConfig, Service,
+import config/routing.{
+  type Routing, type Rule, type Upstream, Bearer, Public, Route, Routing, Rule,
+  Session, Upstream,
 }
 import gleam/bit_array
 import gleam/erlang/process.{type Subject}
@@ -18,51 +18,66 @@ import gleam/set
 pub type Responder =
   fn(Request(BitArray)) -> Result(Response(BitArray), TransportError)
 
-pub fn recipes() -> Service {
-  Service(
-    name: "recipes",
-    base_request: base_url("http://recipes.test/api/v1"),
-    request: RequestConfig(set.from_list(["content-type", "cookie"])),
-    response: ResponseConfig(set.from_list(["set-cookie"])),
-    security: SecurityConfig([
-      AuthConfig(pattern("*"), [Put, Delete], Cookie),
-      AuthConfig(pattern("ingredients/*"), [Put, Delete], Cookie),
-    ]),
+pub fn recipes() -> Upstream {
+  upstream("recipes", "http://recipes.test/api/v1", 30_000)
+}
+
+pub fn identity() -> Upstream {
+  upstream("identity", "http://identity.test/api/v1", 10_000)
+}
+
+pub fn agents() -> Upstream {
+  upstream("agents", "http://agents.test", 120_000)
+}
+
+pub fn routing() -> Routing {
+  Routing(
+    identity: identity(),
+    upstreams: [recipes(), identity(), agents()],
+    routes: [
+      Route(
+        prefix: "recipes",
+        upstream: recipes(),
+        request_headers: set.from_list(["content-type", "cookie"]),
+        response_headers: set.from_list(["set-cookie"]),
+        rules: [
+          rule("*", [Put, Delete], Session),
+          rule("ingredients/*", [Put, Delete], Session),
+        ],
+      ),
+      Route(
+        prefix: "identity",
+        upstream: identity(),
+        request_headers: set.from_list(["content-type", "cookie"]),
+        response_headers: set.from_list(["set-cookie"]),
+        rules: [rule("login", [Post], Public)],
+      ),
+      Route(
+        prefix: "agents",
+        upstream: agents(),
+        request_headers: set.from_list([
+          "content-type", "x-nrdrm-client", "x-hub-signature-256",
+          "x-github-delivery", "x-github-event",
+        ]),
+        response_headers: set.new(),
+        rules: [
+          rule("webhooks/github", [Post], Public),
+          rule("complete", [Post], Bearer("agents")),
+          rule("runs", [Post], Bearer("agents")),
+          rule("runs/*", [Get], Bearer("agents")),
+        ],
+      ),
+    ],
   )
 }
 
-pub fn identity() -> Service {
-  Service(
-    name: "identity",
-    base_request: base_url("http://identity.test/api/v1"),
-    request: RequestConfig(set.from_list(["content-type", "cookie"])),
-    response: ResponseConfig(set.from_list(["set-cookie"])),
-    security: SecurityConfig([]),
-  )
+fn upstream(name: String, url: String, timeout_ms: Int) -> Upstream {
+  let assert Ok(base_request) = routing.parse_base_url(url)
+  Upstream(name, base_request, timeout_ms)
 }
 
-pub fn agents() -> Service {
-  Service(
-    name: "agents",
-    base_request: base_url("http://agents.test"),
-    request: RequestConfig(
-      set.from_list([
-        "content-type", "x-nrdrm-client", "x-hub-signature-256",
-        "x-github-delivery", "x-github-event",
-      ]),
-    ),
-    response: ResponseConfig(set.new()),
-    security: SecurityConfig([
-      AuthConfig(pattern("complete"), [Post], Bearer("agents")),
-      AuthConfig(pattern("runs"), [Post], Bearer("agents")),
-      AuthConfig(pattern("runs/*"), [Get], Bearer("agents")),
-    ]),
-  )
-}
-
-fn base_url(url: String) -> Request(BitArray) {
-  let assert Ok(req) = service.parse_base_url(url)
-  req
+fn rule(path: String, methods: List(http.Method), auth: routing.Auth) -> Rule {
+  Rule(pattern(path), methods, auth)
 }
 
 fn pattern(source: String) -> PathPattern {
@@ -71,9 +86,12 @@ fn pattern(source: String) -> PathPattern {
 }
 
 pub fn context(transport: Transport) -> Context {
+  context_with_routing(routing(), transport)
+}
+
+pub fn context_with_routing(routing: Routing, transport: Transport) -> Context {
   Context(
-    services: [recipes(), identity(), agents()],
-    identity_service: identity(),
+    routing: routing,
     config: Config(
       port: 8080,
       secret_key_base: "test-secret-key-base",
@@ -92,7 +110,7 @@ pub fn recording_transport(
   sent: Subject(Request(BitArray)),
   respond: Responder,
 ) -> Transport {
-  fn(req) {
+  fn(req, _timeout_ms) {
     process.send(sent, req)
     respond(req)
   }
