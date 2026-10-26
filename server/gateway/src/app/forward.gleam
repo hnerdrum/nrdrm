@@ -5,33 +5,30 @@ import gleam/bytes_tree
 import gleam/http/request
 import gleam/http/response
 import gleam/list
+import gleam/set
 import gleam/string
 import gleam/string_tree
+import gleam/uri
 import wisp.{type Request, type Response}
 
 pub fn forward_request(
   transport: Transport,
   service: Service,
-  path: String,
+  path: List(String),
   wisp_request: Request,
 ) -> Response {
-  let url = service.create_url(service, path)
-  wisp.log_info("Forwarding request to URL: " <> url)
+  let req = service.upstream_request(service, path)
+  wisp.log_info(
+    "Forwarding request to URL: " <> uri.to_string(request.to_uri(req)),
+  )
 
   use body <- wisp.require_bit_array_body(wisp_request)
 
-  case request.to(url) {
-    Ok(req) ->
-      send_request(
-        transport,
-        service,
-        map_request(service, wisp_request, req, body),
-      )
-    Error(_) -> {
-      wisp.log_error("Could not create request from URL: " <> url)
-      wisp.internal_server_error()
-    }
-  }
+  send_request(
+    transport,
+    service,
+    map_request(service, wisp_request, req, body),
+  )
 }
 
 pub fn send_request(
@@ -58,7 +55,7 @@ pub fn send_request(
 fn map_request(
   service: Service,
   from: Request,
-  to: request.Request(String),
+  to: request.Request(BitArray),
   body: BitArray,
 ) -> request.Request(BitArray) {
   request.Request(..to, query: from.query)
@@ -74,14 +71,17 @@ pub fn set_request_headers(
 ) -> request.Request(body) {
   let forward_headers =
     list.filter(from.headers, fn(header) {
-      list.contains(service.request.forward_headers, header.0)
+      set.contains(service.request.forward_headers, header.0)
     })
   list.fold(forward_headers, to, fn(acc, header) {
     request.set_header(acc, header.0, header.1)
   })
 }
 
-fn map_response(service: Service, from: response.Response(BitArray)) -> Response {
+fn map_response(
+  service: Service,
+  from: response.Response(BitArray),
+) -> Response {
   wisp.response(from.status)
   |> response.set_body(wisp.Bytes(bytes_tree.from_bit_array(from.body)))
   |> set_response_headers(service, from, _)
@@ -96,7 +96,7 @@ fn set_response_headers(
     let #(name, value) = header
     let forwarded =
       name == "content-type"
-      || list.contains(service.response.forward_headers, name)
+      || set.contains(service.response.forward_headers, name)
     case forwarded {
       True -> response.prepend_header(acc, name, response_header(name, value))
       False -> acc

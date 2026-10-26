@@ -1,5 +1,5 @@
 import app/context.{type Context}
-import app/middleware.{auth_middleware}
+import app/middleware
 import cors_builder as cors
 import gleam/http
 import gleam/list
@@ -18,9 +18,7 @@ pub fn middleware(
 
   use req <- wisp.handle_head(req)
 
-  use req <- auth_middleware(req, ctx)
-
-  handle_request(req)
+  handle_request(middleware.strip_reserved_headers(req))
 }
 
 fn cors(allowed_origins: List(String)) {

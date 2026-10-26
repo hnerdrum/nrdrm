@@ -1,10 +1,12 @@
 import app/context.{type Context}
 import app/forward
+import app/route.{type Match}
 import app/transport.{type Transport}
+import config/path_pattern
 import config/service.{type Scheme, type Service, Bearer, Cookie}
 import gleam/bit_array
 import gleam/dynamic/decode
-import gleam/http
+import gleam/http.{type Method}
 import gleam/http/request
 import gleam/http/response
 import gleam/int
@@ -13,7 +15,6 @@ import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/string
-import utils
 import wisp.{type Request}
 
 pub type TokenValidation {
@@ -31,60 +32,42 @@ pub type Introspection {
 pub fn auth_middleware(
   req: wisp.Request,
   ctx: Context,
+  route: Match,
   handler: fn(wisp.Request) -> wisp.Response,
 ) -> wisp.Response {
-  let req = strip_reserved_headers(req)
-  case wisp.path_segments(req) {
-    [service_name, ..path_segments] -> {
-      case service.find(ctx.services, service_name) {
-        Ok(service) -> {
-          let path = string.join(path_segments, "/")
-          case
-            required_scheme(service, path, http.method_to_string(req.method))
-          {
-            Error(_) -> handler(req)
-            Ok(Cookie) -> {
-              case validate_auth(ctx.transport, ctx.identity_service, req) {
-                TokenValidation(valid: True) -> handler(req)
-                TokenValidation(valid: False) -> unauthorized()
-              }
-            }
-            Ok(Bearer(audience)) -> {
-              case introspect(ctx.transport, ctx.identity_service, req) {
-                Ok(introspection) ->
-                  case bearer_permitted(introspection, audience) {
-                    True ->
-                      handler(attach_client(req, introspection.client_name))
-                    False -> unauthorized()
-                  }
-                Error(_) -> unauthorized()
-              }
-            }
-          }
-        }
-        Error(_) -> handler(req)
+  case required_scheme(route, req.method) {
+    Error(_) -> handler(req)
+    Ok(Cookie) -> {
+      case validate_auth(ctx.transport, ctx.identity_service, req) {
+        TokenValidation(valid: True) -> handler(req)
+        TokenValidation(valid: False) -> unauthorized()
       }
     }
-    _ -> handler(req)
+    Ok(Bearer(audience)) -> {
+      case introspect(ctx.transport, ctx.identity_service, req) {
+        Ok(introspection) ->
+          case bearer_permitted(introspection, audience) {
+            True -> handler(attach_client(req, introspection.client_name))
+            False -> unauthorized()
+          }
+        Error(_) -> unauthorized()
+      }
+    }
   }
 }
 
-pub fn required_scheme(
-  service: Service,
-  path: String,
-  method: String,
-) -> Result(Scheme, Nil) {
-  list.find(service.security.auth, fn(auth) {
-    utils.glob_match(auth.path, path, "/")
-    && list.contains(auth.methods, string.lowercase(method))
+pub fn required_scheme(route: Match, method: Method) -> Result(Scheme, Nil) {
+  list.find(route.service.security.auth, fn(auth) {
+    path_pattern.matches(auth.path, route.path)
+    && list.contains(auth.methods, method)
   })
   |> result.map(fn(auth) { auth.scheme })
 }
 
-pub fn identity_path(scheme: Scheme) -> String {
+pub fn identity_path(scheme: Scheme) -> List(String) {
   case scheme {
-    Cookie -> "validate-token"
-    Bearer(_) -> "oauth/introspect"
+    Cookie -> ["validate-token"]
+    Bearer(_) -> ["oauth", "introspect"]
   }
 }
 
@@ -97,7 +80,7 @@ pub fn bearer_permitted(
 
 /// `x-nrdrm-*` headers carry identity the gateway vouches for, so callers
 /// must never be able to supply them.
-fn strip_reserved_headers(req: Request) -> Request {
+pub fn strip_reserved_headers(req: Request) -> Request {
   let headers =
     list.filter(req.headers, fn(header) {
       !string.starts_with(string.lowercase(header.0), "x-nrdrm-")
@@ -121,22 +104,13 @@ fn validate_auth(
   identity_service: Service,
   incoming_request: Request,
 ) -> TokenValidation {
-  let url = service.create_url(identity_service, identity_path(Cookie))
-  case request.to(url) {
-    Ok(req) -> {
-      case
-        transport(forward.set_request_headers(
-          request.set_body(req, <<>>),
-          incoming_request,
-          identity_service,
-        ))
-      {
-        Ok(response) -> {
-          case parse_validation_response(response) {
-            Ok(token_validation) -> token_validation
-            Error(_) -> TokenValidation(valid: False)
-          }
-        }
+  let req =
+    service.upstream_request(identity_service, identity_path(Cookie))
+    |> forward.set_request_headers(incoming_request, identity_service)
+  case transport(req) {
+    Ok(response) -> {
+      case parse_validation_response(response) {
+        Ok(token_validation) -> token_validation
         Error(_) -> TokenValidation(valid: False)
       }
     }
@@ -150,14 +124,13 @@ fn introspect(
   incoming_request: Request,
 ) -> Result(Introspection, Nil) {
   use token <- result.try(bearer_token(incoming_request))
-  let url = service.create_url(identity_service, identity_path(Bearer("")))
-  use req <- result.try(result.replace_error(request.to(url), Nil))
   let body =
     json.object([#("token", json.string(token))])
     |> json.to_string
     |> bit_array.from_string
   let req =
-    request.set_method(req, http.Post)
+    service.upstream_request(identity_service, identity_path(Bearer("")))
+    |> request.set_method(http.Post)
     |> request.set_header("content-type", "application/json")
     |> request.set_body(body)
   use response <- result.try(result.replace_error(transport(req), Nil))
