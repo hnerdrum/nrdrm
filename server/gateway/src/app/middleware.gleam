@@ -1,9 +1,8 @@
 import app/context.{type Context}
-import app/forward
 import app/route.{type Match}
 import app/transport.{type Transport}
 import config/path_pattern
-import config/service.{type Scheme, type Service, Bearer, Cookie}
+import config/routing.{type Rule, type Upstream, Bearer, Public, Rule, Session}
 import gleam/bit_array
 import gleam/dynamic/decode
 import gleam/http.{type Method}
@@ -32,19 +31,20 @@ pub type Introspection {
 pub fn auth_middleware(
   req: wisp.Request,
   ctx: Context,
-  route: Match,
+  match: Match,
   handler: fn(wisp.Request) -> wisp.Response,
 ) -> wisp.Response {
-  case required_scheme(route, req.method) {
-    Error(_) -> handler(req)
-    Ok(Cookie) -> {
-      case validate_auth(ctx.transport, ctx.identity_service, req) {
+  let identity = ctx.routing.identity
+  case matching_rule(match, req.method) {
+    Error(Nil) | Ok(Rule(auth: Public, ..)) -> handler(req)
+    Ok(Rule(auth: Session, ..)) -> {
+      case validate_auth(ctx.transport, identity, req) {
         TokenValidation(valid: True) -> handler(req)
         TokenValidation(valid: False) -> unauthorized()
       }
     }
-    Ok(Bearer(audience)) -> {
-      case introspect(ctx.transport, ctx.identity_service, req) {
+    Ok(Rule(auth: Bearer(audience), ..)) -> {
+      case introspect(ctx.transport, identity, req) {
         Ok(introspection) ->
           case bearer_permitted(introspection, audience) {
             True -> handler(attach_client(req, introspection.client_name))
@@ -56,19 +56,11 @@ pub fn auth_middleware(
   }
 }
 
-pub fn required_scheme(route: Match, method: Method) -> Result(Scheme, Nil) {
-  list.find(route.service.security.auth, fn(auth) {
-    path_pattern.matches(auth.path, route.path)
-    && list.contains(auth.methods, method)
+pub fn matching_rule(match: Match, method: Method) -> Result(Rule, Nil) {
+  list.find(match.route.rules, fn(rule) {
+    path_pattern.matches(rule.path, match.path)
+    && list.contains(rule.methods, method)
   })
-  |> result.map(fn(auth) { auth.scheme })
-}
-
-pub fn identity_path(scheme: Scheme) -> List(String) {
-  case scheme {
-    Cookie -> ["validate-token"]
-    Bearer(_) -> ["oauth", "introspect"]
-  }
 }
 
 pub fn bearer_permitted(
@@ -101,13 +93,15 @@ fn unauthorized() -> wisp.Response {
 
 fn validate_auth(
   transport: Transport,
-  identity_service: Service,
+  identity: Upstream,
   incoming_request: Request,
 ) -> TokenValidation {
-  let req =
-    service.upstream_request(identity_service, identity_path(Cookie))
-    |> forward.set_request_headers(incoming_request, identity_service)
-  case transport(req) {
+  let req = routing.upstream_request(identity, ["validate-token"])
+  let req = case request.get_header(incoming_request, "cookie") {
+    Ok(cookie) -> request.set_header(req, "cookie", cookie)
+    Error(Nil) -> req
+  }
+  case transport(req, identity.timeout_ms) {
     Ok(response) -> {
       case parse_validation_response(response) {
         Ok(token_validation) -> token_validation
@@ -120,7 +114,7 @@ fn validate_auth(
 
 fn introspect(
   transport: Transport,
-  identity_service: Service,
+  identity: Upstream,
   incoming_request: Request,
 ) -> Result(Introspection, Nil) {
   use token <- result.try(bearer_token(incoming_request))
@@ -129,11 +123,14 @@ fn introspect(
     |> json.to_string
     |> bit_array.from_string
   let req =
-    service.upstream_request(identity_service, identity_path(Bearer("")))
+    routing.upstream_request(identity, ["oauth", "introspect"])
     |> request.set_method(http.Post)
     |> request.set_header("content-type", "application/json")
     |> request.set_body(body)
-  use response <- result.try(result.replace_error(transport(req), Nil))
+  use response <- result.try(result.replace_error(
+    transport(req, identity.timeout_ms),
+    Nil,
+  ))
   parse_introspection(response)
 }
 

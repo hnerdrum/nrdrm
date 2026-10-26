@@ -1,47 +1,38 @@
+import app/route.{type Match}
 import app/transport.{type Transport}
-import config/service.{type Service}
-import gleam/bit_array
+import config/routing.{type Route}
 import gleam/bytes_tree
 import gleam/http/request
 import gleam/http/response
 import gleam/list
 import gleam/set
 import gleam/string
-import gleam/string_tree
 import gleam/uri
 import wisp.{type Request, type Response}
 
 pub fn forward_request(
   transport: Transport,
-  service: Service,
-  path: List(String),
+  match: Match,
   wisp_request: Request,
 ) -> Response {
-  let req = service.upstream_request(service, path)
+  let route = match.route
+  let req = routing.upstream_request(route.upstream, match.path)
   wisp.log_info(
     "Forwarding request to URL: " <> uri.to_string(request.to_uri(req)),
   )
 
   use body <- wisp.require_bit_array_body(wisp_request)
 
-  send_request(
-    transport,
-    service,
-    map_request(service, wisp_request, req, body),
-  )
-}
-
-pub fn send_request(
-  transport: Transport,
-  service: Service,
-  request: request.Request(BitArray),
-) -> Response {
-  case transport(request) {
-    Ok(response) -> map_response(service, response)
+  let req = map_request(route, wisp_request, req, body)
+  case transport(req, route.upstream.timeout_ms) {
+    Ok(response) -> map_response(route, response)
     Error(err) -> {
-      let url = request.host <> request.path
       wisp.log_error(
-        "Request to " <> url <> " got an error: " <> string.inspect(err),
+        "Request to "
+        <> req.host
+        <> req.path
+        <> " got an error: "
+        <> string.inspect(err),
       )
       case err {
         transport.Timeout -> wisp.response(504)
@@ -53,50 +44,38 @@ pub fn send_request(
 }
 
 fn map_request(
-  service: Service,
+  route: Route,
   from: Request,
   to: request.Request(BitArray),
   body: BitArray,
 ) -> request.Request(BitArray) {
+  let forward_headers =
+    list.filter(from.headers, fn(header) {
+      set.contains(route.request_headers, header.0)
+    })
   request.Request(..to, query: from.query)
   |> request.set_method(from.method)
   |> request.set_body(body)
-  |> set_request_headers(from, service)
-}
-
-pub fn set_request_headers(
-  to: request.Request(body),
-  from: Request,
-  service: Service,
-) -> request.Request(body) {
-  let forward_headers =
-    list.filter(from.headers, fn(header) {
-      set.contains(service.request.forward_headers, header.0)
-    })
-  list.fold(forward_headers, to, fn(acc, header) {
+  |> list.fold(forward_headers, _, fn(acc, header) {
     request.set_header(acc, header.0, header.1)
   })
 }
 
-fn map_response(
-  service: Service,
-  from: response.Response(BitArray),
-) -> Response {
+fn map_response(route: Route, from: response.Response(BitArray)) -> Response {
   wisp.response(from.status)
   |> response.set_body(wisp.Bytes(bytes_tree.from_bit_array(from.body)))
-  |> set_response_headers(service, from, _)
+  |> set_response_headers(route, from, _)
 }
 
 fn set_response_headers(
-  service: Service,
+  route: Route,
   from: response.Response(BitArray),
   to: Response,
 ) -> Response {
   list.fold_right(from.headers, to, fn(acc, header) {
     let #(name, value) = header
     let forwarded =
-      name == "content-type"
-      || set.contains(service.response.forward_headers, name)
+      name == "content-type" || set.contains(route.response_headers, name)
     case forwarded {
       True -> response.prepend_header(acc, name, response_header(name, value))
       False -> acc
@@ -120,20 +99,5 @@ fn default_cookie_path(cookie: String) -> String {
   case has_path {
     True -> cookie
     False -> cookie <> "; Path=/"
-  }
-}
-
-pub fn parse_string_response(response: Response) {
-  case response.body {
-    wisp.Text(text) -> Ok(string_tree.to_string(text))
-    wisp.Bytes(bytes) -> {
-      case bit_array.to_string(bytes_tree.to_bit_array(bytes)) {
-        Ok(string) -> Ok(string)
-        Error(_) -> Error("Invalid UTF-8 binary data")
-      }
-    }
-    wisp.File(file_path) ->
-      Error("Received file response at path: " <> file_path)
-    wisp.Empty -> Ok("")
   }
 }

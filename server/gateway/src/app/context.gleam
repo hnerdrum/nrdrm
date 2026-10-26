@@ -1,12 +1,7 @@
 import app/transport.{type Transport}
 import config/config.{type Config}
-import config/service.{type Service}
+import config/routing.{type Routing}
 
 pub type Context {
-  Context(
-    services: List(Service),
-    identity_service: Service,
-    config: Config,
-    transport: Transport,
-  )
+  Context(routing: Routing, config: Config, transport: Transport)
 }
