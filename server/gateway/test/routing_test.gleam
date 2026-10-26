@@ -59,10 +59,6 @@ fn status_with_gateway_json(req: wisp.Request) -> Int {
 }
 
 pub fn gateway_json_protects_writes_and_agent_runs_test() {
-  status_with_gateway_json(testing.post("/recipes", [], "{}"))
-  |> should.equal(401)
-  status_with_gateway_json(testing.post("/recipes/ingredients", [], "{}"))
-  |> should.equal(401)
   status_with_gateway_json(testing.put("/recipes/abc", [], "{}"))
   |> should.equal(401)
   status_with_gateway_json(testing.delete("/recipes/ingredients/flour", [], ""))
@@ -73,15 +69,31 @@ pub fn gateway_json_protects_writes_and_agent_runs_test() {
   |> should.equal(401)
 }
 
-pub fn gateway_json_leaves_reads_and_login_public_test() {
+pub fn gateway_json_leaves_reads_creates_and_login_public_test() {
   status_with_gateway_json(testing.get("/recipes", [])) |> should.equal(200)
   status_with_gateway_json(testing.get("/recipes/abc", [])) |> should.equal(200)
   status_with_gateway_json(testing.get("/recipes/ingredients", []))
   |> should.equal(200)
+  status_with_gateway_json(testing.post("/recipes", [], "{}"))
+  |> should.equal(200)
+  status_with_gateway_json(testing.post("/recipes/ingredients", [], "{}"))
+  |> should.equal(200)
+  status_with_gateway_json(testing.get("/identity/me", [])) |> should.equal(200)
   status_with_gateway_json(testing.post("/identity/login", [], "{}"))
   |> should.equal(200)
   status_with_gateway_json(testing.post("/agents/webhooks/github", [], "{}"))
   |> should.equal(200)
+}
+
+pub fn gateway_json_hides_everything_it_does_not_list_test() {
+  status_with_gateway_json(testing.get("/identity/validate-token", []))
+  |> should.equal(404)
+  status_with_gateway_json(testing.post("/identity/oauth/introspect", [], "{}"))
+  |> should.equal(404)
+  status_with_gateway_json(testing.patch("/recipes/abc", [], "{}"))
+  |> should.equal(404)
+  status_with_gateway_json(testing.get("/agents/unlisted", []))
+  |> should.equal(404)
 }
 
 pub fn every_missing_environment_variable_is_reported_test() {

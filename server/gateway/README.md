@@ -24,7 +24,7 @@ Each route lists `rules`. The first rule whose `path` and `methods` match the re
 - `"session"`: identity must accept the caller's session cookie.
 - `{"bearer": {"audience": "agents"}}`: identity must introspect the `Authorization: Bearer` token as active for that audience. The gateway then sends the token's client name to the upstream as `x-nrdrm-client`, and does not send the token itself.
 
-A request that matches no rule is currently forwarded without a check. That will change to a 404, so list every path clients use.
+A request that matches no rule gets a 404, including a listed path called with a method its rules don't list. Only what `gateway.json` lists is reachable, so a new upstream endpoint needs a rule before clients can call it. Identity's `validate-token` and `oauth/introspect` are deliberately unlisted: only the gateway calls them, and it calls identity directly.
 
 A rule's `path` is matched segment by segment against the path after `/<prefix>`: a literal segment matches itself, `*` matches exactly one segment, and `**` (last segment only) matches any remaining segments, including none.
 

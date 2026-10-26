@@ -16,11 +16,9 @@
       "request_headers": ["content-type", "cookie"],
       "response_headers": ["set-cookie"],
       "rules": [
-        { "path": "", "methods": ["GET"], "auth": "public" },
-        { "path": "", "methods": ["POST"], "auth": "session" },
+        { "path": "", "methods": ["GET", "POST"], "auth": "public" },
         { "path": "health", "methods": ["GET"], "auth": "public" },
-        { "path": "ingredients", "methods": ["GET"], "auth": "public" },
-        { "path": "ingredients", "methods": ["POST"], "auth": "session" },
+        { "path": "ingredients", "methods": ["GET", "POST"], "auth": "public" },
         { "path": "ingredients/*", "methods": ["GET"], "auth": "public" },
         {
           "path": "ingredients/*",

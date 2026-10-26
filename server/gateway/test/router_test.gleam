@@ -206,13 +206,22 @@ pub fn unknown_service_is_not_found_test() {
   sent |> should.equal([])
 }
 
-pub fn request_matching_no_rule_is_forwarded_test() {
+pub fn request_matching_no_rule_is_not_found_test() {
   let #(response, sent) =
     run(testing.get("/agents/unlisted", []), fn(_) { fixture.json(200, "{}") })
 
-  response.status |> should.equal(200)
-  let assert [upstream] = sent
-  upstream.path |> should.equal("/unlisted")
+  response.status |> should.equal(404)
+  sent |> should.equal([])
+}
+
+pub fn listed_path_with_unlisted_method_is_not_found_test() {
+  let #(response, sent) =
+    run(testing.get("/agents/webhooks/github", []), fn(_) {
+      fixture.json(200, "{}")
+    })
+
+  response.status |> should.equal(404)
+  sent |> should.equal([])
 }
 
 pub fn each_upstream_is_called_with_its_own_timeout_test() {
