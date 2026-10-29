@@ -29,7 +29,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           otp-version: "27"
-          gleam-version: "1.10.0"
+          gleam-version: "1.19.2"
           rebar3-version: "3"
       - uses: actions/cache@v4
         with:
@@ -48,7 +48,7 @@ jobs:
       image_name: nrdrm-gateway
       dockerfile: server/gateway/Dockerfile
       context: server/gateway
-      extra_environment_variables: '{"ALLOWED_ORIGINS":"${{ vars.ALLOWED_ORIGINS }}"}'
+      extra_environment_variables: '{"ALLOWED_ORIGINS":"${{ vars.ALLOWED_ORIGINS }}","RECIPES_URL":"${{ vars.RECIPES_URL }}","IDENTITY_URL":"${{ vars.IDENTITY_URL }}","AGENTS_URL":"${{ vars.AGENTS_URL }}"}'
     secrets:
       SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
       CONTAINER_REGISTRY_ENDPOINT: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}

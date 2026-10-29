@@ -1,0 +1,74 @@
+{
+  "identity_upstream": "identity",
+  "upstreams": [
+    { "name": "recipes", "url": "${RECIPES_URL}/api/v1", "timeout_ms": 30000 },
+    {
+      "name": "identity",
+      "url": "${IDENTITY_URL}/api/v1",
+      "timeout_ms": 30000
+    },
+    { "name": "agents", "url": "${AGENTS_URL}", "timeout_ms": 120000 }
+  ],
+  "routes": [
+    {
+      "prefix": "recipes",
+      "upstream": "recipes",
+      "request_headers": ["content-type", "cookie"],
+      "response_headers": ["set-cookie"],
+      "rules": [
+        { "path": "", "methods": ["GET", "POST"], "auth": "public" },
+        { "path": "health", "methods": ["GET"], "auth": "public" },
+        { "path": "ingredients", "methods": ["GET", "POST"], "auth": "public" },
+        { "path": "ingredients/*", "methods": ["GET"], "auth": "public" },
+        {
+          "path": "ingredients/*",
+          "methods": ["PUT", "DELETE"],
+          "auth": "session"
+        },
+        { "path": "*", "methods": ["GET"], "auth": "public" },
+        { "path": "*", "methods": ["PUT", "DELETE"], "auth": "session" }
+      ]
+    },
+    {
+      "prefix": "identity",
+      "upstream": "identity",
+      "request_headers": ["content-type", "cookie"],
+      "response_headers": ["set-cookie"],
+      "rules": [
+        { "path": "health", "methods": ["GET"], "auth": "public" },
+        { "path": "me", "methods": ["GET"], "auth": "public" },
+        { "path": "login", "methods": ["POST"], "auth": "public" },
+        { "path": "oauth/token", "methods": ["POST"], "auth": "public" }
+      ]
+    },
+    {
+      "prefix": "agents",
+      "upstream": "agents",
+      "request_headers": [
+        "content-type",
+        "x-hub-signature-256",
+        "x-github-delivery",
+        "x-github-event"
+      ],
+      "rules": [
+        { "path": "health", "methods": ["GET"], "auth": "public" },
+        { "path": "webhooks/github", "methods": ["POST"], "auth": "public" },
+        {
+          "path": "complete",
+          "methods": ["POST"],
+          "auth": { "bearer": { "audience": "agents" } }
+        },
+        {
+          "path": "runs",
+          "methods": ["POST"],
+          "auth": { "bearer": { "audience": "agents" } }
+        },
+        {
+          "path": "runs/*",
+          "methods": ["GET"],
+          "auth": { "bearer": { "audience": "agents" } }
+        }
+      ]
+    }
+  ]
+}

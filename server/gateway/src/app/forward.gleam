@@ -1,133 +1,89 @@
-import config/service.{type Service}
-import gleam/bit_array
+import app/middleware
+import app/route.{type Match}
+import app/transport.{type Transport}
+import config/routing.{type Route}
 import gleam/bytes_tree
 import gleam/http/request
 import gleam/http/response
-import gleam/httpc
 import gleam/list
+import gleam/set
 import gleam/string
-import gleam/string_tree
 import wisp.{type Request, type Response}
 
 pub fn forward_request(
-  service: Service,
-  path: String,
+  transport: Transport,
+  match: Match,
   wisp_request: Request,
 ) -> Response {
-  let url = service.create_url(service, path)
-  wisp.log_info("Forwarding request to URL: " <> url)
+  let route = match.route
+  let req = routing.upstream_request(route.upstream, match.path)
 
-  use body <- wisp.require_string_body(wisp_request)
+  use body <- wisp.require_bit_array_body(wisp_request)
 
-  case request.to(url) {
-    Ok(req) ->
-      send_request(service, map_request(service, wisp_request, req, body))
-    Error(_) -> {
-      wisp.log_error("Could not create request from URL: " <> url)
-      wisp.internal_server_error()
-    }
-  }
-}
-
-pub fn send_request(
-  service: Service,
-  request: request.Request(String),
-) -> Response {
-  case httpc.send(request) {
-    Ok(response) -> map_response(service, response)
+  let req = map_request(route, wisp_request, req, body)
+  case transport(req, route.upstream.timeout_ms) {
+    Ok(response) -> map_response(route, response)
     Error(err) -> {
-      let url = request.host <> request.path
       wisp.log_error(
-        "Request to " <> url <> "got an error: " <> string.inspect(err),
+        "Request to "
+        <> req.host
+        <> req.path
+        <> " got an error: "
+        <> string.inspect(err),
       )
-      wisp.internal_server_error()
+      case err {
+        transport.Timeout -> wisp.response(504)
+        transport.FailedToConnect(_) | transport.InvalidResponse ->
+          wisp.response(502)
+      }
     }
   }
 }
 
 fn map_request(
-  service: Service,
+  route: Route,
   from: Request,
-  to: request.Request(String),
-  body: String,
-) -> request.Request(String) {
-  request.set_method(to, from.method)
-  |> request.set_body(body)
-  |> set_request_headers(from, service)
-}
-
-pub fn set_request_headers(
-  to: request.Request(String),
-  from: Request,
-  service: Service,
-) -> request.Request(String) {
+  to: request.Request(BitArray),
+  body: BitArray,
+) -> request.Request(BitArray) {
   let forward_headers =
     list.filter(from.headers, fn(header) {
-      list.contains(service.request.forward_headers, header.0)
+      set.contains(route.request_headers, header.0)
+      || middleware.is_gateway_header(header.0)
     })
-  list.fold(forward_headers, to, fn(acc, header) {
+  request.Request(..to, query: from.query)
+  |> request.set_method(from.method)
+  |> request.set_body(body)
+  |> list.fold(forward_headers, _, fn(acc, header) {
     request.set_header(acc, header.0, header.1)
   })
 }
 
-fn map_response(service: Service, from: response.Response(String)) -> Response {
-  let json_response =
-    wisp.json_response(string_tree.from_string(from.body), from.status)
-  set_cookie_header(set_response_headers(service, from, json_response))
+fn map_response(route: Route, from: response.Response(BitArray)) -> Response {
+  wisp.response(from.status)
+  |> response.set_body(wisp.Bytes(bytes_tree.from_bit_array(from.body)))
+  |> set_response_headers(route, from, _)
 }
 
 fn set_response_headers(
-  service: Service,
-  from: response.Response(String),
+  route: Route,
+  from: response.Response(BitArray),
   to: Response,
 ) -> Response {
-  let forward_headers =
-    list.filter(from.headers, fn(header) {
-      list.contains(service.response.forward_headers, header.0)
-    })
-  list.fold(forward_headers, to, fn(acc, header) {
-    response.set_header(acc, header.0, header.1)
+  list.fold_right(from.headers, to, fn(acc, header) {
+    let #(name, value) = header
+    let forwarded =
+      name == "content-type" || set.contains(route.response_headers, name)
+    case forwarded {
+      True -> response.prepend_header(acc, name, response_header(name, value))
+      False -> acc
+    }
   })
 }
 
-pub fn set_cookie_header(response: Response) -> Response {
-  let headers = response.headers
-
-  let updated_response =
-    list.fold(headers, response, fn(acc, header) {
-      let header_name = header.0
-      let header_value = header.1
-
-      case string.lowercase(header_name) {
-        "set-cookie" -> {
-          case string.contains(header_value, "path=") {
-            True -> {
-              response
-            }
-            False -> {
-              let new_value = string.concat([header_value, "; Path=/"])
-              response.set_header(acc, header_name, new_value)
-            }
-          }
-        }
-        _ -> acc
-      }
-    })
-
-  updated_response
-}
-
-pub fn parse_string_response(response: Response) {
-  case response.body {
-    wisp.Text(text) -> Ok(string_tree.to_string(text))
-    wisp.Bytes(bytes) -> {
-      case bit_array.to_string(bytes_tree.to_bit_array(bytes)) {
-        Ok(string) -> Ok(string)
-        Error(_) -> Error("Invalid UTF-8 binary data")
-      }
-    }
-    wisp.File(file_path) ->
-      Error("Received file response at path: " <> file_path)
-    wisp.Empty -> Ok("")
+fn response_header(name: String, value: String) -> String {
+  case name {
+    "set-cookie" -> middleware.ensure_cookie_path(value)
+    _ -> value
   }
 }
