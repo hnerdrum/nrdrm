@@ -1,28 +1,124 @@
 ---
-export interface Props {
+interface Props {
 	title: string;
+	description?: string;
 }
 
-const { title } = Astro.props;
+const { title, description = "Henrik Nerdrum" } = Astro.props;
 ---
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.ico" />´
-		<meta name="generator" content={Astro.generator} />
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>{title}</title>
+		<meta name="description" content={description} />
+		<meta name="color-scheme" content="dark" />
+		<meta name="theme-color" content="#13121C" />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<link rel="icon" href="/favicon.ico" sizes="48x48" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@500&family=IBM+Plex+Mono:wght@400&display=swap"
+			rel="stylesheet"
+		/>
+		<meta name="generator" content={Astro.generator} />
 	</head>
 	<body>
 		<slot />
 	</body>
 </html>
 <style is:global>
+	:root {
+		--bg: #13121c;
+		--text: #eceaf4;
+		--muted: #9f9db5;
+		--line: #3a3852;
+		--accent: #b4b9ff;
+	}
+	* {
+		box-sizing: border-box;
+	}
 	html {
-		font-family: Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono,
-			Bitstream Vera Sans Mono, Courier New, monospace;
-		background-color: #060621;
+		background: var(--bg);
+	}
+	body {
+		margin: 0;
+		min-height: 100vh;
+		min-height: 100dvh;
+		padding: 64px;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		background: var(--bg);
+		color: var(--text);
+		font-family: "Hanken Grotesk", system-ui, sans-serif;
+		-webkit-font-smoothing: antialiased;
+	}
+	main {
+		display: flex;
+		flex-direction: column;
+		gap: 28px;
+		max-width: 440px;
+	}
+	.id {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+	}
+	.name {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+	}
+	.name::before {
+		content: "";
+		width: 8px;
+		height: 8px;
+		background: var(--accent);
+		flex: none;
+	}
+	h1 {
+		margin: 0;
+		font-size: 20px;
+		line-height: 1.2;
+		font-weight: 500;
+		letter-spacing: -0.01em;
+	}
+	p {
+		margin: 0 0 0 22px;
+		font-size: 16px;
+		line-height: 1.5;
+		color: var(--muted);
+	}
+	nav {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 24px;
+		margin-left: 22px;
+		font-family: "IBM Plex Mono", ui-monospace, monospace;
+		font-size: 14px;
+	}
+	a {
+		color: var(--muted);
+		text-decoration: none;
+		border-bottom: 1px solid var(--line);
+		padding-bottom: 2px;
+	}
+	a:hover {
+		color: var(--accent);
+		border-bottom-color: var(--accent);
+	}
+	a:focus-visible {
+		outline: 2px solid var(--accent);
+		outline-offset: 4px;
+	}
+	@media (max-width: 600px) {
+		body {
+			padding: 32px 24px;
+		}
 	}
 </style>
