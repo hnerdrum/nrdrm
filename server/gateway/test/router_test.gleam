@@ -464,6 +464,65 @@ pub fn cookie_route_with_valid_session_is_forwarded_test() {
   upstream.path |> should.equal("/api/v1/pancakes")
 }
 
+pub fn refreshed_session_cookie_is_returned_to_the_caller_test() {
+  let #(response, sent) =
+    run(
+      testing.put("/recipes/pancakes", [#("cookie", "session=expired")], "{}"),
+      fn(req) {
+        case req.host {
+          "identity.test" ->
+            Ok(
+              response.new(200)
+              |> response.set_header("content-type", "application/json")
+              |> response.set_header("set-cookie", "nrdrm-login=refreshed")
+              |> response.set_body(<<"{\"valid\":true}":utf8>>),
+            )
+          _ ->
+            Ok(
+              response.new(200)
+              |> response.set_header("set-cookie", "other=1; Path=/app")
+              |> response.set_body(<<"{}":utf8>>),
+            )
+        }
+      },
+    )
+
+  response.status |> should.equal(200)
+  set_cookies(response)
+  |> should.equal(["nrdrm-login=refreshed; Path=/", "other=1; Path=/app"])
+  let assert [_, upstream] = sent
+  request.get_header(upstream, "cookie") |> should.equal(Ok("session=expired"))
+  request.get_header(upstream, "set-cookie") |> should.equal(Error(Nil))
+}
+
+pub fn cleared_session_cookie_is_returned_on_unauthorized_test() {
+  let #(response, sent) =
+    run(
+      testing.put("/recipes/pancakes", [#("cookie", "session=withdrawn")], "{}"),
+      fn(req) {
+        case req.host {
+          "identity.test" ->
+            Ok(
+              response.new(200)
+              |> response.set_header("content-type", "application/json")
+              |> response.set_header(
+                "set-cookie",
+                "nrdrm-login=; Max-Age=0; Path=/",
+              )
+              |> response.set_body(<<"{\"valid\":false}":utf8>>),
+            )
+          _ -> fixture.json(200, "{}")
+        }
+      },
+    )
+
+  response.status |> should.equal(401)
+  set_cookies(response)
+  |> should.equal(["nrdrm-login=; Max-Age=0; Path=/"])
+  let assert [validation] = sent
+  validation.host |> should.equal("identity.test")
+}
+
 pub fn cookie_route_with_invalid_session_is_unauthorized_test() {
   let #(response, sent) =
     run(

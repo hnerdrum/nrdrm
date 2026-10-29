@@ -6,10 +6,11 @@ import config/path_pattern
 import config/routing.{type Rule, Bearer, Public, Rule, Session}
 import gleam/http.{type Method}
 import gleam/http/request
+import gleam/http/response
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
-import wisp.{type Request}
+import wisp.{type Request, type Response}
 
 pub fn auth_middleware(
   req: wisp.Request,
@@ -28,11 +29,15 @@ pub fn auth_middleware(
       wisp.not_found()
     }
     Ok(Rule(auth: Public, ..)) -> handler(req)
-    Ok(Rule(auth: Session, ..)) ->
-      case identity.validate_session(ctx.transport, ctx.routing.identity, req) {
+    Ok(Rule(auth: Session, ..)) -> {
+      let session =
+        identity.validate_session(ctx.transport, ctx.routing.identity, req)
+      let response = case session.valid {
         True -> handler(req)
         False -> unauthorized()
       }
+      with_set_cookies(response, session.set_cookies)
+    }
     Ok(Rule(auth: Bearer(audience), ..)) ->
       case identity.introspect(ctx.transport, ctx.routing.identity, req) {
         Ok(introspection) ->
@@ -86,4 +91,22 @@ pub fn attach_client(req: Request, client_name: Option(String)) -> Request {
 
 fn unauthorized() -> wisp.Response {
   wisp.string_body(wisp.response(401), "Unauthorized")
+}
+
+pub fn with_set_cookies(response: Response, cookies: List(String)) -> Response {
+  list.fold_right(cookies, response, fn(acc, cookie) {
+    response.prepend_header(acc, "set-cookie", ensure_cookie_path(cookie))
+  })
+}
+
+pub fn ensure_cookie_path(cookie: String) -> String {
+  let has_path =
+    string.split(cookie, ";")
+    |> list.any(fn(attribute) {
+      string.trim(attribute) |> string.lowercase |> string.starts_with("path=")
+    })
+  case has_path {
+    True -> cookie
+    False -> cookie <> "; Path=/"
+  }
 }

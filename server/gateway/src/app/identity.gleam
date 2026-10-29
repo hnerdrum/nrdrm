@@ -7,6 +7,7 @@ import gleam/http
 import gleam/http/request
 import gleam/http/response
 import gleam/json
+import gleam/list
 import gleam/option.{type Option, None}
 import gleam/result
 import gleam/string
@@ -20,11 +21,17 @@ pub type Introspection {
   )
 }
 
+/// `set_cookies` are the cookies identity set while checking the session, such
+/// as a refreshed session or a cleared one.
+pub type Session {
+  Session(valid: Bool, set_cookies: List(String))
+}
+
 pub fn validate_session(
   transport: Transport,
   identity: Upstream,
   incoming_request: Request,
-) -> Bool {
+) -> Session {
   let req =
     routing.upstream_request(identity, ["validate-token"])
     |> request_id.propagate(incoming_request)
@@ -33,10 +40,30 @@ pub fn validate_session(
     Error(Nil) -> req
   }
   case transport(req, identity.timeout_ms) {
-    Ok(response.Response(status: 200, body: body, ..)) ->
-      json.parse_bits(body, valid_decoder()) |> result.unwrap(False)
+    Ok(response) ->
+      Session(
+        valid: session_valid(response),
+        set_cookies: set_cookies(response),
+      )
+    Error(_) -> Session(valid: False, set_cookies: [])
+  }
+}
+
+fn session_valid(response: response.Response(BitArray)) -> Bool {
+  case response.status {
+    200 ->
+      json.parse_bits(response.body, valid_decoder()) |> result.unwrap(False)
     _ -> False
   }
+}
+
+fn set_cookies(response: response.Response(BitArray)) -> List(String) {
+  list.filter_map(response.headers, fn(header) {
+    case header.0 {
+      "set-cookie" -> Ok(header.1)
+      _ -> Error(Nil)
+    }
+  })
 }
 
 pub fn introspect(

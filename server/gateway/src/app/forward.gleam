@@ -83,19 +83,7 @@ fn set_response_headers(
 
 fn response_header(name: String, value: String) -> String {
   case name {
-    "set-cookie" -> default_cookie_path(value)
+    "set-cookie" -> middleware.ensure_cookie_path(value)
     _ -> value
-  }
-}
-
-fn default_cookie_path(cookie: String) -> String {
-  let has_path =
-    string.split(cookie, ";")
-    |> list.any(fn(attribute) {
-      string.trim(attribute) |> string.lowercase |> string.starts_with("path=")
-    })
-  case has_path {
-    True -> cookie
-    False -> cookie <> "; Path=/"
   }
 }
