@@ -1,21 +1,18 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import Layout from "../layouts/Layout.astro";
 ---
 
-<Layout title="nrdrm">
+<Layout title="Henrik Nerdrum">
 	<main>
-		<h1>I'm a software engineer</h1>
+		<div class="id">
+			<div class="name"><h1>Henrik Nerdrum</h1></div>
+			<p>
+				Currently building digital infrastructure for mental healthcare at <a href="https://konfidens.com" target="_blank" rel="noopener noreferrer">Konfidens</a>.
+			</p>
+		</div>
+		<nav>
+			<a href="https://github.com/hnerdrum" target="_blank" rel="noopener noreferrer">GitHub</a>
+			<a href="https://www.linkedin.com/in/henriknerdrum" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+		</nav>
 	</main>
 </Layout>
-
-<style>
-	main {
-		margin: 8rem 20rem;
-	}
-	h1 {
-		font-size: 1.5rem;
-		font-weight: 800;
-		margin: 0;
-		color: hsl(321 70% 69%);
-	}
-</style>
