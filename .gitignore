@@ -6,6 +6,9 @@ node_modules
 .hspec-failures
 .DS_Store
 *.cabal
-.env.test
+.env
+.env.*
+!.env.example
+!.env.*.example
 
 **/build/*
