@@ -1,6 +1,8 @@
 # nrdrm
 
-Apps in this repo are independent. They share local Postgres via [`docker-databases.yml`](docker-databases.yml).
+Personal monorepo. I use it to try things out. [`web/home`](web/home) is my website.
+
+The apps are independent, except the recipes stack at the bottom, where the gateway, identity, the recipe API, and the UI run together. Local Postgres is shared via [`docker-databases.yml`](docker-databases.yml).
 
 ## Setup
 
@@ -21,19 +23,16 @@ just env
 | 5432      | `recipes`      | [`server/recipes`](server/recipes)                                                                                      |
 | 5433      | `identity`     | [`server/identity`](server/identity)                                                                                    |
 | 5435      | `recipes_test` | recipes schema check (`just recipes schema-check`, [`docker-compose.test.yml`](server/recipes/docker-compose.test.yml)) |
+| 5436      | `agents`       | [`server/agents`](server/agents)                                                                                        |
 
 ## Apps
-
-Each app README uses the same verbs: **run**, **test**, **build**, **migrate**.
-
-CI runs those same commands on pull requests (`just recipes test`, `just identity build`, `just gateway test`). Scaleway deploy runs only after a green check on `main`.
 
 ### Backends
 
 - [`server/recipes`](server/recipes) — Haskell recipe API (uses [Poppy](https://github.com/hnerdrum/poppy) for Postgres)
 - [`server/identity`](server/identity) — Rust auth API
 - [`server/gateway`](server/gateway) — Gleam reverse proxy
-- [`server/agents`](server/agents) — Agent runner
+- [`server/agents`](server/agents) — TypeScript agent runner
 
 ### Frontends
 
