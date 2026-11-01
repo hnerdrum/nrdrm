@@ -27,19 +27,6 @@ services:
       interval: 2s
       timeout: 5s
       retries: 10
-  unodb:
-    image: "postgres:alpine"
-    environment:
-      POSTGRES_DB: "uno"
-      POSTGRES_PASSWORD: "nrdrm"
-      POSTGRES_USER: "nrdrm"
-    ports:
-      - "5434:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nrdrm -d uno"]
-      interval: 2s
-      timeout: 5s
-      retries: 10
   agentsdb:
     image: "postgres:alpine"
     environment:

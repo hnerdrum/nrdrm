@@ -23,9 +23,7 @@ env:
     @just recipes env
     @just identity env
     @just gateway env
-    @just uno env
     @just web-recipes env
-    @just web-uno env
     @just delete-images env
     @just agents env
 
@@ -38,14 +36,8 @@ identity *args:
 gateway *args:
     @just fwd server/gateway {{ args }}
 
-uno *args:
-    @just fwd server/uno {{ args }}
-
 web-recipes *args:
     @just fwd web/recipes {{ args }}
-
-web-uno *args:
-    @just fwd web/uno {{ args }}
 
 home *args:
     @just fwd web/home {{ args }}

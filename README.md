@@ -20,7 +20,6 @@ just env
 | --------- | -------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | 5432      | `recipes`      | [`server/recipes`](server/recipes)                                                                                      |
 | 5433      | `identity`     | [`server/identity`](server/identity)                                                                                    |
-| 5434      | `uno`          | [`server/uno`](server/uno)                                                                                              |
 | 5435      | `recipes_test` | recipes schema check (`just recipes schema-check`, [`docker-compose.test.yml`](server/recipes/docker-compose.test.yml)) |
 
 ## Apps
@@ -34,13 +33,11 @@ CI runs those same commands on pull requests (`just recipes test`, `just identit
 - [`server/recipes`](server/recipes) — Haskell recipe API (uses [Poppy](https://github.com/hnerdrum/poppy) for Postgres)
 - [`server/identity`](server/identity) — Rust auth API
 - [`server/gateway`](server/gateway) — Gleam reverse proxy
-- [`server/uno`](server/uno) — Go Uno API (local only)
 - [`server/agents`](server/agents) — Agent runner
 
 ### Frontends
 
 - [`web/recipes`](web/recipes) — Next.js, talks to the gateway
-- [`web/uno`](web/uno) — SvelteKit, talks to the Uno API directly
 - [`web/home`](web/home) — Astro landing page
 
 ### Jobs

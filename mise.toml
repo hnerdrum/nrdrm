@@ -2,7 +2,6 @@
 [tools]
 node = "22"
 rust = "1.99"
-go = "1.22"
 gleam = "1.19.2"
 erlang = "27"
 just = "1.58.0"
