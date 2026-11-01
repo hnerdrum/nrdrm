@@ -50,9 +50,6 @@ web-uno *args:
 home *args:
     @just fwd web/home {{ args }}
 
-wedding *args:
-    @just fwd web/wedding {{ args }}
-
 delete-images *args:
     @just fwd cron/delete-container-images {{ args }}
 

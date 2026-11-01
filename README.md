@@ -42,7 +42,6 @@ CI runs those same commands on pull requests (`just recipes test`, `just identit
 - [`web/recipes`](web/recipes) — Next.js, talks to the gateway
 - [`web/uno`](web/uno) — SvelteKit, talks to the Uno API directly
 - [`web/home`](web/home) — Astro landing page
-- [`web/wedding`](web/wedding) — Astro wedding site
 
 ### Jobs
 
