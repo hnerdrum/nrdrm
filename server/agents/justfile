@@ -6,7 +6,7 @@ run: env migrate
     npm run dev
 
 test:
-    @echo "no tests yet"
+    npm test
 
 build:
     npm run build

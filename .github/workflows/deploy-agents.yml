@@ -34,6 +34,8 @@ jobs:
       - name: Install dependencies
         working-directory: server/agents
         run: npm ci
+      - name: just agents test
+        run: just agents test
       - name: just agents build
         run: just agents build
 

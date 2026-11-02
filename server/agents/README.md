@@ -40,7 +40,9 @@ curl -s localhost:8090/runs \
 
 ## Test
 
-No automated tests yet.
+```bash
+just agents test
+```
 
 ## Build
 
