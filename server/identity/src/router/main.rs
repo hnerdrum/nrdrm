@@ -15,7 +15,7 @@ use axum::response::IntoResponse;
 use axum::{extract::State, routing::get, routing::post, Json, Router};
 use axum::{middleware, Extension};
 use deadpool_diesel::postgres::Pool;
-use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
+use tower_cookies::{CookieManagerLayer, Cookies};
 use tower_http::compression::CompressionLayer;
 use tower_http::trace::{self, TraceLayer};
 use tracing::error;
@@ -49,13 +49,9 @@ pub fn init_router(state: AppState) -> Router {
                 .route("/oauth/introspect", post(oauth_introspect_handler)),
         )
         .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(trace::DefaultMakeSpan::new().include_headers(true))
-                .on_response(
-                    trace::DefaultOnResponse::new()
-                        .include_headers(true)
-                        .latency_unit(tower_http::LatencyUnit::Micros),
-                ),
+            TraceLayer::new_for_http().on_response(
+                trace::DefaultOnResponse::new().latency_unit(tower_http::LatencyUnit::Micros),
+            ),
         )
         .layer(middleware::from_fn_with_state(
             state.clone(),
@@ -128,6 +124,10 @@ async fn handle_valid_user(
         state.config.auth.secret.clone(),
     )?;
 
-    cookies.add(Cookie::new(state.config.auth.cookie_name.clone(), token));
+    cookies.add(super::middleware::session_cookie(
+        state.config.auth.cookie_name.clone(),
+        token,
+        &state.config.env,
+    ));
     Ok(Json(user))
 }
