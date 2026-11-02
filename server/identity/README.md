@@ -27,7 +27,9 @@ That prints `name`, `audience`, `client_id`, `client_secret`, and `secret_hash`.
 
 ## Test
 
-No automated tests yet.
+```bash
+just identity test
+```
 
 ## Build
 

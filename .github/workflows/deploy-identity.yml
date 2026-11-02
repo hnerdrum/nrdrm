@@ -32,8 +32,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server/identity
-      - name: just identity build
-        run: just identity build
+      - name: just identity test
+        run: just identity test
 
   deploy:
     needs: check

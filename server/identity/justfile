@@ -6,7 +6,7 @@ run: env migrate
     cargo run
 
 test:
-    @echo "no tests yet"
+    cargo test
 
 build:
     cargo build
