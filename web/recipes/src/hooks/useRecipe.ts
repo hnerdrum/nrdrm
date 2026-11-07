@@ -1,7 +1,8 @@
-import useSWR from "swr";
-import { Recipe } from "../domain";
-import { RecipeApi } from "../api/recipe";
-import { config } from "../../config";
+import useSWR from 'swr';
+
+import { config } from '../../config';
+import { RecipeApi } from '../api/recipe';
+import type { Recipe } from '../domain';
 
 const fetcher = (arg: string): Promise<Recipe> =>
   fetch(`${config.baseServerUrl}${arg}`).then((res) => res.json());
@@ -9,7 +10,7 @@ const fetcher = (arg: string): Promise<Recipe> =>
 export const useRecipe = ({ recipeId }: { recipeId: string }) => {
   const { data, error, isLoading } = useSWR(
     `${RecipeApi.baseUrl}/${recipeId}`,
-    fetcher
+    fetcher,
   );
 
   return { recipe: data, error, isLoading };

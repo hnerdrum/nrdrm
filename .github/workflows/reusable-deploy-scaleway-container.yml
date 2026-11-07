@@ -15,7 +15,7 @@ on:
       extra_environment_variables:
         required: false
         type: string
-        default: "{}"
+        default: '{}'
     secrets:
       SCALEWAY_API_KEY:
         required: true

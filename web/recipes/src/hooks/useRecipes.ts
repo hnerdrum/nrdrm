@@ -1,15 +1,16 @@
-import useSWR from "swr";
-import { Recipe } from "../domain";
-import { RecipeApi } from "../api/recipe";
-import { config } from "../../config";
+import useSWR from 'swr';
+
+import { config } from '../../config';
+import { RecipeApi } from '../api/recipe';
+import type { Recipe } from '../domain';
 
 const fetcher = (arg: string): Promise<Recipe[]> =>
   fetch(`${config.baseServerUrl}${arg}`, {
-    method: "GET",
+    method: 'GET',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
-    credentials: "include",
+    credentials: 'include',
   }).then((res) => res.json());
 
 export const useRecipes = () => {

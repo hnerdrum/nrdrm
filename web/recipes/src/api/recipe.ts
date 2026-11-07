@@ -1,5 +1,6 @@
-import { deleteRequest, postRequest, putRequest } from ".";
-import { Recipe, RecipeIngredient } from "../domain";
+import type { Recipe, RecipeIngredient } from '../domain';
+
+import { deleteRequest, postRequest, putRequest } from '.';
 
 export type CreateRecipeData = {
   name: string;

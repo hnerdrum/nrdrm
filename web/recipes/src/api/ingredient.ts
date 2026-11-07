@@ -1,5 +1,6 @@
-import { postRequest } from ".";
-import { Ingredient } from "../domain";
+import type { Ingredient } from '../domain';
+
+import { postRequest } from '.';
 
 export type CreateIngredientData = {
   name: string;

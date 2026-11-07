@@ -1,10 +1,11 @@
-import { mount } from "svelte";
-import App from "./App.svelte";
-import "./app.css";
+import { mount } from 'svelte';
 
-const target = document.getElementById("app");
+import App from './App.svelte';
+import './app.css';
+
+const target = document.getElementById('app');
 if (!target) {
-  throw new Error("missing #app");
+  throw new Error('missing #app');
 }
 
 mount(App, { target });

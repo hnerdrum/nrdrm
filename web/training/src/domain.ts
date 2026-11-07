@@ -1,17 +1,17 @@
 export type Run = {
-  sport: "run";
+  sport: 'run';
   distance: number;
   duration: number;
 };
 
 export type Ride = {
-  sport: "ride";
+  sport: 'ride';
   distance: number;
   duration: number;
 };
 
 export type Ski = {
-  sport: "ski";
+  sport: 'ski';
   distance: number;
   duration: number;
   withPack: boolean;
@@ -28,7 +28,7 @@ export type Exercise = {
 };
 
 export type Strength = {
-  sport: "strength";
+  sport: 'strength';
   exercises: Exercise[];
 };
 

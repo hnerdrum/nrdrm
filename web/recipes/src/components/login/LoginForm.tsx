@@ -1,7 +1,12 @@
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { useState } from "react";
-import { useSWRConfig } from "swr";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { useSWRConfig } from 'swr';
+import { z } from 'zod';
+
+import { IdentityApi } from '../../api/identity';
+import { Button } from '../ui/button';
 import {
   Form,
   FormControl,
@@ -9,19 +14,15 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "../ui/form";
-import { Button } from "../ui/button";
-import { Input } from "../ui/input";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { IdentityApi } from "../../api/identity";
+} from '../ui/form';
+import { Input } from '../ui/input';
 
 const loginSchema = z.object({
   email: z.string().min(1, {
-    message: "Email is required.",
+    message: 'Email is required.',
   }),
   password: z.string().min(1, {
-    message: "Password is required.",
+    message: 'Password is required.',
   }),
 });
 
@@ -32,8 +33,8 @@ export const LoginForm = () => {
   const form = useForm<LoginData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
-      password: "",
+      email: '',
+      password: '',
     },
   });
   const [loginError, setLoginError] = useState<string | undefined>(undefined);
@@ -42,11 +43,11 @@ export const LoginForm = () => {
   const onSubmit = async (data: LoginData) => {
     const result = await IdentityApi.login(data);
 
-    if (result.status === "success") {
+    if (result.status === 'success') {
       mutate(`${IdentityApi.baseUrl}/me`);
       router.push(`/`);
     } else {
-      setLoginError("Failed");
+      setLoginError('Failed');
     }
   };
 

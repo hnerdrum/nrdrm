@@ -1,4 +1,4 @@
-import { Loading } from "./loading";
+import { Loading } from './loading';
 
 export const LoadingWrap = ({
   isLoading,

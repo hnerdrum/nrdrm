@@ -18,6 +18,6 @@
     </Button>
   </SiteHeader>
   {#if logoutError}
-    <p class="mx-auto mt-6 max-w-[68rem] font-medium" role="alert">{logoutError}</p>
+    <p class="mx-auto mt-6 max-w-272 font-medium" role="alert">{logoutError}</p>
   {/if}
 </div>

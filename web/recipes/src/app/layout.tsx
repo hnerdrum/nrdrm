@@ -1,10 +1,11 @@
-"use client";
+'use client';
 
-import { Roboto_Mono } from "next/font/google";
-import "./globals.css";
-import { AuthProvider } from "../providers/AuthProvider";
+import { Roboto_Mono } from 'next/font/google';
 
-const robotoMono = Roboto_Mono({ subsets: ["latin"] });
+import './globals.css';
+import { AuthProvider } from '../providers/AuthProvider';
+
+const robotoMono = Roboto_Mono({ subsets: ['latin'] });
 
 export default function RootLayout({
   children,

@@ -1,6 +1,6 @@
-import { LoadingWrap } from "./loading-wrap";
+import { LoadingWrap } from './loading-wrap';
 
-type Status = "loading" | "error" | "empty" | "success";
+type Status = 'loading' | 'error' | 'empty' | 'success';
 
 const getStatus = ({
   isError,
@@ -11,10 +11,16 @@ const getStatus = ({
   isEmpty: boolean;
   isLoading: boolean;
 }): Status => {
-  if (isError) return "error";
-  if (isLoading) return "loading";
-  if (isEmpty) return "empty";
-  return "success";
+  if (isError) {
+    return 'error';
+  }
+  if (isLoading) {
+    return 'loading';
+  }
+  if (isEmpty) {
+    return 'empty';
+  }
+  return 'success';
 };
 
 type Props = {
@@ -39,9 +45,9 @@ export const RequestWrap = ({
 
   return (
     <LoadingWrap isLoading={isLoading}>
-      {status === "error" && (errorComponent || <div>Error</div>)}
-      {status === "empty" && (emptyComponent || <div>Empty </div>)}
-      {status === "success" && children}
+      {status === 'error' && (errorComponent || <div>Error</div>)}
+      {status === 'empty' && (emptyComponent || <div>Empty </div>)}
+      {status === 'success' && children}
     </LoadingWrap>
   );
 };

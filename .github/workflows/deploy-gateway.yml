@@ -3,16 +3,16 @@ name: Gateway
 on:
   pull_request:
     paths:
-      - "server/gateway/**"
-      - ".github/workflows/deploy-gateway.yml"
-      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+      - 'server/gateway/**'
+      - '.github/workflows/deploy-gateway.yml'
+      - '.github/workflows/reusable-deploy-scaleway-container.yml'
   push:
     branches:
       - main
     paths:
-      - "server/gateway/**"
-      - ".github/workflows/deploy-gateway.yml"
-      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+      - 'server/gateway/**'
+      - '.github/workflows/deploy-gateway.yml'
+      - '.github/workflows/reusable-deploy-scaleway-container.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -28,9 +28,9 @@ jobs:
           tool: just@1.58.0
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "27"
-          gleam-version: "1.19.2"
-          rebar3-version: "3"
+          otp-version: '27'
+          gleam-version: '1.19.2'
+          rebar3-version: '3'
       - uses: actions/cache@v4
         with:
           path: server/gateway/build

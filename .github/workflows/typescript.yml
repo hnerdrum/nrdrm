@@ -1,0 +1,37 @@
+name: TypeScript
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/recipes/package-lock.json
+            web/training/package-lock.json
+            web/home/package-lock.json
+            server/agents/package-lock.json
+            cron/delete-container-images/package-lock.json
+      - name: Install the linters
+        run: npm ci
+      - name: Install app dependencies
+        run: |
+          npm ci --prefix web/recipes
+          npm ci --prefix web/training
+          npm ci --prefix web/home
+          npm ci --prefix server/agents
+          npm ci --prefix cron/delete-container-images
+      - name: ESLint
+        run: npm run lint:eslint
+      - name: Prettier
+        run: npm run lint:prettier

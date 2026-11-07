@@ -1,8 +1,10 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
-import { RecipeForm } from "../components/recipes/RecipeForm";
-import { CreateRecipeData, RecipeApi } from "../api/recipe";
+import { useRouter } from 'next/navigation';
+
+import type { CreateRecipeData } from '../api/recipe';
+import { RecipeApi } from '../api/recipe';
+import { RecipeForm } from '../components/recipes/RecipeForm';
 
 export const NewRecipeView = () => {
   const router = useRouter();
@@ -10,7 +12,7 @@ export const NewRecipeView = () => {
   const onSubmit = async (data: CreateRecipeData) => {
     const result = await RecipeApi.create(data);
 
-    if (result.status === "success") {
+    if (result.status === 'success') {
       router.push(`/`);
     } else {
       alert(`Recipe creation failed with message: ${result.message}`);

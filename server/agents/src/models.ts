@@ -1,15 +1,16 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAI } from '@ai-sdk/openai';
 import {
   generateText,
   ToolLoopAgent,
   type LanguageModel,
   type ToolSet,
-} from "ai";
-import { Effect, Layer, Option, Redacted } from "effect";
-import { config } from "./config.js";
-import { type ModelError } from "./errors.js";
+} from 'ai';
+import { Effect, Layer, Option, Redacted } from 'effect';
 
-export const modelProviders = ["scaleway", "openai"] as const;
+import { config } from './config.js';
+import { type ModelError } from './errors.js';
+
+export const modelProviders = ['scaleway', 'openai'] as const;
 export type ModelProvider = (typeof modelProviders)[number];
 
 export type LoopRequest = {
@@ -36,7 +37,7 @@ export type LoopResult = Completion & {
   readonly outputTokens: number;
 };
 
-export class ModelRegistry extends Effect.Tag("ModelRegistry")<
+export class ModelRegistry extends Effect.Tag('ModelRegistry')<
   ModelRegistry,
   {
     readonly complete: (
@@ -69,17 +70,17 @@ export const ModelRegistryLive = Layer.effect(
       const model = entries[name];
       if (model === undefined) {
         return Effect.fail({
-          kind: "ProviderNotConfigured" as const,
+          kind: 'ProviderNotConfigured' as const,
           provider: name,
         });
       }
       return Effect.tryPromise({
         try: () => run(model),
         catch: (cause) => ({
-          kind: "ModelRequestFailed" as const,
+          kind: 'ModelRequestFailed' as const,
           name: model.modelId,
           message:
-            cause instanceof Error ? cause.message : "model request failed",
+            cause instanceof Error ? cause.message : 'model request failed',
         }),
       }).pipe(Effect.tapError((error) => Effect.logError(error.message)));
     };
@@ -101,16 +102,16 @@ const scaleway = (args: {
   }).chat(args.modelId);
   return {
     modelId: args.modelId,
-    provider: "scaleway",
+    provider: 'scaleway',
     complete: async (prompt) => {
       const result = await generateText({ model, prompt });
       return {
         text: result.text,
-        provider: "scaleway",
+        provider: 'scaleway',
         modelId: args.modelId,
       };
     },
-    loop: (request) => loop(model, "scaleway", args.modelId, request),
+    loop: (request) => loop(model, 'scaleway', args.modelId, request),
   };
 };
 
@@ -123,16 +124,16 @@ const openai = (args: {
   }).chat(args.modelId);
   return {
     modelId: args.modelId,
-    provider: "openai",
+    provider: 'openai',
     complete: async (prompt) => {
       const result = await generateText({ model, prompt });
       return {
         text: result.text,
-        provider: "openai",
+        provider: 'openai',
         modelId: args.modelId,
       };
     },
-    loop: (request) => loop(model, "openai", args.modelId, request),
+    loop: (request) => loop(model, 'openai', args.modelId, request),
   };
 };
 
@@ -151,7 +152,7 @@ const loop = async (
   const inputTokens = result.usage.inputTokens;
   const outputTokens = result.usage.outputTokens;
   if (inputTokens === undefined || outputTokens === undefined) {
-    throw new Error("model response did not include token counts");
+    throw new Error('model response did not include token counts');
   }
   return {
     text: result.text,

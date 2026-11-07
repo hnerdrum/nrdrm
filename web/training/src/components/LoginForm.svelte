@@ -34,8 +34,8 @@
   }
 </script>
 
-<main class="enter mx-auto grid max-w-[26rem] gap-12 pt-[min(16vh,7rem)]">
-  <h1 class="-ml-[0.03em] text-[min(16vw,4.75rem)] leading-none font-light tracking-[-0.055em]">
+<main class="enter mx-auto grid max-w-104 gap-12 pt-[min(16vh,7rem)]">
+  <h1 class="ml-[-0.03em] text-[min(16vw,4.75rem)] leading-none font-light tracking-[-0.055em]">
     Training
   </h1>
   <form class="grid gap-6" novalidate onsubmit={submit}>

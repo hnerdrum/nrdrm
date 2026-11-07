@@ -1,24 +1,26 @@
+import { createHmac, createSign, timingSafeEqual } from 'node:crypto';
+
 import {
   Headers,
   HttpServerRequest,
   HttpServerResponse,
-} from "@effect/platform";
-import { createHmac, createSign, timingSafeEqual } from "node:crypto";
-import { Effect, Option, Redacted, Schema } from "effect";
-import { config } from "./config.js";
-import { Database } from "./database.js";
-import { diffTooLarge } from "./review.js";
-import { runMention, runMentionRoute, runReview } from "./runs.js";
-import { githubDeliveries } from "./schema.js";
-import { jsonError } from "./utils.js";
+} from '@effect/platform';
+import { Effect, Option, Redacted, Schema } from 'effect';
 
-const repository = "hnerdrum/nrdrm";
-const appSlug = "ragnhild-review";
-const skipped = "Review skipped.";
+import { config } from './config.js';
+import { Database } from './database.js';
+import { diffTooLarge } from './review.js';
+import { runMention, runMentionRoute, runReview } from './runs.js';
+import { githubDeliveries } from './schema.js';
+import { jsonError } from './utils.js';
+
+const repository = 'hnerdrum/nrdrm';
+const appSlug = 'ragnhild-review';
+const skipped = 'Review skipped.';
 const cannotAnswer = "I can't answer that.";
 const failedAnswer = "I couldn't answer that.";
-const api = "https://api.github.com";
-const writers = new Set(["OWNER", "MEMBER", "COLLABORATOR"]);
+const api = 'https://api.github.com';
+const writers = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
 
 const mentionExpression = (flags: string) =>
   new RegExp(`@${appSlug}\\b`, flags);
@@ -115,16 +117,16 @@ type ThreadTarget = MentionTarget & {
 };
 
 const MentionAction = Schema.Struct({
-  action: Schema.Literal("review", "reply"),
+  action: Schema.Literal('review', 'reply'),
 });
 
-type GithubFailed = { kind: "GithubFailed"; status: number };
+type GithubFailed = { kind: 'GithubFailed'; status: number };
 
 type PostedComment = {
   readonly path: string;
   readonly body: string;
   readonly line: number;
-  readonly side: "LEFT" | "RIGHT";
+  readonly side: 'LEFT' | 'RIGHT';
 };
 
 const ok = () => HttpServerResponse.json({ ok: true }).pipe(Effect.orDie);
@@ -137,18 +139,18 @@ const validSignature = (
   body: Buffer,
   signature: string | undefined,
 ) => {
-  if (signature === undefined || !signature.startsWith("sha256=")) {
+  if (signature === undefined || !signature.startsWith('sha256=')) {
     return false;
   }
-  const hex = signature.slice("sha256=".length);
+  const hex = signature.slice('sha256='.length);
   if (hex.length === 0 || hex.length % 2 !== 0) {
     return false;
   }
-  const presented = Buffer.from(hex, "hex");
+  const presented = Buffer.from(hex, 'hex');
   if (presented.length * 2 !== hex.length) {
     return false;
   }
-  const expected = createHmac("sha256", secret).update(body).digest();
+  const expected = createHmac('sha256', secret).update(body).digest();
   if (presented.length !== expected.length) {
     return false;
   }
@@ -159,7 +161,7 @@ const reviewTarget = (
   event: string | undefined,
   payload: typeof Webhook.Type,
 ): ReviewTarget | undefined => {
-  if (event !== "pull_request") {
+  if (event !== 'pull_request') {
     return undefined;
   }
   if (payload.repository?.full_name !== repository) {
@@ -174,8 +176,8 @@ const reviewTarget = (
   }
   const draft = payload.pull_request.draft ?? false;
   if (
-    payload.action === "ready_for_review" ||
-    (payload.action === "opened" && !draft)
+    payload.action === 'ready_for_review' ||
+    (payload.action === 'opened' && !draft)
   ) {
     return {
       installationId: payload.installation.id,
@@ -189,7 +191,7 @@ const mentionTarget = (
   event: string | undefined,
   payload: typeof Webhook.Type,
 ): MentionTarget | undefined => {
-  if (event !== "issue_comment" || payload.action !== "created") {
+  if (event !== 'issue_comment' || payload.action !== 'created') {
     return undefined;
   }
   if (payload.repository?.full_name !== repository) {
@@ -203,22 +205,22 @@ const mentionTarget = (
   ) {
     return undefined;
   }
-  if (payload.comment.user?.type === "Bot") {
+  if (payload.comment.user?.type === 'Bot') {
     return undefined;
   }
   const association = payload.comment.author_association;
   if (association === undefined || !writers.has(association)) {
     return undefined;
   }
-  if (!mentionExpression("i").test(payload.comment.body)) {
+  if (!mentionExpression('i').test(payload.comment.body)) {
     return undefined;
   }
   return {
     installationId: payload.installation.id,
     number: payload.issue.number,
     comment: payload.comment.body,
-    title: payload.issue.title ?? "",
-    issueBody: payload.issue.body ?? "",
+    title: payload.issue.title ?? '',
+    issueBody: payload.issue.body ?? '',
   };
 };
 
@@ -231,13 +233,13 @@ const isAppBot = (
         readonly type?: string | undefined;
       }
     | undefined,
-) => user?.type === "Bot" && user.login?.toLowerCase() === appBot;
+) => user?.type === 'Bot' && user.login?.toLowerCase() === appBot;
 
 const threadTarget = (
   event: string | undefined,
   payload: typeof Webhook.Type,
 ): ThreadTarget | undefined => {
-  if (event !== "pull_request_review_comment" || payload.action !== "created") {
+  if (event !== 'pull_request_review_comment' || payload.action !== 'created') {
     return undefined;
   }
   if (payload.repository?.full_name !== repository) {
@@ -266,8 +268,8 @@ const threadTarget = (
     installationId: payload.installation.id,
     number: payload.pull_request.number,
     comment: payload.comment.body,
-    title: payload.pull_request.title ?? "",
-    issueBody: payload.pull_request.body ?? "",
+    title: payload.pull_request.title ?? '',
+    issueBody: payload.pull_request.body ?? '',
     rootId,
     ...(hunk === undefined || hunk === null || hunk.length === 0
       ? {}
@@ -288,29 +290,29 @@ const rememberDelivery = (id: string) =>
           return inserted.length > 0;
         },
         catch: (cause) => ({
-          kind: "DatabaseFailed" as const,
+          kind: 'DatabaseFailed' as const,
           message:
-            cause instanceof Error ? cause.message : "database request failed",
+            cause instanceof Error ? cause.message : 'database request failed',
         }),
       }).pipe(Effect.tapError((error) => Effect.logError(error.message))),
     ),
   );
 
-const base64url = (value: string) => Buffer.from(value).toString("base64url");
+const base64url = (value: string) => Buffer.from(value).toString('base64url');
 
 const appJwt = (cfg: GithubConfig) => {
   const now = Math.floor(Date.now() / 1000);
-  const encodedHeader = base64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const encodedHeader = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const encodedPayload = base64url(
     JSON.stringify({ iat: now - 60, exp: now + 540, iss: cfg.appId }),
   );
   const unsigned = `${encodedHeader}.${encodedPayload}`;
-  const signer = createSign("RSA-SHA256");
+  const signer = createSign('RSA-SHA256');
   signer.update(unsigned);
   signer.end();
   const signature = signer
     .sign(Redacted.value(cfg.privateKey))
-    .toString("base64url");
+    .toString('base64url');
   return `${unsigned}.${signature}`;
 };
 
@@ -318,7 +320,7 @@ const github = (
   token: string,
   path: string,
   init?: {
-    readonly method: "GET" | "POST";
+    readonly method: 'GET' | 'POST';
     readonly accept: string;
     readonly body?: string;
   },
@@ -326,32 +328,32 @@ const github = (
   Effect.tryPromise({
     try: async () => {
       const response = await fetch(`${api}${path}`, {
-        method: init?.method ?? "GET",
+        method: init?.method ?? 'GET',
         ...(init?.body === undefined ? {} : { body: init.body }),
         headers: {
-          accept: init?.accept ?? "application/vnd.github+json",
+          accept: init?.accept ?? 'application/vnd.github+json',
           authorization: `Bearer ${token}`,
-          "user-agent": "nrdrm-agents",
-          "x-github-api-version": "2022-11-28",
+          'user-agent': 'nrdrm-agents',
+          'x-github-api-version': '2022-11-28',
           ...(init?.body === undefined
             ? {}
-            : { "content-type": "application/json" }),
+            : { 'content-type': 'application/json' }),
         },
       });
       if (!response.ok) {
-        throw Object.assign(new Error("github request failed"), {
+        throw Object.assign(new Error('github request failed'), {
           status: response.status,
         });
       }
       return await response.text();
     },
     catch: (cause): GithubFailed => ({
-      kind: "GithubFailed",
+      kind: 'GithubFailed',
       status:
         cause !== null &&
-        typeof cause === "object" &&
-        "status" in cause &&
-        typeof cause.status === "number"
+        typeof cause === 'object' &&
+        'status' in cause &&
+        typeof cause.status === 'number'
           ? cause.status
           : 0,
     }),
@@ -359,13 +361,13 @@ const github = (
 
 const decodeJson = <A>(schema: Schema.Schema<A>, text: string) =>
   Schema.decodeUnknown(Schema.parseJson(schema))(text).pipe(
-    Effect.mapError((): GithubFailed => ({ kind: "GithubFailed", status: 0 })),
+    Effect.mapError((): GithubFailed => ({ kind: 'GithubFailed', status: 0 })),
   );
 
 const installationToken = (cfg: GithubConfig, installationId: number) =>
   github(appJwt(cfg), `/app/installations/${installationId}/access_tokens`, {
-    method: "POST",
-    accept: "application/vnd.github+json",
+    method: 'POST',
+    accept: 'application/vnd.github+json',
   }).pipe(
     Effect.flatMap((text) => decodeJson(Token, text)),
     Effect.map((body) => body.token),
@@ -379,8 +381,8 @@ const pullRequest = (token: string, number: number) => {
       Effect.map((pull) => pull.head.sha),
     ),
     diff: github(token, path, {
-      method: "GET",
-      accept: "application/vnd.github.diff",
+      method: 'GET',
+      accept: 'application/vnd.github.diff',
     }),
   });
 };
@@ -393,12 +395,12 @@ const createReview = (
   comments: readonly PostedComment[],
 ) =>
   github(token, `/repos/${repository}/pulls/${number}/reviews`, {
-    method: "POST",
-    accept: "application/vnd.github+json",
+    method: 'POST',
+    accept: 'application/vnd.github+json',
     body: JSON.stringify({
       commit_id: sha,
       body,
-      event: "COMMENT",
+      event: 'COMMENT',
       ...(comments.length === 0 ? {} : { comments }),
     }),
   }).pipe(Effect.asVoid);
@@ -429,20 +431,20 @@ const reviewPullRequest = (cfg: GithubConfig, target: ReviewTarget) =>
         Effect.matchEffect({
           onFailure: (error) => {
             if (
-              error.kind === "InputRefused" ||
-              error.kind === "DiffTooLarge"
+              error.kind === 'InputRefused' ||
+              error.kind === 'DiffTooLarge'
             ) {
               return postReview(token, target.number, sha, skipped, []);
             }
             const message =
-              error.kind === "ModelRequestFailed" ||
-              error.kind === "DatabaseFailed"
+              error.kind === 'ModelRequestFailed' ||
+              error.kind === 'DatabaseFailed'
                 ? error.message
                 : error.kind;
             return Effect.logError(message);
           },
           onSuccess: (result) =>
-            "summary" in result
+            'summary' in result
               ? postReview(
                   token,
                   target.number,
@@ -450,7 +452,7 @@ const reviewPullRequest = (cfg: GithubConfig, target: ReviewTarget) =>
                   result.summary,
                   result.comments,
                 )
-              : Effect.logError("review did not match the schema"),
+              : Effect.logError('review did not match the schema'),
         }),
       ),
     ),
@@ -461,14 +463,14 @@ const reviewPullRequest = (cfg: GithubConfig, target: ReviewTarget) =>
 
 const pullDiff = (token: string, number: number) =>
   github(token, `/repos/${repository}/pulls/${number}`, {
-    method: "GET",
-    accept: "application/vnd.github.diff",
+    method: 'GET',
+    accept: 'application/vnd.github.diff',
   });
 
 const postComment = (token: string, number: number, body: string) =>
   github(token, `/repos/${repository}/issues/${number}/comments`, {
-    method: "POST",
-    accept: "application/vnd.github+json",
+    method: 'POST',
+    accept: 'application/vnd.github+json',
     body: JSON.stringify({ body }),
   }).pipe(Effect.asVoid);
 
@@ -482,14 +484,14 @@ const postThreadReply = (
     token,
     `/repos/${repository}/pulls/${number}/comments/${rootId}/replies`,
     {
-      method: "POST",
-      accept: "application/vnd.github+json",
+      method: 'POST',
+      accept: 'application/vnd.github+json',
       body: JSON.stringify({ body }),
     },
   ).pipe(Effect.asVoid);
 
 const replyBody = (text: string) => {
-  const stripped = text.replace(mentionExpression("gi"), "").trim();
+  const stripped = text.replace(mentionExpression('gi'), '').trim();
   const body = stripped.length === 0 ? failedAnswer : stripped;
   return body.length > 60_000 ? body.slice(0, 60_000) : body;
 };
@@ -501,22 +503,22 @@ const mentionInput = (target: MentionTarget, diff: string | undefined) =>
     target.issueBody,
     target.hunk !== undefined && target.hunk.length > 0
       ? `Hunk:\n${target.hunk}`
-      : "",
+      : '',
     diff === undefined
-      ? "Diff:\nThe diff is too large to include."
+      ? 'Diff:\nThe diff is too large to include.'
       : `Diff:\n${diff}`,
   ]
     .filter((part) => part.length > 0)
-    .join("\n\n");
+    .join('\n\n');
 
 const jsonObject = (text: string) => {
   const trimmed = text.trim();
   const fence = /^```(?:json)?\s*([\s\S]*?)\s*```$/.exec(trimmed);
   const body = (fence?.[1] ?? trimmed).trim();
-  const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
   if (start === -1 || end < start) {
-    throw new Error("mention was not an object");
+    throw new Error('mention was not an object');
   }
   return body.slice(start, end + 1);
 };
@@ -524,18 +526,18 @@ const jsonObject = (text: string) => {
 const readMentionAction = (text: string) =>
   Effect.try({
     try: () => JSON.parse(jsonObject(text)) as unknown,
-    catch: () => ({ kind: "MentionInvalid" as const }),
+    catch: () => ({ kind: 'MentionInvalid' as const }),
   }).pipe(
     Effect.flatMap((value) =>
       Schema.decodeUnknown(MentionAction)(value).pipe(
-        Effect.mapError(() => ({ kind: "MentionInvalid" as const })),
+        Effect.mapError(() => ({ kind: 'MentionInvalid' as const })),
       ),
     ),
   );
 
 const loggedFailure = (error: { kind: string; message?: string }) => {
   const message =
-    error.kind === "ModelRequestFailed" || error.kind === "DatabaseFailed"
+    error.kind === 'ModelRequestFailed' || error.kind === 'DatabaseFailed'
       ? (error.message ?? error.kind)
       : error.kind;
   return Effect.logError(message);
@@ -553,7 +555,7 @@ const answerMention = (
       ).pipe(
         Effect.matchEffect({
           onFailure: (error) => {
-            if (error.kind === "InputRefused") {
+            if (error.kind === 'InputRefused') {
               return say(cannotAnswer);
             }
             return loggedFailure(error).pipe(
@@ -561,7 +563,7 @@ const answerMention = (
             );
           },
           onSuccess: (result) =>
-            "text" in result ? say(replyBody(result.text)) : say(failedAnswer),
+            'text' in result ? say(replyBody(result.text)) : say(failedAnswer),
         }),
       ),
     ),
@@ -575,7 +577,7 @@ const respondToMention = (cfg: GithubConfig, target: MentionTarget) =>
       ).pipe(
         Effect.matchEffect({
           onFailure: (error) => {
-            if (error.kind === "InputRefused") {
+            if (error.kind === 'InputRefused') {
               return postComment(token, target.number, cannotAnswer);
             }
             return loggedFailure(error).pipe(
@@ -585,7 +587,7 @@ const respondToMention = (cfg: GithubConfig, target: MentionTarget) =>
             );
           },
           onSuccess: (result) => {
-            if (!("text" in result)) {
+            if (!('text' in result)) {
               return postComment(token, target.number, failedAnswer);
             }
             return readMentionAction(result.text).pipe(
@@ -595,7 +597,7 @@ const respondToMention = (cfg: GithubConfig, target: MentionTarget) =>
                     postComment(token, target.number, body),
                   ),
                 onSuccess: (action) =>
-                  action.action === "review"
+                  action.action === 'review'
                     ? reviewPullRequest(cfg, target)
                     : answerMention(token, target, (body) =>
                         postComment(token, target.number, body),
@@ -661,14 +663,14 @@ const respondToThread = (cfg: GithubConfig, target: ThreadTarget) =>
   );
 
 type WebhookFailure =
-  | { kind: "InvalidSignature" }
-  | { kind: "InvalidRequestBody" }
-  | { kind: "DatabaseFailed"; message: string };
+  | { kind: 'InvalidSignature' }
+  | { kind: 'InvalidRequestBody' }
+  | { kind: 'DatabaseFailed'; message: string };
 
 export const githubWebhook = HttpServerRequest.HttpServerRequest.pipe(
   Effect.flatMap((request) =>
     request.arrayBuffer.pipe(
-      Effect.mapError((): WebhookFailure => ({ kind: "InvalidRequestBody" })),
+      Effect.mapError((): WebhookFailure => ({ kind: 'InvalidRequestBody' })),
       Effect.map((buffer) => ({
         request,
         raw: Buffer.from(buffer),
@@ -677,12 +679,10 @@ export const githubWebhook = HttpServerRequest.HttpServerRequest.pipe(
   ),
   Effect.flatMap(({ request, raw }) =>
     config.pipe(
-      Effect.mapError(
-        (): WebhookFailure => ({
-          kind: "DatabaseFailed",
-          message: "config unavailable",
-        }),
-      ),
+      Effect.mapError((): WebhookFailure => ({
+        kind: 'DatabaseFailed',
+        message: 'config unavailable',
+      })),
       Effect.map((cfg) => ({ cfg, request, raw })),
     ),
   ),
@@ -691,28 +691,26 @@ export const githubWebhook = HttpServerRequest.HttpServerRequest.pipe(
       !validSignature(
         Redacted.value(cfg.github.webhookSecret),
         raw,
-        header(request.headers, "x-hub-signature-256"),
+        header(request.headers, 'x-hub-signature-256'),
       )
     ) {
-      return Effect.fail({ kind: "InvalidSignature" as const });
+      return Effect.fail({ kind: 'InvalidSignature' as const });
     }
-    const delivery = header(request.headers, "x-github-delivery");
-    const event = header(request.headers, "x-github-event");
+    const delivery = header(request.headers, 'x-github-delivery');
+    const event = header(request.headers, 'x-github-event');
     if (delivery === undefined || delivery.length === 0) {
-      return Effect.fail({ kind: "InvalidRequestBody" as const });
+      return Effect.fail({ kind: 'InvalidRequestBody' as const });
     }
     return Schema.decodeUnknown(Schema.parseJson(Webhook))(
-      raw.toString("utf8"),
+      raw.toString('utf8'),
     ).pipe(
-      Effect.mapError((): WebhookFailure => ({ kind: "InvalidRequestBody" })),
+      Effect.mapError((): WebhookFailure => ({ kind: 'InvalidRequestBody' })),
       Effect.flatMap((payload) =>
         rememberDelivery(delivery).pipe(
-          Effect.mapError(
-            (error): WebhookFailure => ({
-              kind: "DatabaseFailed",
-              message: error.message,
-            }),
-          ),
+          Effect.mapError((error): WebhookFailure => ({
+            kind: 'DatabaseFailed',
+            message: error.message,
+          })),
           Effect.flatMap((fresh) => {
             if (!fresh) {
               return ok();
@@ -742,12 +740,12 @@ export const githubWebhook = HttpServerRequest.HttpServerRequest.pipe(
     );
   }),
   Effect.catchAll((error: WebhookFailure) => {
-    if (error.kind === "InvalidSignature") {
-      return jsonError(401, "invalid signature");
+    if (error.kind === 'InvalidSignature') {
+      return jsonError(401, 'invalid signature');
     }
-    if (error.kind === "InvalidRequestBody") {
-      return jsonError(400, "invalid request body");
+    if (error.kind === 'InvalidRequestBody') {
+      return jsonError(400, 'invalid request body');
     }
-    return jsonError(500, "database request failed");
+    return jsonError(500, 'database request failed');
   }),
 );

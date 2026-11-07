@@ -2,9 +2,15 @@
   "name": "nrdrm",
   "private": true,
   "scripts": {
-    "prepare": "husky"
+    "prepare": "husky",
+    "lint": "npm run lint:eslint && npm run lint:prettier",
+    "lint:eslint": "eslint .",
+    "lint:prettier": "prettier --check --ignore-unknown \"**/*.{js,jsx,cjs,mjs,ts,tsx,json,mdx,md,gql,graphql,yml}\"",
+    "lint:fix": "eslint . --fix && prettier --write --ignore-unknown \"**/*.{js,jsx,cjs,mjs,ts,tsx,json,mdx,md,gql,graphql,yml}\""
   },
   "devDependencies": {
+    "eslint": "10.9.1",
+    "eslint-config-nrdrm": "file:tooling/eslint-config",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
     "prettier": "^3.6.2"

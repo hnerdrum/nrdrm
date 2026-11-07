@@ -1,5 +1,6 @@
-import { postRequest } from ".";
-import { User } from "../domain";
+import type { User } from '../domain';
+
+import { postRequest } from '.';
 
 export type LoginData = {
   email: string;

@@ -1,13 +1,15 @@
-"use client";
+'use client';
 
-import { RequestWrap } from "../components/ui/request-wrap";
-import { Error } from "../components/ui/error";
-import { Error404 } from "../components/ui/404";
-import { useAuth } from "../providers/AuthProvider";
-import { RecipeForm } from "../components/recipes/RecipeForm";
-import { useRouter } from "next/navigation";
-import { CreateRecipeData, RecipeApi } from "../api/recipe";
-import { useRecipe } from "../hooks/useRecipe";
+import { useRouter } from 'next/navigation';
+
+import type { CreateRecipeData } from '../api/recipe';
+import { RecipeApi } from '../api/recipe';
+import { RecipeForm } from '../components/recipes/RecipeForm';
+import { Error404 } from '../components/ui/404';
+import { Error } from '../components/ui/error';
+import { RequestWrap } from '../components/ui/request-wrap';
+import { useRecipe } from '../hooks/useRecipe';
+import { useAuth } from '../providers/AuthProvider';
 
 export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
   const router = useRouter();
@@ -17,7 +19,7 @@ export const UpdateRecipeView = ({ recipeId }: { recipeId: string }) => {
   const onSubmit = async (data: CreateRecipeData) => {
     const result = await RecipeApi.update({ id: recipeId, data });
 
-    if (result.status === "success") {
+    if (result.status === 'success') {
       router.push(`/`);
     } else {
       alert(`Recipe update failed with message: ${result.message}`);

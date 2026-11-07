@@ -1,9 +1,9 @@
-import { createContext, useContext, useMemo } from "react";
-import { config } from "../../config";
-import useSWR from "swr";
-import { UserSettings } from "../domain";
-import { RecipeApi } from "../api/recipe";
-import { IdentityApi } from "../api/identity";
+import { createContext, useContext, useMemo } from 'react';
+import useSWR from 'swr';
+
+import { config } from '../../config';
+import { IdentityApi } from '../api/identity';
+import type { UserSettings } from '../domain';
 
 type AuthData = {
   isLoggedIn: boolean;
@@ -12,11 +12,11 @@ type AuthData = {
 
 const fetcher = (arg: string): Promise<UserSettings> =>
   fetch(`${config.baseServerUrl}${arg}`, {
-    method: "GET",
+    method: 'GET',
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
-    credentials: "include",
+    credentials: 'include',
   }).then((res) => res.json());
 
 const defaultData: AuthData = {
@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       isLoggedIn: !!data?.auth,
       isLoading,
     }),
-    [data?.auth, isLoading]
+    [data?.auth, isLoading],
   );
 
   return (

@@ -8,7 +8,7 @@
   let { children }: Props = $props();
 </script>
 
-<header class="mx-auto grid max-w-[68rem] grid-cols-[1fr_auto] items-center pt-3">
+<header class="mx-auto grid max-w-272 grid-cols-[1fr_auto] items-center pt-3">
   <p class="text-base font-semibold tracking-[0.18em] uppercase">Training</p>
   {#if children}
     <div class="-mr-3">

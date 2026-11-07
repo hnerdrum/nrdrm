@@ -1,6 +1,6 @@
-import { Effect, Schema } from "effect";
+import { Effect, Schema } from 'effect';
 
-export const reviewSkill = "review-pr";
+export const reviewSkill = 'review-pr';
 
 const maxDiffCharacters = 100_000;
 
@@ -8,7 +8,7 @@ const maxComments = 50;
 
 const ReviewComment = Schema.Struct({
   path: Schema.NonEmptyString,
-  side: Schema.Literal("LEFT", "RIGHT"),
+  side: Schema.Literal('LEFT', 'RIGHT'),
   line: Schema.Number.pipe(Schema.int()),
   body: Schema.NonEmptyString,
 });
@@ -33,30 +33,30 @@ const reviewText = (text: string): string => {
   const trimmed = text.trim();
   const fence = fenced.exec(trimmed);
   const body = (fence?.[1] ?? trimmed).trim();
-  if (body.startsWith("{") && body.endsWith("}")) {
+  if (body.startsWith('{') && body.endsWith('}')) {
     return body;
   }
-  const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
+  const start = body.indexOf('{');
+  const end = body.lastIndexOf('}');
   if (start === -1 || end < start) {
-    throw new Error("review was not an object");
+    throw new Error('review was not an object');
   }
   return body.slice(start, end + 1);
 };
 
-const targetKey = (path: string, side: "LEFT" | "RIGHT", line: number) =>
+const targetKey = (path: string, side: 'LEFT' | 'RIGHT', line: number) =>
   `${path}\n${side}\n${line}`;
 
 const headerPath = (line: string): string => {
   const rest = line.slice(4);
-  const tab = rest.indexOf("\t");
+  const tab = rest.indexOf('\t');
   const raw = (tab === -1 ? rest : rest.slice(0, tab)).trim();
   const unquoted =
     raw.startsWith('"') && raw.endsWith('"') ? raw.slice(1, -1) : raw;
-  if (unquoted === "/dev/null") {
+  if (unquoted === '/dev/null') {
     return unquoted;
   }
-  if (unquoted.startsWith("a/") || unquoted.startsWith("b/")) {
+  if (unquoted.startsWith('a/') || unquoted.startsWith('b/')) {
     return unquoted.slice(2);
   }
   return unquoted;
@@ -69,22 +69,22 @@ const commentTargets = (diff: string): ReadonlySet<string> => {
   let inHunk = false;
   let left = 0;
   let right = 0;
-  for (const raw of diff.split("\n")) {
-    const line = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
-    if (line.startsWith("diff --git ")) {
+  for (const raw of diff.split('\n')) {
+    const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    if (line.startsWith('diff --git ')) {
       path = undefined;
       oldPath = undefined;
       inHunk = false;
       continue;
     }
-    if (!inHunk && (line.startsWith("--- ") || line.startsWith("+++ "))) {
+    if (!inHunk && (line.startsWith('--- ') || line.startsWith('+++ '))) {
       const header = headerPath(line);
-      if (line.startsWith("--- ")) {
+      if (line.startsWith('--- ')) {
         oldPath = header;
         continue;
       }
-      path = header === "/dev/null" ? oldPath : header;
-      if (path === "/dev/null") {
+      path = header === '/dev/null' ? oldPath : header;
+      if (path === '/dev/null') {
         path = undefined;
       }
       continue;
@@ -99,21 +99,21 @@ const commentTargets = (diff: string): ReadonlySet<string> => {
     if (!inHunk || path === undefined) {
       continue;
     }
-    if (line.startsWith("\\")) {
+    if (line.startsWith('\\')) {
       continue;
     }
-    if (line.startsWith("+")) {
-      targets.add(targetKey(path, "RIGHT", right));
+    if (line.startsWith('+')) {
+      targets.add(targetKey(path, 'RIGHT', right));
       right += 1;
       continue;
     }
-    if (line.startsWith("-")) {
-      const leftPath = oldPath === "/dev/null" ? path : (oldPath ?? path);
-      targets.add(targetKey(leftPath, "LEFT", left));
+    if (line.startsWith('-')) {
+      const leftPath = oldPath === '/dev/null' ? path : (oldPath ?? path);
+      targets.add(targetKey(leftPath, 'LEFT', left));
       left += 1;
       continue;
     }
-    if (line.startsWith(" ")) {
+    if (line.startsWith(' ')) {
       left += 1;
       right += 1;
     }
@@ -136,11 +136,11 @@ const filterReview = (diff: string, review: Review): Review => {
 export const readReview = (diff: string, text: string) =>
   Effect.try({
     try: () => JSON.parse(reviewText(text)) as unknown,
-    catch: () => ({ kind: "ReviewInvalid" as const }),
+    catch: () => ({ kind: 'ReviewInvalid' as const }),
   }).pipe(
     Effect.flatMap((value) =>
       Schema.decodeUnknown(ReviewBody)(value).pipe(
-        Effect.mapError(() => ({ kind: "ReviewInvalid" as const })),
+        Effect.mapError(() => ({ kind: 'ReviewInvalid' as const })),
       ),
     ),
     Effect.map((review) => filterReview(diff, review)),
