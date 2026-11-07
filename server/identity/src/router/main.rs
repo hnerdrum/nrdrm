@@ -48,11 +48,9 @@ pub fn init_router(state: AppState) -> Router {
                 .route("/oauth/token", post(oauth_token_handler))
                 .route("/oauth/introspect", post(oauth_introspect_handler)),
         )
-        .layer(
-            TraceLayer::new_for_http().on_response(
-                trace::DefaultOnResponse::new().latency_unit(tower_http::LatencyUnit::Micros),
-            ),
-        )
+        .layer(TraceLayer::new_for_http().on_response(
+            trace::DefaultOnResponse::new().latency_unit(tower_http::LatencyUnit::Micros),
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

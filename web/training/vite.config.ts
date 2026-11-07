@@ -3,14 +3,14 @@ import { defineConfig, loadEnv } from "vite";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const trainingOrigin = env.TRAINING_URL || "http://localhost:8082";
+  const gatewayOrigin = env.GATEWAY_URL || "http://localhost:8080";
 
   return {
     plugins: [svelte()],
     server: {
       port: 5173,
       proxy: {
-        "/api": trainingOrigin,
+        "/training": gatewayOrigin,
       },
     },
   };

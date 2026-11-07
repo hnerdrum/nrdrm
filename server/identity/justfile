@@ -17,6 +17,9 @@ migrate:
 create-client name audience:
     cargo run --bin create-client -- {{ name }} {{ audience }}
 
+create-user email password: env
+    cargo run --bin create-user -- {{ email }} {{ password }}
+
 env dest=".env":
     #!/usr/bin/env bash
     set -euo pipefail
