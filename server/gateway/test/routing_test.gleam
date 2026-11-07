@@ -83,6 +83,8 @@ pub fn gateway_json_leaves_reads_creates_and_login_public_test() {
   status_with_gateway_json(testing.get("/identity/me", [])) |> should.equal(200)
   status_with_gateway_json(testing.post("/identity/login", [], "{}"))
   |> should.equal(200)
+  status_with_gateway_json(testing.post("/identity/logout", [], ""))
+  |> should.equal(200)
   status_with_gateway_json(testing.post("/agents/webhooks/github", [], "{}"))
   |> should.equal(200)
   status_with_gateway_json(testing.get("/training/health", []))

@@ -39,6 +39,7 @@
         { "path": "health", "methods": ["GET"], "auth": "public" },
         { "path": "me", "methods": ["GET"], "auth": "public" },
         { "path": "login", "methods": ["POST"], "auth": "public" },
+        { "path": "logout", "methods": ["POST"], "auth": "public" },
         { "path": "oauth/token", "methods": ["POST"], "auth": "public" }
       ]
     },
