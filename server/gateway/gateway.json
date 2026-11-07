@@ -75,8 +75,17 @@
     {
       "prefix": "training",
       "upstream": "training",
-      "request_headers": ["content-type"],
-      "rules": [{ "path": "health", "methods": ["GET"], "auth": "public" }]
+      "request_headers": ["content-type", "cookie"],
+      "response_headers": ["set-cookie"],
+      "rules": [
+        { "path": "health", "methods": ["GET"], "auth": "public" },
+        { "path": "sessions", "methods": ["GET", "POST"], "auth": "session" },
+        {
+          "path": "sessions/*",
+          "methods": ["GET", "PUT", "DELETE"],
+          "auth": "session"
+        }
+      ]
     }
   ]
 }

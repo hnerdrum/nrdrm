@@ -16,12 +16,25 @@ struct Health {
 }
 
 pub fn init_router(state: AppState) -> Router {
-    Router::new()
+    super::sessions::routes()
         .route("/api/health", get(health))
         .layer(TraceLayer::new_for_http().on_response(
             trace::DefaultOnResponse::new().latency_unit(tower_http::LatencyUnit::Micros),
         ))
         .with_state(state)
+}
+
+#[cfg(test)]
+pub(crate) fn test_state() -> AppState {
+    let database_url = "postgres://nrdrm:nrdrm@localhost:5437/training".to_string();
+    AppState {
+        db: crate::database::connection::create_connection_pool(database_url.clone()),
+        config: Config {
+            port: "8082".to_string(),
+            database_url,
+            log_level: "info".to_string(),
+        },
+    }
 }
 
 async fn health() -> Json<Health> {
@@ -33,23 +46,10 @@ async fn health() -> Json<Health> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::database::connection::create_connection_pool;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
     use http_body_util::BodyExt;
     use tower::ServiceExt;
-
-    fn test_state() -> AppState {
-        let database_url = "postgres://nrdrm:nrdrm@localhost:5437/training".to_string();
-        AppState {
-            db: create_connection_pool(database_url.clone()),
-            config: Config {
-                port: "8082".to_string(),
-                database_url,
-                log_level: "info".to_string(),
-            },
-        }
-    }
 
     #[tokio::test]
     async fn health_responds_ok_without_a_cookie() {

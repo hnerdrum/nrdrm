@@ -91,6 +91,19 @@ pub fn gateway_json_leaves_reads_creates_and_login_public_test() {
   |> should.equal(200)
 }
 
+pub fn gateway_json_requires_a_session_for_training_sessions_test() {
+  status_with_gateway_json(testing.get("/training/sessions", []))
+  |> should.equal(401)
+  status_with_gateway_json(testing.post("/training/sessions", [], "{}"))
+  |> should.equal(401)
+  status_with_gateway_json(testing.get("/training/sessions/abc", []))
+  |> should.equal(401)
+  status_with_gateway_json(testing.put("/training/sessions/abc", [], "{}"))
+  |> should.equal(401)
+  status_with_gateway_json(testing.delete("/training/sessions/abc", [], ""))
+  |> should.equal(401)
+}
+
 pub fn gateway_json_hides_everything_it_does_not_list_test() {
   status_with_gateway_json(testing.get("/identity/validate-token", []))
   |> should.equal(404)
@@ -101,6 +114,8 @@ pub fn gateway_json_hides_everything_it_does_not_list_test() {
   status_with_gateway_json(testing.get("/agents/unlisted", []))
   |> should.equal(404)
   status_with_gateway_json(testing.get("/training/me", [])) |> should.equal(404)
+  status_with_gateway_json(testing.patch("/training/sessions/abc", [], "{}"))
+  |> should.equal(404)
 }
 
 pub fn every_missing_environment_variable_is_reported_test() {
