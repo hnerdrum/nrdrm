@@ -24,6 +24,7 @@ just env
 | 5433      | `identity`     | [`server/identity`](server/identity)                                                                                    |
 | 5435      | `recipes_test` | recipes schema check (`just recipes schema-check`, [`docker-compose.test.yml`](server/recipes/docker-compose.test.yml)) |
 | 5436      | `agents`       | [`server/agents`](server/agents)                                                                                        |
+| 5437      | `training`     | [`server/training`](server/training)                                                                                    |
 
 ## Apps
 
@@ -33,11 +34,13 @@ just env
 - [`server/identity`](server/identity) — Rust auth API
 - [`server/gateway`](server/gateway) — Gleam reverse proxy
 - [`server/agents`](server/agents) — TypeScript agent runner
+- [`server/training`](server/training) — Rust training log
 
 ### Frontends
 
 - [`web/recipes`](web/recipes) — Next.js, talks to the gateway
 - [`web/home`](web/home) — Astro landing page
+- [`web/training`](web/training) — Vite + Svelte training page
 
 ### Jobs
 
