@@ -419,7 +419,7 @@ mod tests {
     }
 
     async fn deletion_stamp(state: &AppState, id: Uuid) -> Option<DateTime<Utc>> {
-        use crate::database::schema::session;
+        use crate::database::schema::training_session as session;
         state
             .db
             .get()

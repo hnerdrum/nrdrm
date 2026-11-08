@@ -266,7 +266,9 @@ mod tests {
     }
 
     async fn forget(state: &AppState, from: NaiveDate, to: NaiveDate) {
-        use crate::database::schema::{session, session_source};
+        use crate::database::schema::{
+            training_session as session, training_session_source as session_source,
+        };
         use diesel::prelude::*;
         state
             .db

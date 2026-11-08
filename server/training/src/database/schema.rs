@@ -7,7 +7,7 @@ pub mod sql_types {
 }
 
 diesel::table! {
-    session (id) {
+    training_session (id) {
         id -> Uuid,
         on_date -> Date,
         body -> Jsonb,
@@ -19,16 +19,13 @@ diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::ActivityProvider;
 
-    session_source (session_id) {
+    training_session_source (session_id) {
         session_id -> Uuid,
         provider -> ActivityProvider,
         activity_id -> Text,
     }
 }
 
-diesel::joinable!(session_source -> session (session_id));
+diesel::joinable!(training_session_source -> training_session (session_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    session,
-    session_source,
-);
+diesel::allow_tables_to_appear_in_same_query!(training_session, training_session_source,);

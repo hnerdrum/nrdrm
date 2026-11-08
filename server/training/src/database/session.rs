@@ -10,7 +10,7 @@ use serde_json::Value;
 use tracing::{debug, error};
 use uuid::Uuid;
 
-use super::schema::{session, session_source};
+use super::schema::{training_session as session, training_session_source as session_source};
 use crate::domain::import::PlannedSession;
 use crate::domain::session::{SessionBody, Sport};
 use crate::domain::source::{ActivityProvider, ActivitySource};
