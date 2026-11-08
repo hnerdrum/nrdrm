@@ -5,5 +5,6 @@ diesel::table! {
         id -> Uuid,
         on_date -> Date,
         body -> Jsonb,
+        deleted_at -> Nullable<Timestamptz>,
     }
 }

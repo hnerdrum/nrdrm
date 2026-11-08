@@ -123,10 +123,11 @@ async fn remove(
 mod tests {
     use super::*;
     use crate::domain::session::{Exercise, ExerciseSet, SessionBody};
-    use crate::router::main::{init_router, test_state};
+    use crate::router::main::{init_router, test_state, AppState};
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
-    use chrono::{Datelike, Duration, NaiveDate, Weekday};
+    use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
+    use diesel::prelude::*;
     use http_body_util::BodyExt;
     use serde::de::DeserializeOwned;
     use tower::ServiceExt;
@@ -416,9 +417,28 @@ mod tests {
         clear(&app, monday, sunday).await;
     }
 
+    async fn deletion_stamp(state: &AppState, id: Uuid) -> Option<DateTime<Utc>> {
+        use crate::database::schema::session;
+        state
+            .db
+            .get()
+            .await
+            .expect("database connection")
+            .interact(move |conn| {
+                session::table
+                    .filter(session::id.eq(id))
+                    .select(session::deleted_at)
+                    .first(conn)
+            })
+            .await
+            .expect("session query")
+            .expect("stored session")
+    }
+
     #[tokio::test]
     async fn deletes_a_session() {
-        let app = app();
+        let state = test_state();
+        let app = init_router(state.clone());
         let (monday, sunday) = week_containing(2400, 3, 15);
         clear(&app, monday, sunday).await;
 
@@ -452,8 +472,25 @@ mod tests {
             String::from_utf8_lossy(&bytes)
         );
         assert!(bytes.is_empty());
+        assert!(deletion_stamp(&state, saved.id).await.is_some());
 
         let (status, _) = call(&app, "GET", &format!("/api/sessions/{}", saved.id), None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let (status, _) = call(
+            &app,
+            "PUT",
+            &format!("/api/sessions/{}", saved.id),
+            Some(&input(
+                monday,
+                SessionBody::Run {
+                    distance: 4_000,
+                    duration: 1_200,
+                },
+            )),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let (status, _) = call(&app, "DELETE", &format!("/api/sessions/{}", saved.id), None).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
 
         let (status, bytes) = call(
@@ -466,6 +503,38 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         let listed: Vec<Session> = parse(&bytes);
         assert!(listed.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_deleted_session_is_skipped_by_latest() {
+        let app = app();
+        let through = NaiveDate::from_ymd_opt(2401, 1, 10).unwrap();
+        let earlier = through - Duration::days(3);
+        clear(&app, earlier, through).await;
+
+        let older = save(&app, earlier, strength("older")).await;
+        let newer = save(&app, through, strength("newer")).await;
+        let (status, _) = call(&app, "DELETE", &format!("/api/sessions/{}", newer.id), None).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+
+        let (status, bytes) = call(
+            &app,
+            "GET",
+            &format!("/api/sessions/latest?sport=strength&through={through}"),
+            None,
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+        let found: Option<Session> = parse(&bytes);
+        let found = found.expect("the earlier session remains");
+        assert_eq!(found.id, older.id);
+
+        clear(&app, earlier, through).await;
     }
 
     #[tokio::test]

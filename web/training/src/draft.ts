@@ -97,6 +97,19 @@ function measured(
   return { kilometres, minutes: totalMinutes, metres };
 }
 
+export function distanceDraft(body: Run | Ride | Ski): {
+  kilometres: string;
+  hours: string;
+  minutes: string;
+} {
+  const totalMinutes = Math.round(body.duration / 60);
+  return {
+    kilometres: String(body.distance / 1000),
+    hours: String(Math.floor(totalMinutes / 60)),
+    minutes: String(totalMinutes % 60),
+  };
+}
+
 export function distanceBody(
   sport: DistanceSport,
   kilometres: string,

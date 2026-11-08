@@ -13,9 +13,10 @@
     status: "loading" | "ready" | "error";
     onback: () => void;
     onadd: () => void;
+    onopen: (session: LoggedSession) => void;
   };
 
-  let { monday, today, sessions, status, onback, onadd }: Props = $props();
+  let { monday, today, sessions, status, onback, onadd, onopen }: Props = $props();
   const range = $derived(formatRange(monday));
 </script>
 
@@ -38,7 +39,7 @@
         <AddSessionButton onclick={onadd} />
       </div>
     {:else if status === "ready"}
-      <SessionList {sessions} {today} />
+      <SessionList {sessions} {today} {onopen} />
     {/if}
   </div>
   {#if status === "ready" && sessions.length > 0}

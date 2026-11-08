@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, NaiveDate, Utc};
 use deadpool_diesel::postgres::Pool;
 use diesel::prelude::*;
 use diesel::PgConnection;
@@ -58,6 +58,7 @@ pub async fn list(
 ) -> Result<Vec<Session>, SessionStoreError> {
     run(pool, move |conn| {
         session::table
+            .filter(session::deleted_at.is_null())
             .filter(session::on_date.ge(from))
             .filter(session::on_date.le(to))
             .order((session::on_date.asc(), session::id.asc()))
@@ -79,6 +80,7 @@ pub async fn latest(
     let sport = sport.as_str();
     run(pool, move |conn| {
         let row = session::table
+            .filter(session::deleted_at.is_null())
             .filter(session::on_date.le(through))
             .filter(session::body.retrieve_as_text("sport").eq(sport))
             .order((session::on_date.desc(), session::id.desc()))
@@ -94,6 +96,7 @@ pub async fn latest(
 pub async fn find(pool: &Pool, id: Uuid) -> Result<Session, SessionStoreError> {
     run(pool, move |conn| {
         session::table
+            .filter(session::deleted_at.is_null())
             .filter(session::id.eq(id))
             .select(SessionRow::as_select())
             .first(conn)
@@ -111,21 +114,31 @@ pub async fn update(
 ) -> Result<Session, SessionStoreError> {
     let body = to_json(body)?;
     run(pool, move |conn| {
-        diesel::update(session::table.filter(session::id.eq(id)))
-            .set((session::on_date.eq(on_date), session::body.eq(body)))
-            .returning(SessionRow::as_returning())
-            .get_result(conn)
-            .map_err(store_err)
-            .and_then(from_row)
+        diesel::update(
+            session::table
+                .filter(session::deleted_at.is_null())
+                .filter(session::id.eq(id)),
+        )
+        .set((session::on_date.eq(on_date), session::body.eq(body)))
+        .returning(SessionRow::as_returning())
+        .get_result(conn)
+        .map_err(store_err)
+        .and_then(from_row)
     })
     .await
 }
 
 pub async fn delete(pool: &Pool, id: Uuid) -> Result<(), SessionStoreError> {
+    let now: DateTime<Utc> = Utc::now();
     run(pool, move |conn| {
-        let deleted = diesel::delete(session::table.filter(session::id.eq(id)))
-            .execute(conn)
-            .map_err(store_err)?;
+        let deleted = diesel::update(
+            session::table
+                .filter(session::deleted_at.is_null())
+                .filter(session::id.eq(id)),
+        )
+        .set(session::deleted_at.eq(now))
+        .execute(conn)
+        .map_err(store_err)?;
         if deleted == 0 {
             Err(SessionStoreError::NotFound)
         } else {

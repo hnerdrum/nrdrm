@@ -6,16 +6,19 @@
   type Props = {
     session: LoggedSession;
     today: string;
+    onopen: (session: LoggedSession) => void;
   };
 
-  let { session, today }: Props = $props();
+  let { session, today, onopen }: Props = $props();
 
   const main = $derived(sessionMain(session.body));
   const duration = $derived(sessionDuration(session.body));
 </script>
 
-<div
-  class="grid w-[calc(100%+1.5rem)] -mx-3 min-h-20 grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-0.5 px-3 py-4 text-left wide:-mx-5 wide:min-h-17 wide:w-[calc(100%+2.5rem)] wide:grid-cols-[9.5rem_11rem_9rem_1fr] wide:px-5 wide:py-4"
+<button
+  type="button"
+  class="grid w-[calc(100%+1.5rem)] -mx-3 min-h-20 cursor-pointer grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-0.5 border-0 bg-transparent px-3 py-4 text-left hover:bg-field wide:-mx-5 wide:min-h-17 wide:w-[calc(100%+2.5rem)] wide:grid-cols-[9.5rem_11rem_9rem_1fr] wide:px-5 wide:py-4"
+  onclick={() => onopen(session)}
 >
   <span class="col-start-1 row-start-1 text-muted tabular-nums">
     {formatDay(session.onDate)}
@@ -42,4 +45,4 @@
       {duration}
     </span>
   {/if}
-</div>
+</button>

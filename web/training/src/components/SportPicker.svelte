@@ -6,11 +6,12 @@
 
   type Props = {
     sport?: Sport;
+    locked?: boolean;
   };
 
   const sports: Sport[] = ["run", "ride", "ski", "strength"];
 
-  let { sport = $bindable("run") }: Props = $props();
+  let { sport = $bindable("run"), locked = false }: Props = $props();
 
   const position = $derived(sports.indexOf(sport));
 </script>
@@ -23,17 +24,18 @@
   >
     <span class="thumb" aria-hidden="true"></span>
     {#each sports as item (item)}
-      <label class="relative z-1">
+      <label class="relative z-1 {locked && item !== sport ? 'cursor-default' : ''}">
         <input
-          class="peer absolute inset-0 m-0 cursor-pointer opacity-0 focus-visible:outline-none"
+          class="peer absolute inset-0 m-0 cursor-pointer opacity-0 focus-visible:outline-none disabled:cursor-default"
           type="radio"
           name="sport"
           value={item}
           checked={sport === item}
+          disabled={locked && item !== sport}
           onchange={() => (sport = item)}
         />
         <span
-          class="flex min-h-12 items-center justify-center rounded-full px-1 font-medium text-muted transition-colors duration-300 peer-hover:text-fg peer-checked:font-semibold peer-checked:text-on-accent peer-focus-visible:outline peer-focus-visible:outline-offset-[3px] peer-focus-visible:outline-accent"
+          class="flex min-h-12 items-center justify-center rounded-full px-1 font-medium text-muted transition-colors duration-300 peer-hover:text-fg peer-disabled:text-muted peer-disabled:hover:text-muted peer-checked:font-semibold peer-checked:text-on-accent peer-focus-visible:outline peer-focus-visible:outline-offset-[3px] peer-focus-visible:outline-accent"
         >
           {sportLabel(item)}
         </span>

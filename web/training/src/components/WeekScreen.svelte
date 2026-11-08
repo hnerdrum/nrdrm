@@ -18,6 +18,7 @@
     onprevious: () => void;
     onnext: () => void;
     onadd: () => void;
+    onopen: (session: LoggedSession) => void;
     onsessions: () => void;
     onlogout: () => void;
   };
@@ -33,6 +34,7 @@
     onprevious,
     onnext,
     onadd,
+    onopen,
     onsessions,
     onlogout,
   }: Props = $props();
@@ -68,7 +70,7 @@
             <AddSessionButton onclick={onadd} />
           </div>
         {:else}
-          <SessionList {sessions} {today} />
+          <SessionList {sessions} {today} {onopen} />
         {/if}
       </section>
     {/if}

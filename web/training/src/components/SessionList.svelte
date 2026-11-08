@@ -6,9 +6,10 @@
   type Props = {
     sessions: LoggedSession[];
     today: string;
+    onopen: (session: LoggedSession) => void;
   };
 
-  let { sessions, today }: Props = $props();
+  let { sessions, today, onopen }: Props = $props();
   const days = $derived(groupByDate(sessions));
 </script>
 
@@ -16,7 +17,7 @@
   {#each days as day (day.date)}
     <div class="day border-t border-line">
       {#each day.sessions as session (session.id)}
-        <SessionRow {session} {today} />
+        <SessionRow {session} {today} {onopen} />
       {/each}
     </div>
   {/each}

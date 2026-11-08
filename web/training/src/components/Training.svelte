@@ -3,19 +3,20 @@
   import { createMutation, createQuery, useQueryClient } from "@tanstack/svelte-query";
   import { isUnauthorized } from "../api/client";
   import { identityQueryKey, logout } from "../api/identity";
-  import { listSessions, sessionsQueryKey } from "../api/sessions";
+  import { listSessions, sessionsQueryKey, type LoggedSession } from "../api/sessions";
   import { addDays, mondayOf, todayIso, weekOffset } from "../dates";
   import NewSession from "./NewSession.svelte";
   import SessionsScreen from "./SessionsScreen.svelte";
   import WeekScreen from "./WeekScreen.svelte";
 
-  type View = "week" | "sessions" | "new";
+  type View = "week" | "sessions" | "new" | "edit";
 
   const queryClient = useQueryClient();
   const today = todayIso();
   let offset = $state(0);
   let view = $state<View>("week");
   let returnTo = $state<"week" | "sessions">("week");
+  let editing = $state<LoggedSession | null>(null);
   let wide = $state(
     typeof window !== "undefined" && window.matchMedia("(min-width: 960px)").matches,
   );
@@ -69,22 +70,38 @@
     view = "new";
   }
 
-  function cancelNew() {
+  function openEdit(session: LoggedSession) {
+    returnTo = view === "sessions" ? "sessions" : "week";
+    editing = session;
+    view = "edit";
+  }
+
+  function closeForm() {
+    editing = null;
     view = returnTo;
     window.scrollTo(0, 0);
   }
 
   function saved(onDate: string) {
-    const nextOffset = Math.min(0, weekOffset(mondayOf(today), mondayOf(onDate)));
-    const sameWeek = nextOffset === offset;
-    offset = nextOffset;
+    offset = Math.min(0, weekOffset(mondayOf(today), mondayOf(onDate)));
+    editing = null;
     view = returnTo;
     window.scrollTo(0, 0);
-    if (sameWeek) {
-      void queryClient.invalidateQueries({
-        queryKey: [...sessionsQueryKey, "week", monday],
-      });
+    void queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+  }
+
+  function deleted() {
+    const removed = editing;
+    if (removed) {
+      queryClient.setQueryData<LoggedSession[]>(
+        [...sessionsQueryKey, "week", monday],
+        (current) => current?.filter((session) => session.id !== removed.id),
+      );
     }
+    editing = null;
+    view = "week";
+    window.scrollTo(0, 0);
+    void queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
   }
 
   function onLogout() {
@@ -111,9 +128,19 @@
 </script>
 
 {#if view === "new"}
-  <NewSession {today} oncancel={cancelNew} onsaved={saved} />
+  <NewSession {today} oncancel={closeForm} onsaved={saved} />
+{:else if view === "edit" && editing}
+  <NewSession {today} session={editing} oncancel={closeForm} onsaved={saved} ondeleted={deleted} />
 {:else if view === "sessions"}
-  <SessionsScreen {monday} {today} {sessions} {status} onback={() => (view = "week")} onadd={openNew} />
+  <SessionsScreen
+    {monday}
+    {today}
+    {sessions}
+    {status}
+    onback={() => (view = "week")}
+    onadd={openNew}
+    onopen={openEdit}
+  />
 {:else}
   <WeekScreen
     {monday}
@@ -126,6 +153,7 @@
     onprevious={previous}
     onnext={next}
     onadd={openNew}
+    onopen={openEdit}
     onsessions={() => (view = "sessions")}
     onlogout={onLogout}
   />

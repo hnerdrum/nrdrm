@@ -35,3 +35,18 @@ export async function createSession(
     body: { onDate, body },
   });
 }
+
+export async function updateSession(
+  id: string,
+  onDate: string,
+  body: SessionBody,
+): Promise<void> {
+  await request(`/training/sessions/${id}`, {
+    method: 'PUT',
+    body: { onDate, body },
+  });
+}
+
+export async function deleteSession(id: string): Promise<void> {
+  await request(`/training/sessions/${id}`, { method: 'DELETE' });
+}
