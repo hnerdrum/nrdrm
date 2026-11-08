@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { durationDigitCount, formatKm } from "../format";
+  import type { LoggedSession } from "../api/sessions";
   import { weekTotals } from "../domain";
-  import type { LoggedSession } from "../log";
+  import { durationDigitCount, formatKm } from "../format";
   import CountReadout from "./CountReadout.svelte";
   import DurationReadout from "./DurationReadout.svelte";
 

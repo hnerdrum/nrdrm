@@ -1,59 +1,62 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { createMutation, createQuery, useQueryClient } from "@tanstack/svelte-query";
+  import { isUnauthorized } from "./api/client";
+  import { currentSession, identityQueryKey, login } from "./api/identity";
   import LoginForm from "./components/LoginForm.svelte";
   import Training from "./components/Training.svelte";
-  import { currentSession, login, logout } from "./session";
+  import Button from "./components/Button.svelte";
 
-  let screen = $state<"checking" | "login" | "home">("checking");
+  const queryClient = useQueryClient();
   let email = $state("");
-  let error = $state("");
-  let logoutError = $state("");
-  let submitting = $state(false);
-  let loggingOut = $state(false);
 
-  onMount(() => {
-    void restore();
+  const session = createQuery(() => ({
+    queryKey: identityQueryKey,
+    queryFn: currentSession,
+  }));
+
+  const loginMutation = createMutation(() => ({
+    mutationFn: (password: string) => login(email, password),
+    meta: { credentials: true },
+    onSuccess: () => {
+      queryClient.setQueryData(identityQueryKey, { email });
+    },
+  }));
+
+  const loginError = $derived.by(() => {
+    if (!loginMutation.isError) {
+      return "";
+    }
+    if (isUnauthorized(loginMutation.error)) {
+      return "Wrong email or password.";
+    }
+    return "Couldn't sign in. Try again.";
   });
 
-  async function restore() {
-    const session = await currentSession();
-    screen = session ? "home" : "login";
-  }
-
-  async function onLogin(password: string) {
-    if (submitting) return;
-    submitting = true;
-    error = "";
-    const result = await login(email, password);
-    submitting = false;
-    if (result === "ok") {
-      screen = "home";
+  function onLogin(password: string) {
+    if (loginMutation.isPending) {
       return;
     }
-    error =
-      result === "rejected" ? "Wrong email or password." : "Couldn't sign in. Try again.";
-  }
-
-  function showLogin() {
-    screen = "login";
-  }
-
-  async function onLogout() {
-    if (loggingOut) return;
-    loggingOut = true;
-    logoutError = "";
-    const ok = await logout();
-    loggingOut = false;
-    if (ok) {
-      screen = "login";
-      return;
-    }
-    logoutError = "Couldn't log out. Try again.";
+    loginMutation.mutate(password);
   }
 </script>
 
-{#if screen === "login"}
-  <LoginForm bind:email {error} {submitting} onsubmit={onLogin} />
-{:else if screen === "home"}
-  <Training {loggingOut} {logoutError} onlogout={onLogout} onsignedout={showLogin} />
+{#if session.isPending}
+  <!-- Restoring the session. -->
+{:else if session.isError}
+  <main class="enter mx-auto grid max-w-104 gap-8 pt-[min(16vh,7rem)]">
+    <h1 class="ml-[-0.03em] text-[min(16vw,4.75rem)] leading-none font-light tracking-[-0.055em]">
+      Training
+    </h1>
+    <p class="font-medium" role="alert">Couldn't reach the server.</p>
+    <Button disabled={session.isFetching} onclick={() => session.refetch()}>Try again</Button>
+  </main>
+{:else if session.data}
+  <Training />
+{:else}
+  <LoginForm
+    bind:email
+    error={loginError}
+    submitting={loginMutation.isPending}
+    onsubmit={onLogin}
+  />
 {/if}

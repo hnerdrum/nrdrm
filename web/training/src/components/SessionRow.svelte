@@ -1,7 +1,7 @@
 <script lang="ts">
   import { formatDay } from "../dates";
   import { sessionDuration, sessionMain, sportLabel } from "../format";
-  import type { LoggedSession } from "../log";
+  import type { LoggedSession } from "../api/sessions";
 
   type Props = {
     session: LoggedSession;

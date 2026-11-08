@@ -1,36 +1,58 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { createMutation, createQuery, useQueryClient } from "@tanstack/svelte-query";
+  import { isUnauthorized } from "../api/client";
+  import { identityQueryKey, logout } from "../api/identity";
+  import { listSessions, sessionsQueryKey } from "../api/sessions";
   import { addDays, mondayOf, todayIso, weekOffset } from "../dates";
-  import { listSessions, type LoggedSession } from "../log";
   import NewSession from "./NewSession.svelte";
   import SessionsScreen from "./SessionsScreen.svelte";
   import WeekScreen from "./WeekScreen.svelte";
 
-  type Props = {
-    loggingOut: boolean;
-    logoutError: string;
-    onlogout: () => void;
-    onsignedout: () => void;
-  };
-
   type View = "week" | "sessions" | "new";
 
-  let { loggingOut, logoutError, onlogout, onsignedout }: Props = $props();
-
+  const queryClient = useQueryClient();
   const today = todayIso();
   let offset = $state(0);
   let view = $state<View>("week");
   let returnTo = $state<"week" | "sessions">("week");
-  let sessions = $state<LoggedSession[]>([]);
-  let status = $state<"loading" | "ready" | "error">("loading");
-  let request = $state(0);
-  let shownMonday = "";
   let wide = $state(
     typeof window !== "undefined" && window.matchMedia("(min-width: 960px)").matches,
   );
 
   const monday = $derived(addDays(mondayOf(today), offset * 7));
   const atCurrent = $derived(offset === 0);
+
+  const week = createQuery(() => ({
+    queryKey: [...sessionsQueryKey, "week", monday],
+    queryFn: () => listSessions(monday, addDays(monday, 6)),
+  }));
+
+  const sessions = $derived(week.data ?? []);
+  const status = $derived.by(() => {
+    if (week.isPending) {
+      return "loading" as const;
+    }
+    if (week.isError && week.data === undefined) {
+      return "error" as const;
+    }
+    return "ready" as const;
+  });
+
+  const logoutMutation = createMutation(() => ({
+    mutationFn: logout,
+    onSuccess: () => {
+      queryClient.setQueryData(identityQueryKey, null);
+      void queryClient.removeQueries({ queryKey: sessionsQueryKey });
+    },
+  }));
+
+  const logoutError = $derived.by(() => {
+    if (!logoutMutation.isError || isUnauthorized(logoutMutation.error)) {
+      return "";
+    }
+    return "Couldn't log out. Try again.";
+  });
 
   function previous() {
     offset -= 1;
@@ -53,53 +75,29 @@
   }
 
   function saved(onDate: string) {
-    offset = Math.min(0, weekOffset(mondayOf(today), mondayOf(onDate)));
-    request += 1;
+    const nextOffset = Math.min(0, weekOffset(mondayOf(today), mondayOf(onDate)));
+    const sameWeek = nextOffset === offset;
+    offset = nextOffset;
     view = returnTo;
     window.scrollTo(0, 0);
+    if (sameWeek) {
+      void queryClient.invalidateQueries({
+        queryKey: [...sessionsQueryKey, "week", monday],
+      });
+    }
+  }
+
+  function onLogout() {
+    if (logoutMutation.isPending) {
+      return;
+    }
+    logoutMutation.mutate();
   }
 
   $effect(() => {
     if (wide && view === "sessions") {
       view = "week";
     }
-  });
-
-  $effect(() => {
-    const from = monday;
-    const to = addDays(from, 6);
-    void request;
-    let cancelled = false;
-    if (shownMonday !== from) {
-      status = "loading";
-      sessions = [];
-    }
-
-    listSessions(from, to)
-      .then((result) => {
-        if (cancelled) {
-          return;
-        }
-        if (result === "unauthorized") {
-          onsignedout();
-          return;
-        }
-        sessions = result;
-        shownMonday = from;
-        status = "ready";
-      })
-      .catch(() => {
-        if (cancelled) {
-          return;
-        }
-        sessions = [];
-        shownMonday = "";
-        status = "error";
-      });
-
-    return () => {
-      cancelled = true;
-    };
   });
 
   onMount(() => {
@@ -113,16 +111,9 @@
 </script>
 
 {#if view === "new"}
-  <NewSession {today} oncancel={cancelNew} onsaved={saved} {onsignedout} />
+  <NewSession {today} oncancel={cancelNew} onsaved={saved} />
 {:else if view === "sessions"}
-  <SessionsScreen
-    {monday}
-    {today}
-    {sessions}
-    {status}
-    onback={() => (view = "week")}
-    onadd={openNew}
-  />
+  <SessionsScreen {monday} {today} {sessions} {status} onback={() => (view = "week")} onadd={openNew} />
 {:else}
   <WeekScreen
     {monday}
@@ -130,12 +121,12 @@
     {sessions}
     {status}
     {atCurrent}
-    {loggingOut}
+    loggingOut={logoutMutation.isPending}
     {logoutError}
     onprevious={previous}
     onnext={next}
     onadd={openNew}
     onsessions={() => (view = "sessions")}
-    {onlogout}
+    onlogout={onLogout}
   />
 {/if}

@@ -1,6 +1,6 @@
 import { mount } from 'svelte';
 
-import App from './App.svelte';
+import Root from './Root.svelte';
 import './app.css';
 
 const target = document.getElementById('app');
@@ -8,4 +8,4 @@ if (!target) {
   throw new Error('missing #app');
 }
 
-mount(App, { target });
+mount(Root, { target });

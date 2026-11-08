@@ -21,7 +21,9 @@
       seenError = "";
       return;
     }
-    if (error === seenError) return;
+    if (error === seenError) {
+      return;
+    }
     seenError = error;
     password = "";
     void tick().then(() => passwordInput?.focus());
@@ -29,7 +31,9 @@
 
   function submit(event: SubmitEvent) {
     event.preventDefault();
-    if (submitting) return;
+    if (submitting) {
+      return;
+    }
     onsubmit(password);
   }
 </script>

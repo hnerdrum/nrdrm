@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { groupByDate, type LoggedSession } from "../log";
+  import type { LoggedSession } from "../api/sessions";
+  import { groupByDate } from "../days";
   import SessionRow from "./SessionRow.svelte";
 
   type Props = {

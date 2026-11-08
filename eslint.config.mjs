@@ -1,4 +1,4 @@
-import { ignorePatterns, next, node } from 'eslint-config-nrdrm';
+import { ignorePatterns, next, node, svelte } from 'eslint-config-nrdrm';
 
 const source = '**/*.{js,jsx,cjs,mjs,ts,tsx}';
 
@@ -30,4 +30,5 @@ export default [
   ...inDir(node, 'web/training'),
   ...inDir(node, 'web/home'),
   ...inDir(next, 'web/recipes'),
+  ...svelte,
 ];

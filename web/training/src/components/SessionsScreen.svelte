@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatRange } from "../dates";
-  import type { LoggedSession } from "../log";
+  import type { LoggedSession } from "../api/sessions";
   import AddSessionButton from "./AddSessionButton.svelte";
   import Button from "./Button.svelte";
   import Dock from "./Dock.svelte";

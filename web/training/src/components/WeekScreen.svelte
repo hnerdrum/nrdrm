@@ -1,6 +1,6 @@
 <script lang="ts">
   import { plural } from "../format";
-  import type { LoggedSession } from "../log";
+  import type { LoggedSession } from "../api/sessions";
   import AddSessionButton from "./AddSessionButton.svelte";
   import Dock from "./Dock.svelte";
   import SessionList from "./SessionList.svelte";

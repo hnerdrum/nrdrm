@@ -37,7 +37,9 @@
   function editSet(exerciseKey: string, setKey: string, field: "reps" | "weight", value: string) {
     onchange(
       exercises.map((exercise) => {
-        if (exercise.key !== exerciseKey) return exercise;
+        if (exercise.key !== exerciseKey) {
+          return exercise;
+        }
         return {
           ...exercise,
           sets: exercise.sets.map((set) => (set.key === setKey ? { ...set, [field]: value } : set)),
@@ -59,7 +61,9 @@
   function removeSet(exerciseKey: string, setKey: string) {
     onchange(
       exercises.map((exercise) => {
-        if (exercise.key !== exerciseKey) return exercise;
+        if (exercise.key !== exerciseKey) {
+          return exercise;
+        }
         return { ...exercise, sets: exercise.sets.filter((set) => set.key !== setKey) };
       }),
     );
@@ -69,7 +73,9 @@
   function move(key: string, direction: -1 | 1) {
     const index = exercises.findIndex((exercise) => exercise.key === key);
     const target = index + direction;
-    if (index < 0 || target < 0 || target >= exercises.length) return;
+    if (index < 0 || target < 0 || target >= exercises.length) {
+      return;
+    }
     const next = exercises.slice();
     const [item] = next.splice(index, 1);
     next.splice(target, 0, item);
