@@ -36,12 +36,6 @@
   <article class={tile}>
     <h2 class={label}>Ski</h2>
     <DurationReadout seconds={totals.skiSeconds} index={skiIndex} />
-    <div class="col-span-full mt-4 grid gap-1 wide:mt-auto wide:pt-6">
-      <p class="flex justify-between gap-4 text-muted">
-        <span>Distance</span>
-        <b class="font-mono font-normal text-fg tabular-nums">{formatKm(totals.skiMetres)}</b>
-      </p>
-    </div>
   </article>
   <article class={tile}>
     <h2 class={label}>Strength</h2>
