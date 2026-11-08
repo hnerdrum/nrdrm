@@ -1,0 +1,72 @@
+name: Training
+
+on:
+  pull_request:
+    paths:
+      - 'server/training/**'
+      - '.github/workflows/deploy-training.yml'
+      - '.github/workflows/reusable-deploy-scaleway-container.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'server/training/**'
+      - '.github/workflows/deploy-training.yml'
+      - '.github/workflows/reusable-deploy-scaleway-container.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:alpine
+        env:
+          POSTGRES_USER: nrdrm
+          POSTGRES_PASSWORD: nrdrm
+          POSTGRES_DB: training
+        ports:
+          - 5437:5432
+        options: >-
+          --health-cmd "pg_isready -U nrdrm -d training"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.58.0
+      - uses: dtolnay/rust-toolchain@1.99
+      - name: Install native libraries
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libpq-dev postgresql-client
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server/training
+      - name: Migrate
+        working-directory: server/training
+        env:
+          DATABASE_URL: postgres://nrdrm:nrdrm@localhost:5437/training
+        run: |
+          for f in migrations/*/up.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: just training test
+        run: just training test
+
+  deploy:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/reusable-deploy-scaleway-container.yml
+    with:
+      image_name: nrdrm-training
+      dockerfile: server/training/Dockerfile
+      context: server/training
+      extra_environment_variables: '{"APP_PORT":"8080"}'
+    secrets:
+      SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
+      CONTAINER_REGISTRY_ENDPOINT: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
+      CONTAINER_ID: ${{ secrets.TRAINING_CONTAINER_ID }}
