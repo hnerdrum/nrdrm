@@ -42,7 +42,14 @@
     if (!body) {
       return null;
     }
-    return `${formatKm(body.distance)} · ${formatDuration(body.duration)}`;
+    const parts: string[] = [];
+    if (body.distance > 0) {
+      parts.push(formatKm(body.distance));
+    }
+    if (body.duration > 0) {
+      parts.push(formatDuration(body.duration));
+    }
+    return parts.join(" · ");
   });
 
   function text(event: Event): string {
@@ -130,6 +137,7 @@
     <DistanceFields {sport} bind:kilometres bind:hours bind:minutes />
   {:else}
     <div class="rise-in grid gap-7">
+      <p class="text-muted">Metres or a time. Enter both when you know them.</p>
       {#each intervals as interval, index (interval.key)}
         {@const readout = intervalReadout(sport, interval)}
         <section class="grid gap-5 rounded-3xl border border-line bg-field p-5" aria-label="Interval {index + 1}">
@@ -153,6 +161,8 @@
                 class={inputClass}
                 inputmode="numeric"
                 autocomplete="off"
+                placeholder="Optional"
+                aria-label="Metres of one repeat. Leave empty when you only know the time."
                 value={interval.metres}
                 oninput={(event) => edit(interval.key, "metres", text(event))}
               />

@@ -60,16 +60,20 @@ pub enum SessionBody {
 
 /// One block of repeats in a run, ride, or ski.
 ///
-/// `duration` is the time of a single repeat, in seconds. `recovery` is the
-/// rest between repeats, in seconds. The rest after the last repeat is not
-/// part of the block, so the session time is the work plus the rests between
-/// repeats. `distance` and `duration` on the session are those totals.
-/// An empty list is a steady session and is omitted from JSON.
+/// `distance` is the metres of one repeat, and `duration` is its time in
+/// seconds. A repeat needs one of them, and may have both. Either is omitted
+/// from JSON when it is zero. `recovery` is the rest between repeats, in
+/// seconds, and counts toward the session time when the repeat has a time.
+/// The rest after the last repeat is not part of the block. `distance` and
+/// `duration` on the session are those totals. An empty list is a steady
+/// session and is omitted from JSON.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Interval {
     pub repetitions: u32,
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub distance: u32,
+    #[serde(default, skip_serializing_if = "is_zero")]
     pub duration: u32,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub recovery: u32,
@@ -131,21 +135,25 @@ fn is_zero(value: &u32) -> bool {
 }
 
 fn interval_ok(interval: &Interval) -> bool {
-    interval.repetitions >= 1 && interval.distance >= 1 && interval.duration >= 1
+    interval.repetitions >= 1 && (interval.distance >= 1 || interval.duration >= 1)
 }
 
 fn interval_totals(intervals: &[Interval]) -> Option<(u32, u32)> {
     let mut distance = 0u32;
     let mut duration = 0u32;
     for interval in intervals {
-        let work_distance = interval.repetitions.checked_mul(interval.distance)?;
-        distance = distance.checked_add(work_distance)?;
-        let work = interval.repetitions.checked_mul(interval.duration)?;
-        let rests = interval
-            .repetitions
-            .saturating_sub(1)
-            .checked_mul(interval.recovery)?;
-        duration = duration.checked_add(work)?.checked_add(rests)?;
+        if interval.distance >= 1 {
+            let work_distance = interval.repetitions.checked_mul(interval.distance)?;
+            distance = distance.checked_add(work_distance)?;
+        }
+        if interval.duration >= 1 {
+            let work = interval.repetitions.checked_mul(interval.duration)?;
+            let rests = interval
+                .repetitions
+                .saturating_sub(1)
+                .checked_mul(interval.recovery)?;
+            duration = duration.checked_add(work)?.checked_add(rests)?;
+        }
     }
     Some((distance, duration))
 }
@@ -229,7 +237,7 @@ impl SessionBody {
                 if ok {
                     None
                 } else {
-                    Some("Each interval needs repeats, a distance, and a time")
+                    Some("Each interval needs repeats, and a distance or a time")
                 }
             }
             _ => None,
@@ -507,7 +515,7 @@ mod tests {
         assert!(!short.accepted());
         assert_eq!(
             short.rejection(),
-            Some("Each interval needs repeats, a distance, and a time")
+            Some("Each interval needs repeats, and a distance or a time")
         );
 
         let broken: SessionBody = serde_json::from_str(
@@ -515,6 +523,28 @@ mod tests {
         )
         .unwrap();
         assert!(!broken.accepted());
+
+        let timed: SessionBody = serde_json::from_str(
+            r#"{"sport":"run","distance":0,"duration":480,"intervals":[{"repetitions":8,"duration":60}]}"#,
+        )
+        .unwrap();
+        assert!(timed.accepted());
+        let timed_stored = serde_json::to_value(&timed).unwrap();
+        assert!(timed_stored["intervals"][0].get("distance").is_none());
+
+        let marked: SessionBody = serde_json::from_str(
+            r#"{"sport":"run","distance":2400,"duration":0,"intervals":[{"repetitions":6,"distance":400}]}"#,
+        )
+        .unwrap();
+        assert!(marked.accepted());
+        let marked_stored = serde_json::to_value(&marked).unwrap();
+        assert!(marked_stored["intervals"][0].get("duration").is_none());
+
+        let bare: SessionBody = serde_json::from_str(
+            r#"{"sport":"run","distance":0,"duration":0,"intervals":[{"repetitions":8}]}"#,
+        )
+        .unwrap();
+        assert!(!bare.accepted());
 
         let extra = serde_json::from_str::<SessionBody>(
             r#"{"sport":"run","distance":400,"duration":90,"intervals":[{"repetitions":1,"distance":400,"duration":90,"note":"fast"}]}"#,
