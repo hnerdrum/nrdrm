@@ -42,6 +42,18 @@ function formatRepeatDistance(metres: number): string {
   return `${metres} m`;
 }
 
+function formatRepeat(interval: {
+  distance?: number;
+  duration?: number;
+}): string {
+  if (interval.distance) {
+    return formatRepeatDistance(interval.distance);
+  }
+  const seconds = interval.duration ?? 0;
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 const SPORT_LABEL = {
   run: 'Run',
   ride: 'Ride',
@@ -67,7 +79,7 @@ export function sessionMain(body: SessionBody): {
     if (body.intervals.length === 1) {
       const interval = body.intervals[0];
       return {
-        text: `${interval.repetitions} × ${formatRepeatDistance(interval.distance)}`,
+        text: `${interval.repetitions} × ${formatRepeat(interval)}`,
         plain: false,
       };
     }
@@ -80,7 +92,7 @@ export function sessionMain(body: SessionBody): {
 }
 
 export function sessionDuration(body: SessionBody): string | null {
-  if (body.sport === 'strength') {
+  if (body.sport === 'strength' || body.duration === 0) {
     return null;
   }
   return formatDuration(body.duration);

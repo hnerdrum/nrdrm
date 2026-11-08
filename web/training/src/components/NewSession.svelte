@@ -173,7 +173,7 @@
     } else if (kind === "intervals") {
       body = intervalBody(sport, intervals);
       if (!body) {
-        error = "Enter repeats, metres, and a time for every interval.";
+        error = "Enter repeats, and metres or a time, for every interval.";
         return;
       }
     } else {

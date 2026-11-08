@@ -1,7 +1,7 @@
 export type Interval = {
   repetitions: number;
-  distance: number;
-  duration: number;
+  distance?: number;
+  duration?: number;
   recovery?: number;
 };
 

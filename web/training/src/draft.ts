@@ -55,13 +55,14 @@ export function emptyInterval(): DraftInterval {
 
 export function intervalsFrom(intervals: Interval[]): DraftInterval[] {
   return intervals.map((interval) => {
-    const minutes = Math.floor(interval.duration / 60);
+    const total = interval.duration ?? 0;
+    const minutes = Math.floor(total / 60);
     return {
       key: draftKey(),
       repetitions: String(interval.repetitions),
-      metres: String(interval.distance),
+      metres: interval.distance ? String(interval.distance) : '',
       minutes: minutes > 0 ? String(minutes) : '',
-      seconds: String(interval.duration % 60),
+      seconds: total > 0 ? String(total % 60) : '',
       recovery: interval.recovery ? String(interval.recovery) : '',
     };
   });
@@ -128,6 +129,30 @@ function nonNegativeInt(value: string): number | null {
     return null;
   }
   return Number(trimmed);
+}
+
+function optionalMetres(value: string): number | null | undefined {
+  const trimmed = value.trim();
+  if (trimmed === '') {
+    return undefined;
+  }
+  return positiveInt(trimmed);
+}
+
+function optionalDuration(
+  minutes: string,
+  seconds: string,
+): number | null | undefined {
+  if (minutes.trim() === '' && seconds.trim() === '') {
+    return undefined;
+  }
+  const parsedMinutes = nonNegativeInt(minutes);
+  const parsedSeconds = nonNegativeInt(seconds);
+  if (parsedMinutes === null || parsedSeconds === null) {
+    return null;
+  }
+  const duration = parsedMinutes * 60 + parsedSeconds;
+  return duration >= 1 ? duration : null;
 }
 
 function positiveInt(value: string): number | null {
@@ -253,42 +278,49 @@ export function intervalBody(
   const built: Interval[] = [];
   for (const interval of intervals) {
     const repetitions = positiveInt(interval.repetitions);
-    const metres = positiveInt(interval.metres);
-    const minutes = nonNegativeInt(interval.minutes);
-    const seconds = nonNegativeInt(interval.seconds);
+    const metres = optionalMetres(interval.metres);
+    const repeat = optionalDuration(interval.minutes, interval.seconds);
     const recovery = nonNegativeInt(interval.recovery);
     if (
       repetitions === null ||
       metres === null ||
-      minutes === null ||
-      seconds === null ||
+      repeat === null ||
       recovery === null
     ) {
       return null;
     }
-    const duration = minutes * 60 + seconds;
-    if (duration < 1) {
+    if (metres === undefined && repeat === undefined) {
       return null;
     }
-    built.push(
-      recovery > 0
-        ? { repetitions, distance: metres, duration, recovery }
-        : { repetitions, distance: metres, duration },
-    );
+    const builtInterval: Interval = { repetitions };
+    if (metres !== undefined) {
+      builtInterval.distance = metres;
+    }
+    if (repeat !== undefined) {
+      builtInterval.duration = repeat;
+    }
+    if (recovery > 0) {
+      builtInterval.recovery = recovery;
+    }
+    built.push(builtInterval);
   }
   let distance = 0;
   let duration = 0;
   for (const interval of built) {
-    distance += interval.repetitions * interval.distance;
-    const recovery = interval.recovery ?? 0;
-    duration +=
-      interval.repetitions * interval.duration +
-      Math.max(interval.repetitions - 1, 0) * recovery;
+    if (interval.distance) {
+      distance += interval.repetitions * interval.distance;
+    }
+    if (interval.duration) {
+      const recovery = interval.recovery ?? 0;
+      duration +=
+        interval.repetitions * interval.duration +
+        Math.max(interval.repetitions - 1, 0) * recovery;
+    }
   }
   if (
     !Number.isSafeInteger(distance) ||
     !Number.isSafeInteger(duration) ||
-    distance < 1 ||
+    (distance < 1 && duration < 1) ||
     distance > 0xffffffff ||
     duration > 0xffffffff
   ) {
