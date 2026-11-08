@@ -35,6 +35,13 @@ export function formatKm(metres: number): string {
   return `${(metres / 1000).toFixed(1)} km`;
 }
 
+function formatRepeatDistance(metres: number): string {
+  if (metres >= 1000) {
+    return formatKm(metres);
+  }
+  return `${metres} m`;
+}
+
 const SPORT_LABEL = {
   run: 'Run',
   ride: 'Ride',
@@ -53,6 +60,19 @@ export function sessionMain(body: SessionBody): {
   if (body.sport === 'strength') {
     return {
       text: plural(body.exercises.length, 'exercise', 'exercises'),
+      plain: true,
+    };
+  }
+  if (body.sport === 'run' && body.intervals && body.intervals.length > 0) {
+    if (body.intervals.length === 1) {
+      const interval = body.intervals[0];
+      return {
+        text: `${interval.repetitions} × ${formatRepeatDistance(interval.distance)}`,
+        plain: false,
+      };
+    }
+    return {
+      text: plural(body.intervals.length, 'interval', 'intervals'),
       plain: true,
     };
   }

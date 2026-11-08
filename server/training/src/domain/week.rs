@@ -137,6 +137,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 5_000,
                     duration: 1_500,
+                    intervals: vec![],
                 },
             ),
             session(
@@ -144,6 +145,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 1_000,
                     duration: 300,
+                    intervals: vec![],
                 },
             ),
             session(

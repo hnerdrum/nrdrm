@@ -322,6 +322,7 @@ mod tests {
             SessionBody::Run {
                 distance: 5_000,
                 duration: 1_501,
+                intervals: vec![],
             }
         );
         assert_eq!(body.sessions[0].source, Some(source("run-2400")));
@@ -433,6 +434,7 @@ mod tests {
             body: SessionBody::Run {
                 distance: 1_000,
                 duration: 300,
+                intervals: vec![],
             },
             source: source("shared-2400"),
         }];
@@ -545,6 +547,7 @@ mod tests {
             SessionBody::Run {
                 distance: 8_000,
                 duration: 2_400,
+                intervals: vec![],
             }
         );
 

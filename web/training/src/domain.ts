@@ -1,7 +1,15 @@
+export type RunInterval = {
+  repetitions: number;
+  distance: number;
+  duration: number;
+  recovery?: number;
+};
+
 export type Run = {
   sport: 'run';
   distance: number;
   duration: number;
+  intervals?: RunInterval[];
 };
 
 export type Ride = {

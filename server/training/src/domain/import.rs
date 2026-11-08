@@ -81,6 +81,7 @@ fn planned(summary: &ActivitySummary, source: ActivitySource) -> Option<PlannedS
         ActivityKind::Run => SessionBody::Run {
             distance: whole_units(summary.distance_metres?)?,
             duration: whole_units(summary.duration_seconds?)?,
+            intervals: vec![],
         },
         ActivityKind::Ride => SessionBody::Ride {
             distance: whole_units(summary.distance_metres?)?,
@@ -184,6 +185,7 @@ mod tests {
                 body: SessionBody::Run {
                     distance: 10_235,
                     duration: 3_120,
+                    intervals: vec![],
                 },
                 source: source("100"),
             }]
@@ -235,6 +237,7 @@ mod tests {
             SessionBody::Run {
                 distance: 5_000,
                 duration: 1_500,
+                intervals: vec![],
             }
         );
         assert!(plan.skipped.is_empty());

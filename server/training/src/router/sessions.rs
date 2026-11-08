@@ -65,8 +65,8 @@ async fn create(
     State(state): State<AppState>,
     Json(input): Json<SessionInput>,
 ) -> Result<(StatusCode, Json<Session>), ApiError> {
-    if !input.body.accepted() {
-        return Err(ApiError::BadRequest("Each set needs reps or a duration"));
+    if let Some(message) = input.body.rejection() {
+        return Err(ApiError::BadRequest(message));
     }
     let saved = session::create(&state.db, input.on_date, input.body).await?;
     Ok((StatusCode::CREATED, Json(saved)))
@@ -110,8 +110,8 @@ async fn update(
     Path(id): Path<Uuid>,
     Json(input): Json<SessionInput>,
 ) -> Result<Json<Session>, ApiError> {
-    if !input.body.accepted() {
-        return Err(ApiError::BadRequest("Each set needs reps or a duration"));
+    if let Some(message) = input.body.rejection() {
+        return Err(ApiError::BadRequest(message));
     }
     let saved = session::update(&state.db, id, input.on_date, input.body).await?;
     Ok(Json(saved))
@@ -268,6 +268,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 5_000,
                     duration: 1_500,
+                    intervals: vec![],
                 },
             ),
             (
@@ -289,6 +290,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 1_000,
                     duration: 300,
+                    intervals: vec![],
                 },
             ),
             (
@@ -341,6 +343,7 @@ mod tests {
                     SessionBody::Run {
                         distance: 5_000,
                         duration: 1_500,
+                        intervals: vec![],
                     },
                 ),
                 (
@@ -458,6 +461,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 3_000,
                     duration: 900,
+                    intervals: vec![],
                 },
             )),
         )
@@ -492,6 +496,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 4_000,
                     duration: 1_200,
+                    intervals: vec![],
                 },
             )),
         )
@@ -639,6 +644,7 @@ mod tests {
             SessionBody::Run {
                 distance: 5_000,
                 duration: 1_500,
+                intervals: vec![],
             },
         )
         .await;

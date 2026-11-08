@@ -35,10 +35,41 @@ impl Sport {
     deny_unknown_fields
 )]
 pub enum SessionBody {
-    Run { distance: u32, duration: u32 },
-    Ride { distance: u32, duration: u32 },
-    Ski { distance: u32, duration: u32 },
-    Strength { exercises: Vec<Exercise> },
+    Run {
+        distance: u32,
+        duration: u32,
+        /// Empty for a steady run. Omitted from JSON when empty, so a stored
+        /// `{sport, distance, duration}` run still parses.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        intervals: Vec<RunInterval>,
+    },
+    Ride {
+        distance: u32,
+        duration: u32,
+    },
+    Ski {
+        distance: u32,
+        duration: u32,
+    },
+    Strength {
+        exercises: Vec<Exercise>,
+    },
+}
+
+/// One block of repeats in a run.
+///
+/// `duration` is the time of a single repeat, in seconds. `recovery` is the
+/// rest between repeats, in seconds. The rest after the last repeat is not
+/// part of the block, so the session time is the work plus the rests between
+/// repeats. `distance` and `duration` on the run are those totals.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunInterval {
+    pub repetitions: u32,
+    pub distance: u32,
+    pub duration: u32,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub recovery: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -92,6 +123,30 @@ fn is_bodyweight(weight: &f64) -> bool {
     *weight == 0.0
 }
 
+fn is_zero(value: &u32) -> bool {
+    *value == 0
+}
+
+fn interval_ok(interval: &RunInterval) -> bool {
+    interval.repetitions >= 1 && interval.distance >= 1 && interval.duration >= 1
+}
+
+fn interval_totals(intervals: &[RunInterval]) -> Option<(u32, u32)> {
+    let mut distance = 0u32;
+    let mut duration = 0u32;
+    for interval in intervals {
+        let work_distance = interval.repetitions.checked_mul(interval.distance)?;
+        distance = distance.checked_add(work_distance)?;
+        let work = interval.repetitions.checked_mul(interval.duration)?;
+        let rests = interval
+            .repetitions
+            .saturating_sub(1)
+            .checked_mul(interval.recovery)?;
+        duration = duration.checked_add(work)?.checked_add(rests)?;
+    }
+    Some((distance, duration))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pace {
     pub minutes: u32,
@@ -101,7 +156,9 @@ pub struct Pace {
 impl SessionBody {
     pub fn pace(&self) -> Option<Pace> {
         let (distance, duration) = match self {
-            Self::Run { distance, duration }
+            Self::Run {
+                distance, duration, ..
+            }
             | Self::Ski {
                 distance, duration, ..
             } => (*distance, *duration),
@@ -128,18 +185,43 @@ impl SessionBody {
         Some(f64::from(*distance) * 3.6 / f64::from(*duration))
     }
 
-    pub fn accepted(&self) -> bool {
-        let Self::Strength { exercises } = self else {
-            return true;
-        };
-        exercises.iter().all(|exercise| {
-            exercise.sets.iter().all(|set| match set {
-                ExerciseSet::Reps { reps, weight } => {
-                    *reps >= 1 && weight.is_finite() && *weight >= 0.0
+    pub fn rejection(&self) -> Option<&'static str> {
+        match self {
+            Self::Strength { exercises } => {
+                let ok = exercises.iter().all(|exercise| {
+                    exercise.sets.iter().all(|set| match set {
+                        ExerciseSet::Reps { reps, weight } => {
+                            *reps >= 1 && weight.is_finite() && *weight >= 0.0
+                        }
+                        ExerciseSet::Hold { duration } => *duration >= 1,
+                    })
+                });
+                if ok {
+                    None
+                } else {
+                    Some("Each set needs reps or a duration")
                 }
-                ExerciseSet::Hold { duration } => *duration >= 1,
-            })
-        })
+            }
+            Self::Run {
+                distance,
+                duration,
+                intervals,
+            } if !intervals.is_empty() => {
+                let totals = interval_totals(intervals);
+                let ok =
+                    intervals.iter().all(interval_ok) && totals == Some((*distance, *duration));
+                if ok {
+                    None
+                } else {
+                    Some("Each interval needs repeats, a distance, and a time")
+                }
+            }
+            _ => None,
+        }
+    }
+
+    pub fn accepted(&self) -> bool {
+        self.rejection().is_none()
     }
 }
 
@@ -167,6 +249,7 @@ mod tests {
         let stopped = SessionBody::Run {
             distance: 0,
             duration: 1_200,
+            intervals: vec![],
         };
         assert_eq!(stopped.pace(), None);
 
@@ -197,6 +280,7 @@ mod tests {
         let run = SessionBody::Run {
             distance: 2_000,
             duration: 1_001,
+            intervals: vec![],
         };
         assert_eq!(
             run.pace(),
@@ -212,6 +296,7 @@ mod tests {
         let run = SessionBody::Run {
             distance: 10_000,
             duration: 3_000,
+            intervals: vec![],
         };
         assert_eq!(
             run.pace(),
@@ -237,7 +322,8 @@ mod tests {
             run,
             SessionBody::Run {
                 distance: 5000,
-                duration: 1500
+                duration: 1500,
+                intervals: vec![],
             }
         );
 
@@ -343,5 +429,67 @@ mod tests {
         )
         .unwrap();
         assert!(!zero.accepted());
+    }
+
+    #[test]
+    fn a_steady_run_omits_intervals() {
+        let json = r#"{"sport":"run","distance":5000,"duration":1500}"#;
+        let run: SessionBody = serde_json::from_str(json).unwrap();
+        assert!(run.accepted());
+        let stored = serde_json::to_value(&run).unwrap();
+        assert!(stored.get("intervals").is_none());
+    }
+
+    #[test]
+    fn an_interval_run_is_repeats_of_a_distance() {
+        // 4 × 1000m in 3:40, 90s between, then 4 × 400m in 80s, 60s between.
+        // 4*1000 + 4*400 = 5600m. Work 4*220 + 4*80, rests 3*90 + 3*60 = 1650s.
+        let json = r#"{"sport":"run","distance":5600,"duration":1650,"intervals":[{"repetitions":4,"distance":1000,"duration":220,"recovery":90},{"repetitions":4,"distance":400,"duration":80,"recovery":60}]}"#;
+        let run: SessionBody = serde_json::from_str(json).unwrap();
+        assert!(run.accepted());
+        assert_eq!(
+            run,
+            SessionBody::Run {
+                distance: 5600,
+                duration: 1650,
+                intervals: vec![
+                    RunInterval {
+                        repetitions: 4,
+                        distance: 1000,
+                        duration: 220,
+                        recovery: 90,
+                    },
+                    RunInterval {
+                        repetitions: 4,
+                        distance: 400,
+                        duration: 80,
+                        recovery: 60,
+                    },
+                ],
+            }
+        );
+        let stored = serde_json::to_value(&run).unwrap();
+        assert!(stored["intervals"][0].get("recovery").is_some());
+
+        let short: SessionBody = serde_json::from_str(
+            r#"{"sport":"run","distance":1000,"duration":220,"intervals":[{"repetitions":4,"distance":1000,"duration":220,"recovery":90}]}"#,
+        )
+        .unwrap();
+        assert!(!short.accepted());
+        assert_eq!(
+            short.rejection(),
+            Some("Each interval needs repeats, a distance, and a time")
+        );
+
+        let broken: SessionBody = serde_json::from_str(
+            r#"{"sport":"run","distance":0,"duration":0,"intervals":[{"repetitions":0,"distance":400,"duration":90}]}"#,
+        )
+        .unwrap();
+        assert!(!broken.accepted());
+
+        let extra = serde_json::from_str::<SessionBody>(
+            r#"{"sport":"run","distance":400,"duration":90,"intervals":[{"repetitions":1,"distance":400,"duration":90,"note":"fast"}]}"#,
+        );
+        assert!(extra.is_err());
     }
 }

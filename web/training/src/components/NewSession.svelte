@@ -16,13 +16,19 @@
     distanceBody,
     distanceDraft,
     emptyExercise,
+    emptyInterval,
     exercisesFrom,
+    intervalBody,
+    intervalsFrom,
     strengthBody,
     type DraftExercise,
+    type DraftInterval,
+    type RunKind,
   } from "../draft";
   import { sportLabel } from "../format";
   import Button from "./Button.svelte";
   import DistanceFields from "./DistanceFields.svelte";
+  import RunEditor from "./RunEditor.svelte";
   import SportPicker from "./SportPicker.svelte";
   import StrengthEditor from "./StrengthEditor.svelte";
   import TextField from "./TextField.svelte";
@@ -47,6 +53,14 @@
   let kilometres = $state(seeded?.kilometres ?? "");
   let hours = $state(seeded?.hours ?? "");
   let minutes = $state(seeded?.minutes ?? "");
+  let runKind = $state<RunKind>(
+    editing?.body.sport === "run" && editing.body.intervals?.length ? "intervals" : "distance",
+  );
+  let intervals = $state<DraftInterval[]>(
+    editing?.body.sport === "run" && editing.body.intervals?.length
+      ? intervalsFrom(editing.body.intervals)
+      : [emptyInterval()],
+  );
   let exercises = $state<DraftExercise[]>(
     editing?.body.sport === "strength" ? exercisesFrom(editing.body) : [],
   );
@@ -155,6 +169,12 @@
         error = "Name each exercise. Enter reps or a time for every set.";
         return;
       }
+    } else if (sport === "run" && runKind === "intervals") {
+      body = intervalBody(intervals);
+      if (!body) {
+        error = "Enter repeats, metres, and a time for every interval.";
+        return;
+      }
     } else {
       body = distanceBody(sport, kilometres, hours, minutes);
       if (!body) {
@@ -220,7 +240,16 @@
       mono
       bind:value={date}
     />
-    {#if sport === "strength"}
+    {#if sport === "run"}
+      <RunEditor
+        bind:kind={runKind}
+        bind:kilometres
+        bind:hours
+        bind:minutes
+        {intervals}
+        onchange={(next) => (intervals = next)}
+      />
+    {:else if sport === "strength"}
       {#if waitingForLast}
         <p class="text-muted" role="status">Loading exercises…</p>
       {:else}

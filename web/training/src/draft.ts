@@ -1,8 +1,19 @@
-import type { Ride, Run, Ski, Strength } from './domain';
+import type { Ride, Run, RunInterval, Ski, Strength } from './domain';
 
 export type DistanceSport = 'run' | 'ride' | 'ski';
 
 export type SetMeasure = 'reps' | 'time';
+
+export type RunKind = 'distance' | 'intervals';
+
+export type DraftInterval = {
+  key: string;
+  repetitions: string;
+  metres: string;
+  minutes: string;
+  seconds: string;
+  recovery: string;
+};
 
 export type DraftSet = {
   key: string;
@@ -29,6 +40,31 @@ export function emptySet(): DraftSet {
 
 export function emptyExercise(): DraftExercise {
   return { key: draftKey(), name: '', measure: 'reps', sets: [emptySet()] };
+}
+
+export function emptyInterval(): DraftInterval {
+  return {
+    key: draftKey(),
+    repetitions: '1',
+    metres: '',
+    minutes: '',
+    seconds: '',
+    recovery: '',
+  };
+}
+
+export function intervalsFrom(intervals: RunInterval[]): DraftInterval[] {
+  return intervals.map((interval) => {
+    const minutes = Math.floor(interval.duration / 60);
+    return {
+      key: draftKey(),
+      repetitions: String(interval.repetitions),
+      metres: String(interval.distance),
+      minutes: minutes > 0 ? String(minutes) : '',
+      seconds: String(interval.duration % 60),
+      recovery: interval.recovery ? String(interval.recovery) : '',
+    };
+  });
 }
 
 export function exercisesFrom(body: Strength): DraftExercise[] {
@@ -181,6 +217,74 @@ export function derivedEffort(
     label: 'Pace',
     value: `${paceMinutes}:${String(paceSeconds).padStart(2, '0')} /km`,
   };
+}
+
+export function intervalPace(interval: DraftInterval): string | null {
+  const metres = positiveInt(interval.metres);
+  const minutes = nonNegativeInt(interval.minutes);
+  const seconds = nonNegativeInt(interval.seconds);
+  if (metres === null || minutes === null || seconds === null) {
+    return null;
+  }
+  const duration = minutes * 60 + seconds;
+  if (duration < 1) {
+    return null;
+  }
+  const perKm = Math.round((duration * 1000) / metres);
+  const paceMinutes = Math.floor(perKm / 60);
+  const paceSeconds = perKm % 60;
+  return `${paceMinutes}:${String(paceSeconds).padStart(2, '0')} /km`;
+}
+
+export function intervalBody(intervals: DraftInterval[]): Run | null {
+  if (intervals.length === 0) {
+    return null;
+  }
+  const built: RunInterval[] = [];
+  for (const interval of intervals) {
+    const repetitions = positiveInt(interval.repetitions);
+    const metres = positiveInt(interval.metres);
+    const minutes = nonNegativeInt(interval.minutes);
+    const seconds = nonNegativeInt(interval.seconds);
+    const recovery = nonNegativeInt(interval.recovery);
+    if (
+      repetitions === null ||
+      metres === null ||
+      minutes === null ||
+      seconds === null ||
+      recovery === null
+    ) {
+      return null;
+    }
+    const duration = minutes * 60 + seconds;
+    if (duration < 1) {
+      return null;
+    }
+    built.push(
+      recovery > 0
+        ? { repetitions, distance: metres, duration, recovery }
+        : { repetitions, distance: metres, duration },
+    );
+  }
+  let distance = 0;
+  let duration = 0;
+  for (const interval of built) {
+    distance += interval.repetitions * interval.distance;
+    const recovery = interval.recovery ?? 0;
+    duration +=
+      interval.repetitions * interval.duration +
+      Math.max(interval.repetitions - 1, 0) * recovery;
+  }
+  if (
+    !Number.isSafeInteger(distance) ||
+    !Number.isSafeInteger(duration) ||
+    distance < 1 ||
+    distance > 0xffffffff ||
+    duration > 0xffffffff
+  ) {
+    return null;
+  }
+  return { sport: 'run', distance, duration, intervals: built };
 }
 
 export function strengthBody(exercises: DraftExercise[]): Strength | null {
