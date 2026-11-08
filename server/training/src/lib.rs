@@ -5,3 +5,4 @@ pub mod database;
 pub mod domain;
 pub mod garmin;
 pub mod router;
+pub mod schedule;

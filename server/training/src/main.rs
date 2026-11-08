@@ -21,12 +21,15 @@ async fn main() {
     let activities: Arc<dyn ActivityClient> =
         Arc::new(GarminClient::new(config.garmin_api_key.clone()));
     let clock: Arc<dyn Clock> = Arc::new(OsloClock);
-    let app = init_router(AppState {
+    let state = AppState {
         db: pool,
         config,
         activities,
         clock,
-    });
+    };
+    let nights = state.clone();
+    tokio::spawn(training::schedule::nightly(nights));
+    let app = init_router(state);
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
         .await
         .unwrap();

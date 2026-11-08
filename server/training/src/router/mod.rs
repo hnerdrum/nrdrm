@@ -1,3 +1,3 @@
 pub mod main;
 mod sessions;
-mod sync;
+pub(crate) mod sync;

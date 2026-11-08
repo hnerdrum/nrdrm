@@ -92,6 +92,8 @@ pub fn gateway_json_leaves_reads_creates_and_login_public_test() {
 }
 
 pub fn gateway_json_requires_a_session_for_training_sessions_test() {
+  status_with_gateway_json(testing.post("/training/sync", [], ""))
+  |> should.equal(401)
   status_with_gateway_json(testing.get("/training/sessions", []))
   |> should.equal(401)
   status_with_gateway_json(testing.post("/training/sessions", [], "{}"))
@@ -114,6 +116,8 @@ pub fn gateway_json_hides_everything_it_does_not_list_test() {
   status_with_gateway_json(testing.get("/agents/unlisted", []))
   |> should.equal(404)
   status_with_gateway_json(testing.get("/training/me", [])) |> should.equal(404)
+  status_with_gateway_json(testing.get("/training/sync", []))
+  |> should.equal(404)
   status_with_gateway_json(testing.patch("/training/sessions/abc", [], "{}"))
   |> should.equal(404)
 }

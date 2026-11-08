@@ -4,6 +4,7 @@
   import AddSessionButton from "./AddSessionButton.svelte";
   import Dock from "./Dock.svelte";
   import SessionList from "./SessionList.svelte";
+  import SyncGarmin from "./SyncGarmin.svelte";
   import WeekFigures from "./WeekFigures.svelte";
   import WeekHeader from "./WeekHeader.svelte";
 
@@ -15,6 +16,10 @@
     atCurrent: boolean;
     loggingOut: boolean;
     logoutError: string;
+    syncing: boolean;
+    syncMessage: string;
+    syncFailed: boolean;
+    onsync: () => void;
     onprevious: () => void;
     onnext: () => void;
     onadd: () => void;
@@ -31,6 +36,10 @@
     atCurrent,
     loggingOut,
     logoutError,
+    syncing,
+    syncMessage,
+    syncFailed,
+    onsync,
     onprevious,
     onnext,
     onadd,
@@ -48,8 +57,10 @@
   <main class="week-enter mx-auto max-w-272" aria-busy={status === "loading"}>
     {#if status === "error"}
       <p class="py-6 font-medium" role="alert">Couldn't load this week.</p>
+      <SyncGarmin {syncing} message={syncMessage} failed={syncFailed} {onsync} />
     {:else if status === "ready"}
       <WeekFigures {sessions} />
+      <SyncGarmin {syncing} message={syncMessage} failed={syncFailed} {onsync} />
       <button
         type="button"
         class="count mt-6 flex min-h-15 w-full items-center justify-between border-y border-line bg-transparent px-1 text-lg font-medium hover:text-accent wide:hidden"

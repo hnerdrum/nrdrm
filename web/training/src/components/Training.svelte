@@ -4,6 +4,7 @@
   import { isUnauthorized } from "../api/client";
   import { identityQueryKey, logout } from "../api/identity";
   import { listSessions, sessionsQueryKey, type LoggedSession } from "../api/sessions";
+  import { describeSync, describeSyncFailure, syncGarmin } from "../api/sync";
   import { addDays, mondayOf, todayIso, weekOffset } from "../dates";
   import NewSession from "./NewSession.svelte";
   import SessionsScreen from "./SessionsScreen.svelte";
@@ -111,6 +112,35 @@
     logoutMutation.mutate();
   }
 
+  const syncMutation = createMutation(() => ({
+    mutationFn: syncGarmin,
+    onSuccess: (result) => {
+      if (result.sessions.length > 0) {
+        void queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
+      }
+    },
+  }));
+
+  function onSync() {
+    if (syncMutation.isPending) {
+      return;
+    }
+    syncMutation.mutate();
+  }
+
+  const syncMessage = $derived.by(() => {
+    if (syncMutation.isPending) {
+      return "";
+    }
+    if (syncMutation.isError) {
+      return describeSyncFailure(syncMutation.error);
+    }
+    if (syncMutation.data) {
+      return describeSync(syncMutation.data);
+    }
+    return "";
+  });
+
   $effect(() => {
     if (wide && view === "sessions") {
       view = "week";
@@ -150,6 +180,10 @@
     {atCurrent}
     loggingOut={logoutMutation.isPending}
     {logoutError}
+    syncing={syncMutation.isPending}
+    {syncMessage}
+    syncFailed={syncMutation.isError}
+    onsync={onSync}
     onprevious={previous}
     onnext={next}
     onadd={openNew}

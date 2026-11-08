@@ -79,6 +79,7 @@
       "response_headers": ["set-cookie"],
       "rules": [
         { "path": "health", "methods": ["GET"], "auth": "public" },
+        { "path": "sync", "methods": ["POST"], "auth": "session" },
         { "path": "sessions", "methods": ["GET", "POST"], "auth": "session" },
         {
           "path": "sessions/*",

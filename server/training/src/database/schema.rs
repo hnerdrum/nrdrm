@@ -28,4 +28,7 @@ diesel::table! {
 
 diesel::joinable!(session_source -> session (session_id));
 
-diesel::allow_tables_to_appear_in_same_query!(session, session_source,);
+diesel::allow_tables_to_appear_in_same_query!(
+    session,
+    session_source,
+);

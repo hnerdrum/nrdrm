@@ -20,13 +20,23 @@ pub fn routes() -> Router<AppState> {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SyncResponse {
-    sessions: Vec<Session>,
-    skipped: Vec<String>,
+    pub(crate) sessions: Vec<Session>,
+    pub(crate) skipped: Vec<String>,
 }
 
+#[derive(Debug)]
 pub(crate) enum SyncError {
     Unavailable,
     Failed,
+}
+
+impl std::fmt::Display for SyncError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Unavailable => "Garmin didn't respond",
+            Self::Failed => "sync failed",
+        })
+    }
 }
 
 impl From<SessionStoreError> for SyncError {
@@ -439,5 +449,132 @@ mod tests {
         assert!(again.is_empty());
 
         forget(&state, on_date, on_date).await;
+    }
+
+    struct ManualClock(std::sync::Mutex<chrono::DateTime<chrono_tz::Tz>>);
+
+    impl ManualClock {
+        fn new(now: chrono::DateTime<chrono_tz::Tz>) -> Self {
+            Self(std::sync::Mutex::new(now))
+        }
+
+        fn set(&self, now: chrono::DateTime<chrono_tz::Tz>) {
+            *self.0.lock().expect("clock") = now;
+        }
+    }
+
+    impl crate::clock::Clock for ManualClock {
+        fn now(&self) -> chrono::DateTime<chrono_tz::Tz> {
+            *self.0.lock().expect("clock")
+        }
+    }
+
+    fn oslo(
+        year: i32,
+        month: u32,
+        day: u32,
+        hour: u32,
+        minute: u32,
+    ) -> chrono::DateTime<chrono_tz::Tz> {
+        use chrono::TimeZone;
+        chrono_tz::Europe::Oslo
+            .with_ymd_and_hms(year, month, day, hour, minute, 0)
+            .single()
+            .unwrap_or_else(|| panic!("{year}-{month:02}-{day:02} {hour:02}:{minute:02}"))
+    }
+
+    #[tokio::test]
+    async fn the_night_path_calls_import_at_two() {
+        let from = NaiveDate::from_ymd_opt(2099, 6, 1).unwrap();
+        let morning = NaiveDate::from_ymd_opt(2099, 6, 15).unwrap();
+        let to = NaiveDate::from_ymd_opt(2099, 6, 30).unwrap();
+        let clock = Arc::new(ManualClock::new(oslo(2099, 6, 14, 22, 0)));
+        let requested = Arc::new(Mutex::new(None));
+        let summaries = vec![
+            activity(
+                "night-2099",
+                "Night run",
+                morning.and_hms_opt(1, 0, 0).unwrap(),
+                ActivityKind::Run,
+                Some(8_000.0),
+                Some(2_400.0),
+            ),
+            activity(
+                "night-2099-strength",
+                "Strength",
+                morning.and_hms_opt(1, 30, 0).unwrap(),
+                ActivityKind::Other,
+                None,
+                Some(2_400.0),
+            ),
+        ];
+        let base = test_state();
+        let state = AppState {
+            db: base.db,
+            config: base.config,
+            activities: Arc::new(Fixture {
+                summaries,
+                requested: Arc::clone(&requested),
+            }),
+            clock: Arc::clone(&clock) as Arc<dyn crate::clock::Clock>,
+        };
+        forget(&state, from, to).await;
+
+        let clock_for_sleep = Arc::clone(&clock);
+        let result = crate::schedule::wait_and_sync(&state, move |deadline| {
+            let clock = Arc::clone(&clock_for_sleep);
+            async move {
+                assert_eq!(deadline, oslo(2099, 6, 15, 2, 0));
+                clock.set(deadline);
+            }
+        })
+        .await
+        .expect("night sync");
+
+        assert_eq!(
+            *requested.lock().unwrap(),
+            Some(super::sync_window(morning))
+        );
+        assert_eq!(result.skipped, vec!["Strength".to_string()]);
+        assert_eq!(result.sessions.len(), 1);
+        assert_eq!(result.sessions[0].on_date, morning);
+        assert_eq!(
+            result.sessions[0].body,
+            SessionBody::Run {
+                distance: 8_000,
+                duration: 2_400,
+            }
+        );
+
+        forget(&state, from, to).await;
+    }
+
+    #[tokio::test]
+    async fn the_night_path_leaves_rows_when_garmin_does_not_respond() {
+        let from = NaiveDate::from_ymd_opt(2099, 7, 1).unwrap();
+        let to = NaiveDate::from_ymd_opt(2099, 7, 31).unwrap();
+        let clock = Arc::new(ManualClock::new(oslo(2099, 7, 14, 22, 0)));
+        let base = test_state();
+        let state = AppState {
+            db: base.db,
+            config: base.config,
+            activities: Arc::new(Unavailable),
+            clock: Arc::clone(&clock) as Arc<dyn crate::clock::Clock>,
+        };
+        forget(&state, from, to).await;
+        let before = session::list(&state.db, from, to).await.expect("list");
+
+        let clock_for_sleep = Arc::clone(&clock);
+        let result = crate::schedule::wait_and_sync(&state, move |deadline| {
+            let clock = Arc::clone(&clock_for_sleep);
+            async move {
+                clock.set(deadline);
+            }
+        })
+        .await;
+
+        assert!(matches!(result, Err(super::SyncError::Unavailable)));
+        let after = session::list(&state.db, from, to).await.expect("list");
+        assert_eq!(after, before);
     }
 }

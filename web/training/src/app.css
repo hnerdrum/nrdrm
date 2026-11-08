@@ -82,7 +82,8 @@
 
 .week-enter .day,
 .week-enter .count,
-.week-enter .empty {
+.week-enter .empty,
+.week-enter .sync {
   animation: rise 0.8s 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
@@ -177,6 +178,7 @@
   .week-enter .day,
   .week-enter .count,
   .week-enter .empty,
+  .week-enter .sync,
   .week-enter .odo,
   .form-enter > *,
   .rise-in,
