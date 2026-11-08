@@ -227,6 +227,7 @@ mod tests {
         let state = AppState {
             db: base.db,
             config: base.config,
+            tokens: base.tokens,
             activities,
             clock: Arc::new(FixedClock(today())),
         };
@@ -518,6 +519,7 @@ mod tests {
         let state = AppState {
             db: base.db,
             config: base.config,
+            tokens: base.tokens,
             activities: Arc::new(Fixture {
                 summaries,
                 requested: Arc::clone(&requested),
@@ -565,6 +567,7 @@ mod tests {
         let state = AppState {
             db: base.db,
             config: base.config,
+            tokens: base.tokens,
             activities: Arc::new(Unavailable),
             clock: Arc::clone(&clock) as Arc<dyn crate::clock::Clock>,
         };

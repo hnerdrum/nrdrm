@@ -1,6 +1,7 @@
 use chrono::NaiveDate;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// A run, ride, or ski as an agent types it.
 ///
@@ -87,4 +88,68 @@ pub struct SessionUpdate {
     pub intervals: Option<Vec<IntervalInput>>,
     #[serde(default)]
     pub exercises: Option<Vec<ExerciseInput>>,
+}
+
+/// A date inside the week to read. Omitted means today in Europe/Oslo.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct WeekQuery {
+    #[serde(default)]
+    pub on_date: Option<NaiveDate>,
+}
+
+/// `run`, `ride`, `ski`, or `strength`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SportName {
+    #[default]
+    Run,
+    Ride,
+    Ski,
+    Strength,
+}
+
+/// The newest session of one sport. `through` omitted means today in Europe/Oslo.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct LatestQuery {
+    pub sport: SportName,
+    #[serde(default)]
+    pub through: Option<NaiveDate>,
+}
+
+/// One stored session and the fields to change. Omitted fields stay as they are.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateQuery {
+    pub id: Uuid,
+    #[serde(default)]
+    pub on_date: Option<NaiveDate>,
+    #[serde(default)]
+    pub distance_km: Option<f64>,
+    #[serde(default)]
+    pub minutes: Option<f64>,
+    #[serde(default)]
+    pub intervals: Option<Vec<IntervalInput>>,
+    #[serde(default)]
+    pub exercises: Option<Vec<ExerciseInput>>,
+}
+
+impl UpdateQuery {
+    pub(crate) fn change(&self) -> SessionUpdate {
+        SessionUpdate {
+            on_date: self.on_date,
+            distance_km: self.distance_km,
+            minutes: self.minutes,
+            intervals: self.intervals.clone(),
+            exercises: self.exercises.clone(),
+        }
+    }
+}
+
+/// The session to delete.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct DeleteQuery {
+    pub id: Uuid,
 }
