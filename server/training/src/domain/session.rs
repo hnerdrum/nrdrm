@@ -15,22 +15,10 @@ pub struct Session {
     deny_unknown_fields
 )]
 pub enum SessionBody {
-    Run {
-        distance: u32,
-        duration: u32,
-    },
-    Ride {
-        distance: u32,
-        duration: u32,
-    },
-    Ski {
-        distance: u32,
-        duration: u32,
-        with_pack: bool,
-    },
-    Strength {
-        exercises: Vec<Exercise>,
-    },
+    Run { distance: u32, duration: u32 },
+    Ride { distance: u32, duration: u32 },
+    Ski { distance: u32, duration: u32 },
+    Strength { exercises: Vec<Exercise> },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -91,7 +79,6 @@ mod tests {
         let ski = SessionBody::Ski {
             distance: 15_000,
             duration: 3_600,
-            with_pack: true,
         };
         assert_eq!(
             ski.pace(),
@@ -191,18 +178,20 @@ mod tests {
             }
         );
 
-        let ski: SessionBody = serde_json::from_str(
-            r#"{"sport":"ski","distance":12000,"duration":3600,"withPack":true}"#,
-        )
-        .unwrap();
+        let ski: SessionBody =
+            serde_json::from_str(r#"{"sport":"ski","distance":12000,"duration":3600}"#).unwrap();
         assert_eq!(
             ski,
             SessionBody::Ski {
                 distance: 12000,
-                duration: 3600,
-                with_pack: true
+                duration: 3600
             }
         );
+
+        let packed = serde_json::from_str::<SessionBody>(
+            r#"{"sport":"ski","distance":12000,"duration":3600,"withPack":true}"#,
+        );
+        assert!(packed.is_err());
 
         let strength: SessionBody = serde_json::from_str(
             r#"{"sport":"strength","exercises":[{"name":"squat","sets":[{"reps":5,"weight":0}]}]}"#,

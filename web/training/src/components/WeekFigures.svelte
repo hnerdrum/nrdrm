@@ -38,12 +38,8 @@
     <DurationReadout seconds={totals.skiSeconds} index={skiIndex} />
     <div class="col-span-full mt-4 grid gap-1 wide:mt-auto wide:pt-6">
       <p class="flex justify-between gap-4 text-muted">
-        <span>All ski</span>
+        <span>Distance</span>
         <b class="font-mono font-normal text-fg tabular-nums">{formatKm(totals.skiMetres)}</b>
-      </p>
-      <p class="flex justify-between gap-4 text-muted">
-        <span>With pack</span>
-        <b class="font-mono font-normal text-fg tabular-nums">{formatKm(totals.packMetres)}</b>
       </p>
     </div>
   </article>

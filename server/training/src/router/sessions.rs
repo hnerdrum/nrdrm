@@ -237,7 +237,6 @@ mod tests {
                 SessionBody::Ski {
                     distance: 12_000,
                     duration: 3_600,
-                    with_pack: false,
                 },
             ),
             (
@@ -310,7 +309,6 @@ mod tests {
                     SessionBody::Ski {
                         distance: 12_000,
                         duration: 3_600,
-                        with_pack: false,
                     },
                 ),
                 (
@@ -332,7 +330,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn changes_a_skis_pack_flag() {
+    async fn updates_a_ski() {
         let app = app();
         let (monday, sunday) = week_containing(2400, 2, 15);
         clear(&app, monday, sunday).await;
@@ -340,7 +338,6 @@ mod tests {
         let ski = SessionBody::Ski {
             distance: 8_000,
             duration: 2_400,
-            with_pack: false,
         };
         let (status, bytes) = call(&app, "POST", "/api/sessions", Some(&input(monday, ski))).await;
         assert_eq!(
@@ -351,16 +348,15 @@ mod tests {
         );
         let saved: Session = parse(&bytes);
 
-        let packed = SessionBody::Ski {
-            distance: 8_000,
-            duration: 2_400,
-            with_pack: true,
+        let longer = SessionBody::Ski {
+            distance: 12_000,
+            duration: 3_600,
         };
         let (status, bytes) = call(
             &app,
             "PUT",
             &format!("/api/sessions/{}", saved.id),
-            Some(&input(monday, packed.clone())),
+            Some(&input(monday, longer.clone())),
         )
         .await;
         assert_eq!(
@@ -372,12 +368,12 @@ mod tests {
         let updated: Session = parse(&bytes);
         assert_eq!(updated.id, saved.id);
         assert_eq!(updated.on_date, monday);
-        assert_eq!(updated.body, packed);
+        assert_eq!(updated.body, longer);
 
         let (status, bytes) = call(&app, "GET", &format!("/api/sessions/{}", saved.id), None).await;
         assert_eq!(status, StatusCode::OK);
         let read: Session = parse(&bytes);
-        assert_eq!(read.body, packed);
+        assert_eq!(read.body, longer);
 
         clear(&app, monday, sunday).await;
     }

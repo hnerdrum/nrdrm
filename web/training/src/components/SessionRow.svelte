@@ -27,11 +27,6 @@
     class="col-start-1 row-start-2 flex items-center gap-3 text-xl font-medium tracking-tight wide:col-start-2 wide:row-start-1"
   >
     {sportLabel(session.body.sport)}
-    {#if session.body.sport === "ski" && session.body.withPack}
-      <span class="rounded-full border border-edge px-[0.65rem] text-base leading-[1.4] font-medium"
-        >Pack</span
-      >
-    {/if}
   </span>
   <span
     class="col-start-2 row-start-2 text-right text-xl leading-[1.3] tabular-nums wide:col-start-3 wide:row-start-1 wide:text-left {main.plain

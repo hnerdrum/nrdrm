@@ -14,7 +14,6 @@ export type Ski = {
   sport: 'ski';
   distance: number;
   duration: number;
-  withPack: boolean;
 };
 
 export type ExerciseSet = {
@@ -39,7 +38,6 @@ export type WeekTotals = {
   rideSeconds: number;
   skiSeconds: number;
   skiMetres: number;
-  packMetres: number;
   strengthSessions: number;
 };
 
@@ -49,7 +47,6 @@ export function weekTotals(sessions: { body: SessionBody }[]): WeekTotals {
     rideSeconds: 0,
     skiSeconds: 0,
     skiMetres: 0,
-    packMetres: 0,
     strengthSessions: 0,
   };
 
@@ -65,9 +62,6 @@ export function weekTotals(sessions: { body: SessionBody }[]): WeekTotals {
       case 'ski':
         totals.skiSeconds += body.duration;
         totals.skiMetres += body.distance;
-        if (body.withPack) {
-          totals.packMetres += body.distance;
-        }
         break;
       case 'strength':
         totals.strengthSessions += 1;

@@ -8,7 +8,6 @@ pub struct WeekTotals {
     pub ride_seconds: u32,
     pub ski_seconds: u32,
     pub ski_metres: u32,
-    pub ski_with_pack_metres: u32,
     pub strength_sessions: u32,
 }
 
@@ -21,16 +20,9 @@ pub fn week_totals(sessions: &[Session], monday: NaiveDate) -> WeekTotals {
             continue;
         }
         match session.body {
-            SessionBody::Ski {
-                distance,
-                duration,
-                with_pack,
-            } => {
+            SessionBody::Ski { distance, duration } => {
                 totals.ski_seconds += duration;
                 totals.ski_metres += distance;
-                if with_pack {
-                    totals.ski_with_pack_metres += distance;
-                }
             }
             SessionBody::Run { duration, .. } => totals.run_seconds += duration,
             SessionBody::Ride { duration, .. } => totals.ride_seconds += duration,
@@ -59,7 +51,7 @@ mod tests {
     }
 
     #[test]
-    fn pack_ski_counts_in_both_ski_distances() {
+    fn ski_distance_and_time_are_summed() {
         let monday = date(2026, 11, 2);
         let sessions = [
             session(
@@ -67,7 +59,6 @@ mod tests {
                 SessionBody::Ski {
                     distance: 4_000,
                     duration: 1_800,
-                    with_pack: false,
                 },
             ),
             session(
@@ -75,7 +66,6 @@ mod tests {
                 SessionBody::Ski {
                     distance: 10_000,
                     duration: 3_600,
-                    with_pack: true,
                 },
             ),
         ];
@@ -87,7 +77,6 @@ mod tests {
                 ride_seconds: 0,
                 ski_seconds: 5_400,
                 ski_metres: 14_000,
-                ski_with_pack_metres: 10_000,
                 strength_sessions: 0,
             }
         );
@@ -116,7 +105,6 @@ mod tests {
                 ride_seconds: 0,
                 ski_seconds: 0,
                 ski_metres: 0,
-                ski_with_pack_metres: 0,
                 strength_sessions: 1,
             }
         );
@@ -131,7 +119,6 @@ mod tests {
                 SessionBody::Ski {
                     distance: 8_000,
                     duration: 2_400,
-                    with_pack: true,
                 },
             ),
             session(9, SessionBody::Strength { exercises: vec![] }),
@@ -175,7 +162,6 @@ mod tests {
                 ride_seconds: 3_600,
                 ski_seconds: 0,
                 ski_metres: 0,
-                ski_with_pack_metres: 0,
                 strength_sessions: 0,
             }
         );
