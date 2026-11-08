@@ -34,6 +34,36 @@ pub async fn find_user_by_email(pool: &Pool, email: String) -> Result<UserAccoun
     .map_err(|_| DatabaseError::UnknownError)?
 }
 
+pub async fn create_user(
+    pool: &Pool,
+    email: String,
+    password_hash: String,
+) -> Result<(), DatabaseError> {
+    match find_user_by_email(pool, email.clone()).await {
+        Ok(_) => return Err(DatabaseError::AlreadyExists),
+        Err(DatabaseError::NotFoundError) => {}
+        Err(err) => return Err(err),
+    }
+
+    let conn = pool
+        .get()
+        .await
+        .map_err(|_| DatabaseError::ConnectionError)?;
+
+    conn.interact(move |conn| {
+        diesel::insert_into(user_account::table)
+            .values((
+                user_account::email.eq(email),
+                user_account::password_hash.eq(password_hash),
+            ))
+            .execute(conn)
+            .map(|_| ())
+            .map_err(DatabaseError::from_diesel)
+    })
+    .await
+    .map_err(|_| DatabaseError::UnknownError)?
+}
+
 pub async fn find_user_by_id(pool: &Pool, id: Uuid) -> Result<UserAccount, DatabaseError> {
     let conn = pool
         .get()

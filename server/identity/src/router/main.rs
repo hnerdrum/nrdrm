@@ -1,4 +1,4 @@
-use super::middleware::auth_middleware;
+use super::middleware::{auth_middleware, session_cookie};
 use crate::config::Config;
 use crate::database::auth_token::create_auth_token;
 use crate::domain::error::DomainError;
@@ -45,14 +45,13 @@ pub fn init_router(state: AppState) -> Router {
                 .route("/validate-token", get(validate_token_handler))
                 .route("/me", get(me_handler))
                 .route("/login", post(login_handler))
+                .route("/logout", post(logout_handler))
                 .route("/oauth/token", post(oauth_token_handler))
                 .route("/oauth/introspect", post(oauth_introspect_handler)),
         )
-        .layer(
-            TraceLayer::new_for_http().on_response(
-                trace::DefaultOnResponse::new().latency_unit(tower_http::LatencyUnit::Micros),
-            ),
-        )
+        .layer(TraceLayer::new_for_http().on_response(
+            trace::DefaultOnResponse::new().latency_unit(tower_http::LatencyUnit::Micros),
+        ))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
@@ -91,6 +90,15 @@ async fn login_handler(
     handle_valid_user(state, user, cookies).await
 }
 
+async fn logout_handler(cookies: Cookies, State(state): State<AppState>) -> StatusCode {
+    cookies.remove(session_cookie(
+        state.config.auth.cookie_name.clone(),
+        String::new(),
+        &state.config.env,
+    ));
+    StatusCode::NO_CONTENT
+}
+
 async fn oauth_token_handler(
     State(state): State<AppState>,
     Json(input): Json<TokenRequest>,
@@ -124,10 +132,68 @@ async fn handle_valid_user(
         state.config.auth.secret.clone(),
     )?;
 
-    cookies.add(super::middleware::session_cookie(
+    cookies.add(session_cookie(
         state.config.auth.cookie_name.clone(),
         token,
         &state.config.env,
     ));
     Ok(Json(user))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{AuthConfig, Environment};
+    use crate::database::connection::create_connection_pool;
+    use axum::body::Body;
+    use axum::http::{header, Request, StatusCode};
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    fn test_state() -> AppState {
+        AppState {
+            db: create_connection_pool("postgres://nrdrm:nrdrm@localhost:5433/identity".into()),
+            config: Config {
+                env: Environment::Dev,
+                port: "8081".into(),
+                database_url: "postgres://nrdrm:nrdrm@localhost:5433/identity".into(),
+                log_level: "info".into(),
+                auth: AuthConfig {
+                    secret: "test-secret".into(),
+                    cookie_name: "nrdrm-login".into(),
+                },
+                boot_time: "2026-11-07T00:00:00Z".into(),
+                api_version: "test".into(),
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn logout_clears_the_session_cookie() {
+        let response = init_router(test_state())
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/v1/logout")
+                    .header(header::COOKIE, "nrdrm-login=session")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        let set_cookie = response
+            .headers()
+            .get(header::SET_COOKIE)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.starts_with("nrdrm-login="));
+        assert!(set_cookie.contains("Max-Age=0"));
+        assert!(set_cookie.contains("Path=/"));
+        assert!(set_cookie.contains("HttpOnly"));
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert!(body.is_empty());
+    }
 }

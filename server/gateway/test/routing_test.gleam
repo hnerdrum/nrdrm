@@ -16,6 +16,7 @@ fn stub_env(name: String) -> Result(String, Nil) {
     "RECIPES_URL" -> Ok("http://recipes.test")
     "IDENTITY_URL" -> Ok("http://identity.test")
     "AGENTS_URL" -> Ok("http://agents.test")
+    "TRAINING_URL" -> Ok("http://training.test")
     _ -> Error(Nil)
   }
 }
@@ -29,7 +30,7 @@ pub fn gateway_json_loads_test() {
 
   config.identity.name |> should.equal("identity")
   list.map(config.routes, fn(route) { route.prefix })
-  |> should.equal(["recipes", "identity", "agents"])
+  |> should.equal(["recipes", "identity", "agents", "training"])
   list.map(config.upstreams, fn(upstream) {
     let base = upstream.base_request
     #(upstream.name, base.host <> base.path, upstream.timeout_ms)
@@ -38,6 +39,7 @@ pub fn gateway_json_loads_test() {
     #("recipes", "recipes.test/api/v1", 30_000),
     #("identity", "identity.test/api/v1", 30_000),
     #("agents", "agents.test", 120_000),
+    #("training", "training.test/api", 30_000),
   ])
 }
 
@@ -81,8 +83,27 @@ pub fn gateway_json_leaves_reads_creates_and_login_public_test() {
   status_with_gateway_json(testing.get("/identity/me", [])) |> should.equal(200)
   status_with_gateway_json(testing.post("/identity/login", [], "{}"))
   |> should.equal(200)
+  status_with_gateway_json(testing.post("/identity/logout", [], ""))
+  |> should.equal(200)
   status_with_gateway_json(testing.post("/agents/webhooks/github", [], "{}"))
   |> should.equal(200)
+  status_with_gateway_json(testing.get("/training/health", []))
+  |> should.equal(200)
+}
+
+pub fn gateway_json_requires_a_session_for_training_sessions_test() {
+  status_with_gateway_json(testing.post("/training/sync", [], ""))
+  |> should.equal(401)
+  status_with_gateway_json(testing.get("/training/sessions", []))
+  |> should.equal(401)
+  status_with_gateway_json(testing.post("/training/sessions", [], "{}"))
+  |> should.equal(401)
+  status_with_gateway_json(testing.get("/training/sessions/abc", []))
+  |> should.equal(401)
+  status_with_gateway_json(testing.put("/training/sessions/abc", [], "{}"))
+  |> should.equal(401)
+  status_with_gateway_json(testing.delete("/training/sessions/abc", [], ""))
+  |> should.equal(401)
 }
 
 pub fn gateway_json_hides_everything_it_does_not_list_test() {
@@ -94,6 +115,11 @@ pub fn gateway_json_hides_everything_it_does_not_list_test() {
   |> should.equal(404)
   status_with_gateway_json(testing.get("/agents/unlisted", []))
   |> should.equal(404)
+  status_with_gateway_json(testing.get("/training/me", [])) |> should.equal(404)
+  status_with_gateway_json(testing.get("/training/sync", []))
+  |> should.equal(404)
+  status_with_gateway_json(testing.patch("/training/sessions/abc", [], "{}"))
+  |> should.equal(404)
 }
 
 pub fn every_missing_environment_variable_is_reported_test() {
@@ -103,6 +129,7 @@ pub fn every_missing_environment_variable_is_reported_test() {
     "gateway.json: upstream \"recipes\": environment variable RECIPES_URL is not set",
     "gateway.json: upstream \"identity\": environment variable IDENTITY_URL is not set",
     "gateway.json: upstream \"agents\": environment variable AGENTS_URL is not set",
+    "gateway.json: upstream \"training\": environment variable TRAINING_URL is not set",
   ])
 }
 

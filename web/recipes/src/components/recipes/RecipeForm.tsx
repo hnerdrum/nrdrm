@@ -1,19 +1,31 @@
-"use client";
+'use client';
 
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Check, ChevronsUpDown } from 'lucide-react';
+import { useState } from 'react';
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { useSWRConfig } from 'swr';
+import { z } from 'zod';
+
+import { IngredientApi } from '../../api/ingredient';
+import type { Recipe, RecipeIngredient } from '../../domain';
+import { Unit } from '../../domain';
+import { unitFromString } from '../../domain/utils';
+import { useIngredients } from '../../hooks/useIngredients';
+import { Badge } from '../ui/badge';
+import { Label } from '../ui/label';
 import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
+
+import { formatIngredient } from './utils';
+
+import { Button } from '@/components/ui/button';
 import {
   Command,
   CommandEmpty,
@@ -21,37 +33,29 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command";
+} from '@/components/ui/command';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { useState } from "react";
-import React from "react";
-import { useSWRConfig } from "swr";
-import { Label } from "../ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import { formatIngredient } from "./utils";
-import { Badge } from "../ui/badge";
-import { IngredientApi } from "../../api/ingredient";
-import { Recipe, RecipeIngredient, Unit } from "../../domain";
-import { unitFromString } from "../../domain/utils";
-import { useIngredients } from "../../hooks/useIngredients";
+} from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 const createRecipeSchema = z.object({
   name: z.string().min(1, {
-    message: "Recipe name is required.",
+    message: 'Recipe name is required.',
   }),
   description: z.string().min(1, {
-    message: "Recipe description is required.",
+    message: 'Recipe description is required.',
   }),
 });
 
@@ -63,7 +67,7 @@ export const RecipeForm = ({
 }: {
   recipe?: Recipe;
   onSubmit: (
-    data: CreateRecipeFormData & { ingredients: RecipeIngredient[] }
+    data: CreateRecipeFormData & { ingredients: RecipeIngredient[] },
   ) => Promise<void>;
 }) => {
   const { mutate } = useSWRConfig();
@@ -71,8 +75,8 @@ export const RecipeForm = ({
   const form = useForm<CreateRecipeFormData>({
     resolver: zodResolver(createRecipeSchema),
     defaultValues: {
-      name: recipe?.name ?? "",
-      description: recipe?.description ?? "",
+      name: recipe?.name ?? '',
+      description: recipe?.description ?? '',
     },
   });
 
@@ -85,8 +89,8 @@ export const RecipeForm = ({
     value: string;
     label: string;
   } | null>(null);
-  const [selectedAmount, setSelectedAmount] = useState<number | "">("");
-  const [selectedUnit, setSelectedUnit] = useState<Unit | "">("");
+  const [selectedAmount, setSelectedAmount] = useState<number | ''>('');
+  const [selectedUnit, setSelectedUnit] = useState<Unit | ''>('');
   const [showIngredientError, setShowIngredientError] = useState(false);
 
   const selectIngredient = (ingredient: { value: string; label: string }) => {
@@ -98,7 +102,7 @@ export const RecipeForm = ({
 
   const onCreateNewIngredient = async (name: string) => {
     const result = await IngredientApi.create({ name });
-    if (result.status === "success") {
+    if (result.status === 'success') {
       mutate(IngredientApi.baseUrl);
       result.data &&
         selectIngredient({ value: result.data.id, label: result.data.name });
@@ -131,19 +135,19 @@ export const RecipeForm = ({
 
   const handleRemoveIngredient = (ingredient: RecipeIngredient) => {
     setRecipeIngredients(
-      recipeIngredients.filter((ri) => ri.id !== ingredient.id)
+      recipeIngredients.filter((ri) => ri.id !== ingredient.id),
     );
   };
 
   const resetIngredientForm = () => {
     setSelectedIngredient((_) => null);
-    setSelectedAmount((_) => "");
-    setSelectedUnit((_) => "");
+    setSelectedAmount((_) => '');
+    setSelectedUnit((_) => '');
   };
 
   const handleAmountInputChange = (value: string) => {
-    if (value === "") {
-      setSelectedAmount("");
+    if (value === '') {
+      setSelectedAmount('');
       return;
     }
     const parsed = Number.parseInt(value, 10);
@@ -274,7 +278,7 @@ export const ComboboxDemo = <T extends { label: string; value: string }>({
   onOptionCreate,
 }: ComboboxProps<T>) => {
   const [open, setOpen] = React.useState(false);
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setInputValue] = useState('');
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -287,7 +291,7 @@ export const ComboboxDemo = <T extends { label: string; value: string }>({
         >
           {selected
             ? options.find((option) => option.value === selected.value)?.label
-            : "Select ingredient..."}
+            : 'Select ingredient...'}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -300,15 +304,16 @@ export const ComboboxDemo = <T extends { label: string; value: string }>({
           />
           <CommandEmpty>
             {inputValue && (
-              <span
-                className="cursor-pointer p-4"
+              <button
+                type="button"
+                className="w-full cursor-pointer p-4 text-left"
                 onClick={() => {
                   onOptionCreate(inputValue);
                   setOpen(false);
                 }}
               >
                 Click to create &quot;{inputValue}&quot;
-              </span>
+              </button>
             )}
             {!inputValue && <span>No ingredients found.</span>}
           </CommandEmpty>
@@ -325,10 +330,10 @@ export const ComboboxDemo = <T extends { label: string; value: string }>({
                 >
                   <Check
                     className={cn(
-                      "mr-2 h-4 w-4",
+                      'mr-2 h-4 w-4',
                       selected?.value === option.value
-                        ? "opacity-100"
-                        : "opacity-0"
+                        ? 'opacity-100'
+                        : 'opacity-0',
                     )}
                   />
                   {option.label}

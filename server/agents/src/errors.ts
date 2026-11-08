@@ -1,4 +1,4 @@
-import { ModelProvider } from "./models.js";
+import type { ModelProvider } from './models.js';
 
 export type ApiError =
   | InvalidRequestBodyError
@@ -9,33 +9,33 @@ export type ApiError =
   | DatabaseError
   | ModelError;
 
-export type InputRefused = { kind: "InputRefused"; id: string };
+export type InputRefused = { kind: 'InputRefused'; id: string };
 
-export type DiffTooLarge = { kind: "DiffTooLarge"; id: string };
+export type DiffTooLarge = { kind: 'DiffTooLarge'; id: string };
 
-export type RunNotFound = { kind: "RunNotFound" };
+export type RunNotFound = { kind: 'RunNotFound' };
 
 export type DatabaseError = {
-  kind: "DatabaseFailed";
+  kind: 'DatabaseFailed';
   message: string;
 };
 
-export type InvalidRequestBodyError = { kind: "InvalidRequestBody" };
+export type InvalidRequestBodyError = { kind: 'InvalidRequestBody' };
 
 export type UnknownSkill = {
-  kind: "UnknownSkill";
+  kind: 'UnknownSkill';
   skill: string;
 };
 
 export type ModelError = ProviderNotConfigured | ModelRequestFailedError;
 
 export type ProviderNotConfigured = {
-  kind: "ProviderNotConfigured";
+  kind: 'ProviderNotConfigured';
   provider: ModelProvider;
 };
 
 export type ModelRequestFailedError = {
-  kind: "ModelRequestFailed";
+  kind: 'ModelRequestFailed';
   name: string;
   message: string;
 };

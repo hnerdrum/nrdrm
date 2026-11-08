@@ -1,4 +1,5 @@
-import { RecipeIngredient, Unit } from "../../domain";
+import type { RecipeIngredient } from '../../domain';
+import { Unit } from '../../domain';
 
 export const formatIngredient = (ingredient: RecipeIngredient) => {
   return `${ingredient.amount} ${formatUnit(ingredient.unit)} ${
@@ -7,6 +8,8 @@ export const formatIngredient = (ingredient: RecipeIngredient) => {
 };
 
 const formatUnit = (unit: Unit) => {
-  if (unit.toLowerCase() === Unit.Qty) return "";
+  if (unit.toLowerCase() === Unit.Qty) {
+    return '';
+  }
   return unit.toLowerCase();
 };

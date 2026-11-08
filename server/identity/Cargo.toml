@@ -2,6 +2,7 @@
 name = "identity"
 version = "0.1.0"
 edition = "2021"
+default-run = "identity"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -22,3 +23,7 @@ tower-http = { version = "0.5.2", features = ["compression-full", "trace"] }
 tracing = "0.1.41"
 tracing-subscriber = {version = "0.3.18", features = ["env-filter"]}
 uuid = { version = "1.8.0", features = ["v4", "serde"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+tower = { version = "0.4.13", features = ["util"] }

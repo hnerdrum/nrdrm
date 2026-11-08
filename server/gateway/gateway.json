@@ -7,7 +7,8 @@
       "url": "${IDENTITY_URL}/api/v1",
       "timeout_ms": 30000
     },
-    { "name": "agents", "url": "${AGENTS_URL}", "timeout_ms": 120000 }
+    { "name": "agents", "url": "${AGENTS_URL}", "timeout_ms": 120000 },
+    { "name": "training", "url": "${TRAINING_URL}/api", "timeout_ms": 30000 }
   ],
   "routes": [
     {
@@ -38,6 +39,7 @@
         { "path": "health", "methods": ["GET"], "auth": "public" },
         { "path": "me", "methods": ["GET"], "auth": "public" },
         { "path": "login", "methods": ["POST"], "auth": "public" },
+        { "path": "logout", "methods": ["POST"], "auth": "public" },
         { "path": "oauth/token", "methods": ["POST"], "auth": "public" }
       ]
     },
@@ -67,6 +69,22 @@
           "path": "runs/*",
           "methods": ["GET"],
           "auth": { "bearer": { "audience": "agents" } }
+        }
+      ]
+    },
+    {
+      "prefix": "training",
+      "upstream": "training",
+      "request_headers": ["content-type", "cookie"],
+      "response_headers": ["set-cookie"],
+      "rules": [
+        { "path": "health", "methods": ["GET"], "auth": "public" },
+        { "path": "sync", "methods": ["POST"], "auth": "session" },
+        { "path": "sessions", "methods": ["GET", "POST"], "auth": "session" },
+        {
+          "path": "sessions/*",
+          "methods": ["GET", "PUT", "DELETE"],
+          "auth": "session"
         }
       ]
     }

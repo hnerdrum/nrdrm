@@ -1,4 +1,4 @@
-import { Unit } from ".";
+import { Unit } from '.';
 
 export const unitFromString = (unit: string): Unit => {
   if (Object.values(Unit).includes(unit as Unit)) {

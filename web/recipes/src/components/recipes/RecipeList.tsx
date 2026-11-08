@@ -1,19 +1,18 @@
-import { formatIngredient } from "./utils";
+import { Ellipsis } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useSWRConfig } from 'swr';
+
+import { RecipeApi } from '../../api/recipe';
+import type { Recipe } from '../../domain';
+import { useAuth } from '../../providers/AuthProvider';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "../ui/accordion";
-import { Badge } from "../ui/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
-import { Ellipsis } from "lucide-react";
-import { useSWRConfig } from "swr";
+} from '../ui/accordion';
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
 import {
   Dialog,
   DialogContent,
@@ -22,12 +21,15 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "../ui/dialog";
-import { Button } from "../ui/button";
-import { useAuth } from "../../providers/AuthProvider";
-import { useRouter } from "next/navigation";
-import { RecipeApi } from "../../api/recipe";
-import { Recipe } from "../../domain";
+} from '../ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+
+import { formatIngredient } from './utils';
 
 type Props = {
   recipes: Recipe[];
@@ -60,7 +62,7 @@ const RecipeItem = ({ recipe }: { recipe: Recipe }) => {
       </AccordionTrigger>
       <AccordionContent>
         <div className="flex flex-col">
-          {recipe.description ?? ""}
+          {recipe.description ?? ''}
           {!!recipe.ingredients.length && (
             <div className="flex flex-wrap gap-2 pt-4">
               {recipe.ingredients.map((ingredient) => (
@@ -119,7 +121,7 @@ const DeleteRecipeDialog = ({ recipe }: { recipe: Recipe }) => {
 
   const onDeleteRecipe = async () => {
     const result = await RecipeApi.delete(recipe.id);
-    if (result.status !== "success") {
+    if (result.status !== 'success') {
       alert(`Recipe deletion failed with message: ${result.message}`);
       return;
     }

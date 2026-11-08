@@ -3,16 +3,16 @@ name: Delete images job
 on:
   pull_request:
     paths:
-      - "cron/delete-container-images/**"
-      - ".github/workflows/deploy-delete-images-job.yml"
-      - ".github/workflows/reusable-deploy-scaleway-job.yml"
+      - 'cron/delete-container-images/**'
+      - '.github/workflows/deploy-delete-images-job.yml'
+      - '.github/workflows/reusable-deploy-scaleway-job.yml'
   push:
     branches:
       - main
     paths:
-      - "cron/delete-container-images/**"
-      - ".github/workflows/deploy-delete-images-job.yml"
-      - ".github/workflows/reusable-deploy-scaleway-job.yml"
+      - 'cron/delete-container-images/**'
+      - '.github/workflows/deploy-delete-images-job.yml'
+      - '.github/workflows/reusable-deploy-scaleway-job.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -28,7 +28,7 @@ jobs:
           tool: just@1.58.0
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
           cache: npm
           cache-dependency-path: cron/delete-container-images/package-lock.json
       - name: Install dependencies
@@ -45,7 +45,7 @@ jobs:
       image_name: nrdrm-delete-images-job
       dockerfile: cron/delete-container-images/Dockerfile
       context: cron/delete-container-images
-      cron_schedule: "0 2 * * 1"
+      cron_schedule: '0 2 * * 1'
       cron_timezone: Europe/Oslo
     secrets:
       SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}

@@ -1,0 +1,191 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --color-bg: #13121c;
+  --color-fg: #eceaf4;
+  --color-muted: #9f9db5;
+  --color-line: #3a3852;
+  --color-accent: #b4b9ff;
+  --color-on-accent: #13121c;
+  --color-edge: #7e7c96;
+  --color-field: #1a1927;
+  --breakpoint-wide: 960px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background: var(--color-bg);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input {
+    font: inherit;
+    color: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.enter > * {
+  animation: rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.enter > :nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.week-header {
+  grid-template-areas:
+    'brand out'
+    'nav nav';
+}
+
+.odo {
+  transform: translateY(calc(var(--v) * -1em));
+}
+
+.week-enter .figs {
+  animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.week-enter .odo {
+  animation: roll 1.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--i) * 70ms + 150ms);
+}
+
+.week-enter .day,
+.week-enter .count,
+.week-enter .empty,
+.week-enter .sync {
+  animation: rise 0.8s 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.form-enter > * {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.form-enter > :nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.form-enter > :nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.form-enter > :nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+.form-enter > :nth-child(5) {
+  animation-delay: 0.2s;
+}
+
+.form-enter input,
+.form-enter button {
+  scroll-margin-bottom: 7rem;
+}
+
+.rise-in,
+.derived-enter {
+  animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.offbeat-glow {
+  animation: offbeat-drift 7s ease-in-out infinite;
+}
+
+.offbeat-line,
+.offbeat-word {
+  transform-origin: left center;
+  animation: offbeat-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.offbeat-word:nth-child(2) {
+  animation-name: offbeat-swing;
+  animation-delay: 0.12s;
+}
+
+.offbeat-word:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+.offbeat-line:last-child {
+  animation-delay: 0.46s;
+}
+
+@keyframes roll {
+  from {
+    transform: translateY(0);
+  }
+}
+
+@keyframes offbeat-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) rotate(-2.5deg);
+  }
+}
+
+@keyframes offbeat-swing {
+  from {
+    opacity: 0;
+    transform: translateY(22px) rotate(2.5deg);
+  }
+}
+
+@keyframes offbeat-drift {
+  50% {
+    transform: translate3d(36px, -28px, 0) scale(1.14);
+  }
+}
+
+@media (min-width: 960px) {
+  .week-header {
+    grid-template-areas: 'brand nav add out';
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter > *,
+  .week-enter .figs,
+  .week-enter .day,
+  .week-enter .count,
+  .week-enter .empty,
+  .week-enter .sync,
+  .week-enter .odo,
+  .form-enter > *,
+  .rise-in,
+  .derived-enter,
+  .offbeat-glow,
+  .offbeat-line,
+  .offbeat-word {
+    animation: none;
+  }
+}

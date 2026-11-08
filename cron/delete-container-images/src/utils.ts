@@ -1,7 +1,8 @@
-import { Effect } from "effect";
-import { config } from "./config";
-import { ScalewayImage, ScalewayImageTag } from "./schema";
-import { deleteImageTag } from "./api/scaleway";
+import { Effect } from 'effect';
+
+import { deleteImageTag } from './api/scaleway';
+import { config } from './config';
+import type { ScalewayImage, ScalewayImageTag } from './schema';
 
 type ImageWithTags = {
   image: ScalewayImage;
@@ -22,7 +23,7 @@ type FilteredImage = {
 
 export const filterValidImages = (images: readonly ScalewayImage[]) =>
   Effect.sync(() => {
-    const isValidImage = (image: ScalewayImage) => image.status === "ready";
+    const isValidImage = (image: ScalewayImage) => image.status === 'ready';
     const validImages = images.filter(isValidImage);
     const invalidImages = images.filter((image) => !isValidImage(image));
 
@@ -30,32 +31,32 @@ export const filterValidImages = (images: readonly ScalewayImage[]) =>
   }).pipe(
     Effect.flatMap(({ validImages, invalidImages }) =>
       Effect.forEach(invalidImages, (image) =>
-        Effect.log(`${image.name} is in invalid state: ${image.status}`)
-      ).pipe(Effect.map(() => validImages))
-    )
+        Effect.log(`${image.name} is in invalid state: ${image.status}`),
+      ).pipe(Effect.map(() => validImages)),
+    ),
   );
 
 export const partitionTags = (data: ImageWithTags): TagPartition => {
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  const readyTags = data.tags.filter((tag) => tag.status === "ready");
+  const readyTags = data.tags.filter((tag) => tag.status === 'ready');
   const recentTags = readyTags.filter(
-    (tag) => tag.created_at > twentyFourHoursAgo
+    (tag) => tag.created_at > twentyFourHoursAgo,
   );
   const oldTags = readyTags.filter(
-    (tag) => tag.created_at <= twentyFourHoursAgo
+    (tag) => tag.created_at <= twentyFourHoursAgo,
   );
 
   const maxOldTagsToKeep = Math.max(
     0,
-    config.scaleway.containerRegistry.tagsToKeep - recentTags.length
+    config.scaleway.containerRegistry.tagsToKeep - recentTags.length,
   );
 
   const tagsToDelete = oldTags
     .sort(
       (a: ScalewayImageTag, b: ScalewayImageTag) =>
-        b.created_at.getTime() - a.created_at.getTime()
+        b.created_at.getTime() - a.created_at.getTime(),
     )
     .slice(maxOldTagsToKeep);
 
@@ -66,8 +67,8 @@ export const filterTagsForDeletion = (data: ImageWithTags) =>
   Effect.sync(() => partitionTags(data)).pipe(
     Effect.tap(({ readyTags, recentTags, oldTags }) =>
       Effect.log(
-        `${data.image.name}: Found ${readyTags.length} ready tags, ${recentTags.length} recent (last 24h), ${oldTags.length} old`
-      )
+        `${data.image.name}: Found ${readyTags.length} ready tags, ${recentTags.length} recent (last 24h), ${oldTags.length} old`,
+      ),
     ),
     Effect.tap(({ tagsToDelete, recentTags, oldTags }) => {
       const message =
@@ -80,12 +81,10 @@ export const filterTagsForDeletion = (data: ImageWithTags) =>
             } old tags, deleting ${tagsToDelete.length} old tags`;
       return Effect.log(message);
     }),
-    Effect.map(
-      ({ tagsToDelete }): FilteredImage => ({
-        image: data.image,
-        tagsToDelete,
-      })
-    )
+    Effect.map(({ tagsToDelete }): FilteredImage => ({
+      image: data.image,
+      tagsToDelete,
+    })),
   );
 
 export const deleteImageTagWithLogging = ({
@@ -98,11 +97,11 @@ export const deleteImageTagWithLogging = ({
   Effect.log(`${image.name}: Deleting tag ${tag.name}`).pipe(
     Effect.flatMap(() => deleteImageTag(tag.id)),
     Effect.tap(() =>
-      Effect.log(`${image.name}: Successfully deleted tag ${tag.name}`)
+      Effect.log(`${image.name}: Successfully deleted tag ${tag.name}`),
     ),
     Effect.catchAll((error) =>
       Effect.logError(
-        `${image.name}: Failed to delete tag ${tag.name}: ${error.message}`
-      )
-    )
+        `${image.name}: Failed to delete tag ${tag.name}: ${error.message}`,
+      ),
+    ),
   );

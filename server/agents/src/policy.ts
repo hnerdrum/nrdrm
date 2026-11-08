@@ -1,4 +1,4 @@
-export type SensitiveData = "email" | "phone" | "national-id";
+export type SensitiveData = 'email' | 'phone' | 'national-id';
 
 const boundary = String.raw`[\w./:@+-]`;
 const email = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i;
@@ -14,17 +14,17 @@ const spacedPhone =
 
 export const sensitiveData = (input: string): SensitiveData | undefined => {
   if (email.test(input)) {
-    return "email";
+    return 'email';
   }
   if (nationalId.test(input)) {
-    return "national-id";
+    return 'national-id';
   }
   if (
     internationalPhone.test(input) ||
     localPhone.test(input) ||
     spacedPhone.test(input)
   ) {
-    return "phone";
+    return 'phone';
   }
   return undefined;
 };

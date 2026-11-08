@@ -3,33 +3,34 @@ import {
   HttpRouter,
   HttpServerRequest,
   HttpServerResponse,
-} from "@effect/platform";
-import { eq } from "drizzle-orm";
-import { Effect, Option, Schema } from "effect";
-import { Database } from "./database.js";
+} from '@effect/platform';
+import { eq } from 'drizzle-orm';
+import { Effect, Option, Schema } from 'effect';
+
+import { Database } from './database.js';
 import {
   type DatabaseError,
   type DiffTooLarge,
   type InputRefused,
   type ModelError,
   type UnknownSkill,
-} from "./errors.js";
+} from './errors.js';
 import {
   type LoopResult,
   modelProviders,
   type ModelProvider,
   ModelRegistry,
-} from "./models.js";
-import { sensitiveData } from "./policy.js";
+} from './models.js';
+import { sensitiveData } from './policy.js';
 import {
   diffTooLarge,
   readReview,
   type ReviewComment,
   reviewSkill,
-} from "./review.js";
-import { agentRuns, type RunRow } from "./schema.js";
-import { type Skill, loadSkill } from "./skills.js";
-import { mapApiError } from "./utils.js";
+} from './review.js';
+import { agentRuns, type RunRow } from './schema.js';
+import { type Skill, loadSkill } from './skills.js';
+import { mapApiError } from './utils.js';
 
 const RunRequest = Schema.Struct({
   skill: Schema.NonEmptyString,
@@ -78,7 +79,7 @@ const startRun = (
 > => {
   const skill = loadSkill(body.skill);
   if (skill === undefined) {
-    return Effect.fail({ kind: "UnknownSkill", skill: body.skill });
+    return Effect.fail({ kind: 'UnknownSkill', skill: body.skill });
   }
   const startedAt = new Date();
   const actor = `agent:${skill.name}`;
@@ -88,13 +89,13 @@ const startRun = (
         skill: skill.name,
         actor,
         caller,
-        status: "refused",
+        status: 'refused',
         modelId: body.model,
         inputTokens: 0,
         outputTokens: 0,
         startedAt,
       },
-      (id) => ({ kind: "InputRefused" as const, id }),
+      (id) => ({ kind: 'InputRefused' as const, id }),
     );
   }
   if (skill.name === reviewSkill && diffTooLarge(body.input)) {
@@ -103,13 +104,13 @@ const startRun = (
         skill: skill.name,
         actor,
         caller,
-        status: "too-large",
+        status: 'too-large',
         modelId: body.model,
         inputTokens: 0,
         outputTokens: 0,
         startedAt,
       },
-      (id) => ({ kind: "DiffTooLarge" as const, id }),
+      (id) => ({ kind: 'DiffTooLarge' as const, id }),
     );
   }
   return ModelRegistry.pipe(
@@ -123,14 +124,14 @@ const startRun = (
         .pipe(
           Effect.tapError(
             (error): Effect.Effect<void, DatabaseError, Database> => {
-              if (error.kind !== "ModelRequestFailed") {
+              if (error.kind !== 'ModelRequestFailed') {
                 return Effect.void;
               }
               return recordRun({
                 skill: skill.name,
                 actor,
                 caller,
-                status: "failed",
+                status: 'failed',
                 modelId: error.name,
                 inputTokens: 0,
                 outputTokens: 0,
@@ -177,7 +178,7 @@ const finishRun = (
     modelId: completion.modelId,
   };
   if (skill.name !== reviewSkill) {
-    return recordRun({ ...row, status: "finished" }).pipe(
+    return recordRun({ ...row, status: 'finished' }).pipe(
       Effect.map((stored) => ({
         ...identity,
         id: stored.id,
@@ -188,18 +189,18 @@ const finishRun = (
   return readReview(input, completion.text).pipe(
     Effect.matchEffect({
       onFailure: () =>
-        Effect.logError("review did not match the schema").pipe(
-          Effect.flatMap(() => recordRun({ ...row, status: "failed" })),
+        Effect.logError('review did not match the schema').pipe(
+          Effect.flatMap(() => recordRun({ ...row, status: 'failed' })),
           Effect.flatMap(() =>
             Effect.fail({
-              kind: "ModelRequestFailed" as const,
+              kind: 'ModelRequestFailed' as const,
               name: completion.modelId,
-              message: "review did not match the schema",
+              message: 'review did not match the schema',
             }),
           ),
         ),
       onSuccess: (review) =>
-        recordRun({ ...row, status: "finished" }).pipe(
+        recordRun({ ...row, status: 'finished' }).pipe(
           Effect.map((stored) => ({
             ...identity,
             id: stored.id,
@@ -222,29 +223,29 @@ const recordRun = (row: NewRun) =>
             .returning();
           const run = inserted[0];
           if (run === undefined) {
-            throw new Error("insert returned no row");
+            throw new Error('insert returned no row');
           }
           return run;
         },
         catch: (cause) => ({
-          kind: "DatabaseFailed" as const,
+          kind: 'DatabaseFailed' as const,
           message:
-            cause instanceof Error ? cause.message : "database request failed",
+            cause instanceof Error ? cause.message : 'database request failed',
         }),
       }).pipe(Effect.tapError((error) => Effect.logError(error.message))),
     ),
   );
 
 const callerFrom = (request: HttpServerRequest.HttpServerRequest) =>
-  Option.match(Headers.get(request.headers, "x-nrdrm-client"), {
+  Option.match(Headers.get(request.headers, 'x-nrdrm-client'), {
     onNone: () => null,
-    onSome: (caller) => (caller === "" ? null : caller),
+    onSome: (caller) => (caller === '' ? null : caller),
   });
 
 export const runs = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
   const body = yield* HttpServerRequest.schemaBodyJson(RunRequest).pipe(
-    Effect.mapError(() => ({ kind: "InvalidRequestBody" }) as const),
+    Effect.mapError(() => ({ kind: 'InvalidRequestBody' }) as const),
   );
   return yield* startRun(body, callerFrom(request));
 }).pipe(
@@ -255,25 +256,25 @@ export const runs = Effect.gen(function* () {
 );
 
 export const getRun = HttpRouter.schemaPathParams(RunParams).pipe(
-  Effect.mapError(() => ({ kind: "RunNotFound" }) as const),
+  Effect.mapError(() => ({ kind: 'RunNotFound' }) as const),
   Effect.flatMap(({ id }) =>
     Database.pipe(
       Effect.flatMap((db) =>
         Effect.tryPromise({
           try: () => db.select().from(agentRuns).where(eq(agentRuns.id, id)),
           catch: (cause) => ({
-            kind: "DatabaseFailed" as const,
+            kind: 'DatabaseFailed' as const,
             message:
               cause instanceof Error
                 ? cause.message
-                : "database request failed",
+                : 'database request failed',
           }),
         }).pipe(Effect.tapError((error) => Effect.logError(error.message))),
       ),
       Effect.flatMap((rows) => {
         const row = rows[0];
         if (row === undefined) {
-          return Effect.fail({ kind: "RunNotFound" } as const);
+          return Effect.fail({ kind: 'RunNotFound' } as const);
         }
         return Effect.succeed(row);
       }),
@@ -286,13 +287,13 @@ export const getRun = HttpRouter.schemaPathParams(RunParams).pipe(
 );
 
 export const runReview = (input: string) =>
-  startRun({ skill: reviewSkill, input, model: "scaleway" }, null);
+  startRun({ skill: reviewSkill, input, model: 'scaleway' }, null);
 
 export const runMention = (input: string) =>
-  startRun({ skill: "mention", input, model: "scaleway" }, null);
+  startRun({ skill: 'mention', input, model: 'scaleway' }, null);
 
 export const runMentionRoute = (input: string) =>
-  startRun({ skill: "mention-route", input, model: "scaleway" }, null);
+  startRun({ skill: 'mention-route', input, model: 'scaleway' }, null);
 
 const fromDbRun = (row: RunRow) => ({
   id: row.id,

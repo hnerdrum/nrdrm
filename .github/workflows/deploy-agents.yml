@@ -3,16 +3,16 @@ name: Agents
 on:
   pull_request:
     paths:
-      - "server/agents/**"
-      - ".github/workflows/deploy-agents.yml"
-      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+      - 'server/agents/**'
+      - '.github/workflows/deploy-agents.yml'
+      - '.github/workflows/reusable-deploy-scaleway-container.yml'
   push:
     branches:
       - main
     paths:
-      - "server/agents/**"
-      - ".github/workflows/deploy-agents.yml"
-      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+      - 'server/agents/**'
+      - '.github/workflows/deploy-agents.yml'
+      - '.github/workflows/reusable-deploy-scaleway-container.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -28,7 +28,7 @@ jobs:
           tool: just@1.58.0
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: '22'
           cache: npm
           cache-dependency-path: server/agents/package-lock.json
       - name: Install dependencies

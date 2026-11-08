@@ -8,7 +8,7 @@ Gleam reverse proxy. No database. Routing lives in [`gateway.json`](gateway.json
 just gateway run       # env bootstrap, then gleam run
 ```
 
-Listens on `PORT`. CORS: `ALLOWED_ORIGINS`. Upstream URLs come from `RECIPES_URL`, `IDENTITY_URL` and `AGENTS_URL` (locally `:8000`, `:8081` and `:8090`, see `.env.example`). Every one of these must be set. If your `.env` predates them, copy the new lines from `.env.example`.
+Listens on `PORT`. CORS: `ALLOWED_ORIGINS`. Upstream URLs come from `RECIPES_URL`, `IDENTITY_URL`, `AGENTS_URL` and `TRAINING_URL` (locally `:8000`, `:8081`, `:8090` and `:8082`, see `.env.example`). Every one of these must be set. If your `.env` predates them, copy the new lines from `.env.example`.
 
 ## Config
 

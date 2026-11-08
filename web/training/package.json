@@ -1,0 +1,23 @@
+{
+  "name": "web-training",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json"
+  },
+  "dependencies": {
+    "@tanstack/svelte-query": "^6.4.1",
+    "svelte": "^5.19.0"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tailwindcss/vite": "^4.3.5",
+    "svelte-check": "^4.1.4",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}

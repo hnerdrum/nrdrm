@@ -3,16 +3,16 @@ name: Identity
 on:
   pull_request:
     paths:
-      - "server/identity/**"
-      - ".github/workflows/deploy-identity.yml"
-      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+      - 'server/identity/**'
+      - '.github/workflows/deploy-identity.yml'
+      - '.github/workflows/reusable-deploy-scaleway-container.yml'
   push:
     branches:
       - main
     paths:
-      - "server/identity/**"
-      - ".github/workflows/deploy-identity.yml"
-      - ".github/workflows/reusable-deploy-scaleway-container.yml"
+      - 'server/identity/**'
+      - '.github/workflows/deploy-identity.yml'
+      - '.github/workflows/reusable-deploy-scaleway-container.yml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

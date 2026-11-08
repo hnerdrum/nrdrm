@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { type ToolSet } from "ai";
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
+import { type ToolSet } from 'ai';
 
 export type Skill = {
   readonly name: string;
@@ -14,11 +15,11 @@ export const loadSkill = (name: string): Skill | undefined => {
   if (!skillName.test(name)) {
     return undefined;
   }
-  const file = path.join(process.cwd(), "skills", `${name}.md`);
+  const file = path.join(process.cwd(), 'skills', `${name}.md`);
   try {
     return {
       name,
-      instructions: readFileSync(file, "utf8").trim(),
+      instructions: readFileSync(file, 'utf8').trim(),
       tools: {},
     };
   } catch (error) {
@@ -30,4 +31,4 @@ export const loadSkill = (name: string): Skill | undefined => {
 };
 
 const isMissingFile = (error: unknown): error is NodeJS.ErrnoException =>
-  error instanceof Error && "code" in error && error.code === "ENOENT";
+  error instanceof Error && 'code' in error && error.code === 'ENOENT';

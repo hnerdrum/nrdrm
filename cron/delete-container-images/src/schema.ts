@@ -1,11 +1,11 @@
-import { Schema } from "effect";
+import { Schema } from 'effect';
 
 const ImageStatusSchema = Schema.Literal(
-  "ready",
-  "unknown",
-  "deleting",
-  "error",
-  "locked"
+  'ready',
+  'unknown',
+  'deleting',
+  'error',
+  'locked',
 );
 
 export const ScalewayImageSchema = Schema.Struct({

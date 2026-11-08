@@ -1,5 +1,11 @@
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/target/
+**/.stack-work/
+**/coverage/
 package-lock.json
-pnpm-lock.yaml
-**/dist
-**/.stack-work
-**/target
+**/package-lock.json
+Cargo.lock
+**/Cargo.lock

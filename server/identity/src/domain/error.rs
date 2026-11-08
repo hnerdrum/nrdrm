@@ -1,6 +1,5 @@
-
 #[derive(Debug)]
 pub enum DomainError {
-  InvalidCredentialsError,
-  UnknownError
+    InvalidCredentialsError,
+    UnknownError,
 }

@@ -13,11 +13,11 @@ export type RecipeIngredient = {
 };
 
 export const Unit = {
-  G: "g",
-  Ml: "ml",
-  Tbsp: "tbsp",
-  Tsp: "tsp",
-  Qty: "qty",
+  G: 'g',
+  Ml: 'ml',
+  Tbsp: 'tbsp',
+  Tsp: 'tsp',
+  Qty: 'qty',
 } as const;
 
 export type Unit = (typeof Unit)[keyof typeof Unit];

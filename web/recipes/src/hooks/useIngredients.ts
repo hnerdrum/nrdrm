@@ -1,7 +1,8 @@
-import useSWR from "swr";
-import { Ingredient } from "../domain";
-import { IngredientApi } from "../api/ingredient";
-import { config } from "../../config";
+import useSWR from 'swr';
+
+import { config } from '../../config';
+import { IngredientApi } from '../api/ingredient';
+import type { Ingredient } from '../domain';
 
 const fetcher = (arg: string): Promise<Ingredient[]> =>
   fetch(`${config.baseServerUrl}${arg}`).then((res) => res.json());

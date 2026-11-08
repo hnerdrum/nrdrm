@@ -26,6 +26,8 @@ env:
     @just web-recipes env
     @just delete-images env
     @just agents env
+    @just training env
+    @just web-training env
 
 recipes *args:
     @just fwd server/recipes {{ args }}
@@ -47,6 +49,12 @@ delete-images *args:
 
 agents *args:
     @just fwd server/agents {{ args }}
+
+training *args:
+    @just fwd server/training {{ args }}
+
+web-training *args:
+    @just fwd web/training {{ args }}
 
 [private]
 fwd dir *args:
