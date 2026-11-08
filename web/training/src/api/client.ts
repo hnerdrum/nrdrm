@@ -25,11 +25,16 @@ type RequestOptions = {
   body?: unknown;
 };
 
+function serverUrl(): string {
+  const url = import.meta.env.VITE_SERVER_URL ?? '';
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+}
+
 export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
-  const response = await fetch(path, {
+  const response = await fetch(`${serverUrl()}${path}`, {
     method: options.method ?? 'GET',
     credentials: 'include',
     headers:
