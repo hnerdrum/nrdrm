@@ -138,7 +138,7 @@ fn interval_ok(interval: &Interval) -> bool {
     interval.repetitions >= 1 && (interval.distance >= 1 || interval.duration >= 1)
 }
 
-fn interval_totals(intervals: &[Interval]) -> Option<(u32, u32)> {
+pub(crate) fn interval_totals(intervals: &[Interval]) -> Option<(u32, u32)> {
     let mut distance = 0u32;
     let mut duration = 0u32;
     for interval in intervals {
