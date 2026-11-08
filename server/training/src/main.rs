@@ -1,6 +1,11 @@
+use std::sync::Arc;
+
 use tracing::info;
+use training::activities::ActivityClient;
+use training::clock::{Clock, OsloClock};
 use training::config::load_config;
 use training::database::connection::create_connection_pool;
+use training::garmin::GarminClient;
 use training::router::main::{init_router, AppState};
 
 #[tokio::main]
@@ -13,7 +18,15 @@ async fn main() {
 
     let port = config.port.clone();
     let pool = create_connection_pool(config.database_url.clone());
-    let app = init_router(AppState { db: pool, config });
+    let activities: Arc<dyn ActivityClient> =
+        Arc::new(GarminClient::new(config.garmin_api_key.clone()));
+    let clock: Arc<dyn Clock> = Arc::new(OsloClock);
+    let app = init_router(AppState {
+        db: pool,
+        config,
+        activities,
+        clock,
+    });
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{port}"))
         .await
         .unwrap();

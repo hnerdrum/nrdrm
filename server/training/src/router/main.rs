@@ -1,3 +1,7 @@
+use std::sync::Arc;
+
+use crate::activities::ActivityClient;
+use crate::clock::Clock;
 use crate::config::Config;
 use axum::{routing::get, Json, Router};
 use deadpool_diesel::postgres::Pool;
@@ -8,6 +12,8 @@ use tower_http::trace::{self, TraceLayer};
 pub struct AppState {
     pub db: Pool,
     pub config: Config,
+    pub activities: Arc<dyn ActivityClient>,
+    pub clock: Arc<dyn Clock>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -17,6 +23,7 @@ struct Health {
 
 pub fn init_router(state: AppState) -> Router {
     super::sessions::routes()
+        .merge(super::sync::routes())
         .route("/api/health", get(health))
         .layer(TraceLayer::new_for_http().on_response(
             trace::DefaultOnResponse::new().latency_unit(tower_http::LatencyUnit::Micros),
@@ -33,7 +40,28 @@ pub(crate) fn test_state() -> AppState {
             port: "8082".to_string(),
             database_url,
             log_level: "info".to_string(),
+            garmin_api_key: String::new(),
         },
+        activities: Arc::new(EmptyActivities),
+        clock: Arc::new(crate::clock::FixedClock(
+            chrono::NaiveDate::from_ymd_opt(2026, 11, 8).unwrap(),
+        )),
+    }
+}
+
+#[cfg(test)]
+struct EmptyActivities;
+
+#[cfg(test)]
+#[async_trait::async_trait]
+impl ActivityClient for EmptyActivities {
+    async fn summaries(
+        &self,
+        _from: chrono::NaiveDate,
+        _to: chrono::NaiveDate,
+    ) -> Result<Vec<crate::domain::import::ActivitySummary>, crate::activities::ActivityClientError>
+    {
+        Ok(Vec::new())
     }
 }
 

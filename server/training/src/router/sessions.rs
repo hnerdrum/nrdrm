@@ -311,6 +311,7 @@ mod tests {
             let saved: Session = parse(&bytes);
             assert_eq!(saved.on_date, *on_date);
             assert_eq!(saved.body, *body);
+            assert!(saved.source.is_none());
         }
 
         let (status, bytes) = call(

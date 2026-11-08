@@ -4,11 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async-trait = "0.1.83"
 axum = "0.7.5"
+base64 = "0.22.1"
 chrono = { version = "0.4.38", features = ["serde"] }
+chrono-tz = "0.10"
 deadpool-diesel = { version = "0.6.1", features = ["postgres"] }
 diesel = { version = "2.1.6", features = ["postgres", "postgres_backend", "uuid", "serde_json", "chrono"] }
 dotenvy = "0.15.7"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
 serde = { version = "1.0.202", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.37.0", features = ["rt-multi-thread"] }
