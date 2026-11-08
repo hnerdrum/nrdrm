@@ -46,11 +46,25 @@
   </QueryClientProvider>
 
   {#snippet failed(_error, reset)}
-    <main class="enter mx-auto grid max-w-104 gap-8 pt-[min(16vh,7rem)]">
-      <h1 class="text-[clamp(2.5rem,12vw,3rem)] leading-none font-light tracking-tighter">
-        Something went wrong.
-      </h1>
-      <Button onclick={reset}>Try again</Button>
+    <main class="relative grid min-h-dvh content-center">
+      <div class="pointer-events-none absolute top-[16%] -left-16" aria-hidden="true">
+        <div class="offbeat-glow size-72 rounded-full bg-accent/25 blur-3xl"></div>
+      </div>
+      <div class="offbeat relative grid max-w-104 gap-8">
+        <p class="offbeat-line font-mono text-[0.7rem] tracking-[0.22em] text-muted uppercase">
+          Off tempo
+        </p>
+        <h1
+          class="text-[clamp(3.25rem,14vw,5.5rem)] leading-[0.9] font-light tracking-[-0.045em]"
+        >
+          <span class="offbeat-word block">Something</span>
+          <span class="offbeat-word block">went</span>
+          <span class="offbeat-word block text-accent">wrong.</span>
+        </h1>
+        <div class="offbeat-line">
+          <Button variant="accent" class="w-full" onclick={reset}>Try again</Button>
+        </div>
+      </div>
     </main>
   {/snippet}
 </svelte:boundary>

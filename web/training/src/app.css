@@ -116,9 +116,52 @@
   animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
+.offbeat-glow {
+  animation: offbeat-drift 7s ease-in-out infinite;
+}
+
+.offbeat-line,
+.offbeat-word {
+  transform-origin: left center;
+  animation: offbeat-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.offbeat-word:nth-child(2) {
+  animation-name: offbeat-swing;
+  animation-delay: 0.12s;
+}
+
+.offbeat-word:nth-child(3) {
+  animation-delay: 0.28s;
+}
+
+.offbeat-line:last-child {
+  animation-delay: 0.46s;
+}
+
 @keyframes roll {
   from {
     transform: translateY(0);
+  }
+}
+
+@keyframes offbeat-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) rotate(-2.5deg);
+  }
+}
+
+@keyframes offbeat-swing {
+  from {
+    opacity: 0;
+    transform: translateY(22px) rotate(2.5deg);
+  }
+}
+
+@keyframes offbeat-drift {
+  50% {
+    transform: translate3d(36px, -28px, 0) scale(1.14);
   }
 }
 
@@ -137,7 +180,10 @@
   .week-enter .odo,
   .form-enter > *,
   .rise-in,
-  .derived-enter {
+  .derived-enter,
+  .offbeat-glow,
+  .offbeat-line,
+  .offbeat-word {
     animation: none;
   }
 }
