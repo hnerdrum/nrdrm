@@ -2,15 +2,20 @@ import type { Ride, Run, Ski, Strength } from './domain';
 
 export type DistanceSport = 'run' | 'ride' | 'ski';
 
+export type SetMeasure = 'reps' | 'time';
+
 export type DraftSet = {
   key: string;
   reps: string;
   weight: string;
+  minutes: string;
+  seconds: string;
 };
 
 export type DraftExercise = {
   key: string;
   name: string;
+  measure: SetMeasure;
   sets: DraftSet[];
 };
 
@@ -19,26 +24,54 @@ function draftKey(): string {
 }
 
 export function emptySet(): DraftSet {
-  return { key: draftKey(), reps: '', weight: '' };
+  return { key: draftKey(), reps: '', weight: '', minutes: '', seconds: '' };
 }
 
 export function emptyExercise(): DraftExercise {
-  return { key: draftKey(), name: '', sets: [emptySet()] };
+  return { key: draftKey(), name: '', measure: 'reps', sets: [emptySet()] };
 }
 
 export function exercisesFrom(body: Strength): DraftExercise[] {
-  return body.exercises.map((exercise) => ({
+  return body.exercises.map((exercise) => {
+    const measure: SetMeasure = exercise.sets.some(
+      (set) => set.duration != null,
+    )
+      ? 'time'
+      : 'reps';
+    return {
+      key: draftKey(),
+      name: exercise.name,
+      measure,
+      sets:
+        exercise.sets.length > 0
+          ? exercise.sets.map((set) => draftSet(set, measure))
+          : [emptySet()],
+    };
+  });
+}
+
+function draftSet(
+  set: Strength['exercises'][number]['sets'][number],
+  measure: SetMeasure,
+): DraftSet {
+  if (measure === 'time') {
+    const total = set.duration ?? 0;
+    const minutes = Math.floor(total / 60);
+    return {
+      key: draftKey(),
+      reps: '',
+      weight: '',
+      minutes: minutes > 0 ? String(minutes) : '',
+      seconds: String(total % 60),
+    };
+  }
+  return {
     key: draftKey(),
-    name: exercise.name,
-    sets:
-      exercise.sets.length > 0
-        ? exercise.sets.map((set) => ({
-            key: draftKey(),
-            reps: String(set.reps),
-            weight: String(set.weight),
-          }))
-        : [emptySet()],
-  }));
+    reps: set.reps == null ? '' : String(set.reps),
+    weight: set.weight ? String(set.weight) : '',
+    minutes: '',
+    seconds: '',
+  };
 }
 
 function parseDecimal(value: string): number | null {
@@ -162,12 +195,26 @@ export function strengthBody(exercises: DraftExercise[]): Strength | null {
     }
     const sets: Strength['exercises'][number]['sets'] = [];
     for (const set of exercise.sets) {
+      if (exercise.measure === 'time') {
+        const minutes = nonNegativeInt(set.minutes);
+        const seconds = nonNegativeInt(set.seconds);
+        if (minutes === null || seconds === null) {
+          return null;
+        }
+        const duration = minutes * 60 + seconds;
+        if (duration < 1) {
+          return null;
+        }
+        sets.push({ duration });
+        continue;
+      }
       const reps = positiveInt(set.reps);
-      const weight = parseDecimal(set.weight);
+      const weightText = set.weight.trim();
+      const weight = weightText === '' ? 0 : parseDecimal(set.weight);
       if (reps === null || weight === null || weight < 0) {
         return null;
       }
-      sets.push({ reps, weight });
+      sets.push(weight === 0 ? { reps } : { reps, weight });
     }
     built.push({ name, sets });
   }

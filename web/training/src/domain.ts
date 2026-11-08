@@ -17,8 +17,9 @@ export type Ski = {
 };
 
 export type ExerciseSet = {
-  reps: number;
-  weight: number;
+  reps?: number;
+  weight?: number;
+  duration?: number;
 };
 
 export type Exercise = {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { DraftExercise } from "../draft";
+  import type { DraftExercise, SetMeasure } from "../draft";
   import Button from "./Button.svelte";
 
   type Props = {
@@ -7,7 +7,8 @@
     index: number;
     total: number;
     onname: (name: string) => void;
-    onset: (setKey: string, field: "reps" | "weight", value: string) => void;
+    onmeasure: (measure: SetMeasure) => void;
+    onset: (setKey: string, field: "reps" | "weight" | "minutes" | "seconds", value: string) => void;
     onaddset: () => void;
     onremoveset: (setKey: string) => void;
     onmove: (direction: -1 | 1) => void;
@@ -19,6 +20,7 @@
     index,
     total,
     onname,
+    onmeasure,
     onset,
     onaddset,
     onremoveset,
@@ -49,48 +51,128 @@
       oninput={(event) => onname(text(event))}
     />
   </label>
-  <div class="grid gap-2">
-    <div
-      class="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 text-muted"
-      aria-hidden="true"
-    >
-      <span>Set</span>
-      <span>Reps</span>
-      <span>kg</span>
-      <span></span>
-    </div>
-    {#each exercise.sets as set, setIndex (set.key)}
-      <div class="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2">
-        <span class="font-mono text-muted">{setIndex + 1}</span>
+  <fieldset class="m-0 grid gap-2 border-0 p-0">
+    <legend class="p-0 text-muted">Sets</legend>
+    <div class="flex gap-2">
+      <label class="relative min-w-24">
         <input
-          id="set-{set.key}-reps"
-          class="{inputClass} font-mono text-lg tabular-nums"
-          inputmode="numeric"
-          autocomplete="off"
-          aria-label="Exercise {index + 1} set {setIndex + 1} reps"
-          value={set.reps}
-          oninput={(event) => onset(set.key, "reps", text(event))}
+          class="peer absolute inset-0 m-0 cursor-pointer opacity-0 focus-visible:outline-none"
+          type="radio"
+          name="measure-{exercise.key}"
+          value="reps"
+          checked={exercise.measure === "reps"}
+          onchange={() => onmeasure("reps")}
         />
-        <input
-          id="set-{set.key}-kg"
-          class="{inputClass} font-mono text-lg tabular-nums"
-          inputmode="decimal"
-          autocomplete="off"
-          aria-label="Exercise {index + 1} set {setIndex + 1} weight in kg"
-          value={set.weight}
-          oninput={(event) => onset(set.key, "weight", text(event))}
-        />
-        <Button
-          variant="quiet"
-          class="px-0"
-          label="Remove set {setIndex + 1} of exercise {index + 1}"
-          disabled={exercise.sets.length < 2}
-          onclick={() => onremoveset(set.key)}
+        <span
+          class="flex min-h-11 items-center justify-center rounded-full border border-edge px-4 text-muted peer-checked:border-accent peer-checked:bg-accent peer-checked:font-semibold peer-checked:text-on-accent peer-focus-visible:outline peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
         >
-          Remove
-        </Button>
+          Reps
+        </span>
+      </label>
+      <label class="relative min-w-24">
+        <input
+          class="peer absolute inset-0 m-0 cursor-pointer opacity-0 focus-visible:outline-none"
+          type="radio"
+          name="measure-{exercise.key}"
+          value="time"
+          checked={exercise.measure === "time"}
+          onchange={() => onmeasure("time")}
+        />
+        <span
+          class="flex min-h-11 items-center justify-center rounded-full border border-edge px-4 text-muted peer-checked:border-accent peer-checked:bg-accent peer-checked:font-semibold peer-checked:text-on-accent peer-focus-visible:outline peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+        >
+          Time
+        </span>
+      </label>
+    </div>
+  </fieldset>
+  <div class="grid gap-2">
+    {#if exercise.measure === "reps"}
+      <div
+        class="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 text-muted"
+        aria-hidden="true"
+      >
+        <span>Set</span>
+        <span>Reps</span>
+        <span>kg</span>
+        <span></span>
       </div>
-    {/each}
+      {#each exercise.sets as set, setIndex (set.key)}
+        <div class="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2">
+          <span class="font-mono text-muted">{setIndex + 1}</span>
+          <input
+            id="set-{set.key}-reps"
+            class="{inputClass} font-mono text-lg tabular-nums"
+            inputmode="numeric"
+            autocomplete="off"
+            aria-label="Exercise {index + 1} set {setIndex + 1} reps"
+            value={set.reps}
+            oninput={(event) => onset(set.key, "reps", text(event))}
+          />
+          <input
+            id="set-{set.key}-kg"
+            class="{inputClass} font-mono text-lg tabular-nums"
+            inputmode="decimal"
+            autocomplete="off"
+            placeholder="Bodyweight"
+            aria-label="Exercise {index + 1} set {setIndex + 1} weight in kg. Leave empty for bodyweight."
+            value={set.weight}
+            oninput={(event) => onset(set.key, "weight", text(event))}
+          />
+          <Button
+            variant="quiet"
+            class="px-0"
+            label="Remove set {setIndex + 1} of exercise {index + 1}"
+            disabled={exercise.sets.length < 2}
+            onclick={() => onremoveset(set.key)}
+          >
+            Remove
+          </Button>
+        </div>
+      {/each}
+    {:else}
+      <div
+        class="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2 text-muted"
+        aria-hidden="true"
+      >
+        <span>Set</span>
+        <span>Min</span>
+        <span>Sec</span>
+        <span></span>
+      </div>
+      {#each exercise.sets as set, setIndex (set.key)}
+        <div class="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-2">
+          <span class="font-mono text-muted">{setIndex + 1}</span>
+          <input
+            id="set-{set.key}-minutes"
+            class="{inputClass} font-mono text-lg tabular-nums"
+            inputmode="numeric"
+            autocomplete="off"
+            aria-label="Exercise {index + 1} set {setIndex + 1} minutes"
+            value={set.minutes}
+            oninput={(event) => onset(set.key, "minutes", text(event))}
+          />
+          <input
+            id="set-{set.key}-seconds"
+            class="{inputClass} font-mono text-lg tabular-nums"
+            inputmode="numeric"
+            autocomplete="off"
+            aria-label="Exercise {index + 1} set {setIndex + 1} seconds"
+            value={set.seconds}
+            oninput={(event) => onset(set.key, "seconds", text(event))}
+          />
+          <Button
+            variant="quiet"
+            class="px-0"
+            label="Remove set {setIndex + 1} of exercise {index + 1}"
+            disabled={exercise.sets.length < 2}
+            onclick={() => onremoveset(set.key)}
+          >
+            Remove
+          </Button>
+        </div>
+      {/each}
+    {/if}
   </div>
   <div class="-ml-2 flex flex-wrap gap-x-1">
     <Button id="add-set-{exercise.key}" variant="quiet" onclick={onaddset}>Add set</Button>

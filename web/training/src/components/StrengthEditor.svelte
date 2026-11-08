@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { formatDay } from "../dates";
-  import { emptyExercise, emptySet, type DraftExercise } from "../draft";
+  import { emptyExercise, emptySet, type DraftExercise, type SetMeasure } from "../draft";
   import Button from "./Button.svelte";
   import ExerciseCard from "./ExerciseCard.svelte";
 
@@ -34,7 +34,12 @@
     );
   }
 
-  function editSet(exerciseKey: string, setKey: string, field: "reps" | "weight", value: string) {
+  function editSet(
+    exerciseKey: string,
+    setKey: string,
+    field: "reps" | "weight" | "minutes" | "seconds",
+    value: string,
+  ) {
     onchange(
       exercises.map((exercise) => {
         if (exercise.key !== exerciseKey) {
@@ -50,12 +55,15 @@
 
   function addSet(exerciseKey: string) {
     const created = emptySet();
+    const measure = exercises.find((exercise) => exercise.key === exerciseKey)?.measure ?? "reps";
     onchange(
       exercises.map((exercise) =>
         exercise.key === exerciseKey ? { ...exercise, sets: [...exercise.sets, created] } : exercise,
       ),
     );
-    void focus(`set-${created.key}-reps`);
+    void focus(
+      measure === "time" ? `set-${created.key}-seconds` : `set-${created.key}-reps`,
+    );
   }
 
   function removeSet(exerciseKey: string, setKey: string) {
@@ -85,6 +93,16 @@
     void focusEnabled(`move-${action}-${key}`, `move-${other}-${key}`);
   }
 
+  function setMeasure(key: string, measure: SetMeasure) {
+    const exercise = exercises.find((item) => item.key === key);
+    onchange(exercises.map((item) => (item.key === key ? { ...item, measure } : item)));
+    const first = exercise?.sets[0];
+    if (!first) {
+      return;
+    }
+    void focus(measure === "time" ? `set-${first.key}-seconds` : `set-${first.key}-reps`);
+  }
+
   function addExercise() {
     const created = emptyExercise();
     onchange([...exercises, created]);
@@ -109,6 +127,7 @@
       {index}
       total={exercises.length}
       onname={(name) => rename(exercise.key, name)}
+      onmeasure={(measure) => setMeasure(exercise.key, measure)}
       onset={(setKey, field, value) => editSet(exercise.key, setKey, field, value)}
       onaddset={() => addSet(exercise.key)}
       onremoveset={(setKey) => removeSet(exercise.key, setKey)}

@@ -152,7 +152,7 @@
     if (sport === "strength") {
       body = strengthBody(exercises);
       if (!body) {
-        error = "Name each exercise and fill reps and kg for every set.";
+        error = "Name each exercise. Enter reps or a time for every set.";
         return;
       }
     } else {

@@ -47,10 +47,49 @@ pub struct Exercise {
     pub sets: Vec<ExerciseSet>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExerciseSet {
-    pub reps: u32,
-    pub weight: f64,
+/// A loaded or bodyweight effort, or a timed hold such as a plank.
+/// Bodyweight is a rep set whose weight is omitted.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(untagged)]
+pub enum ExerciseSet {
+    Reps {
+        reps: u32,
+        #[serde(default, skip_serializing_if = "is_bodyweight")]
+        weight: f64,
+    },
+    Hold {
+        duration: u32,
+    },
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawSet {
+    #[serde(default)]
+    reps: Option<u32>,
+    #[serde(default)]
+    weight: Option<f64>,
+    #[serde(default)]
+    duration: Option<u32>,
+}
+
+impl<'de> Deserialize<'de> for ExerciseSet {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = RawSet::deserialize(deserializer)?;
+        let weight = raw.weight.unwrap_or(0.0);
+        match (raw.reps, raw.duration) {
+            (Some(reps), None) => Ok(Self::Reps { reps, weight }),
+            (None, Some(duration)) if weight == 0.0 => Ok(Self::Hold { duration }),
+            _ => Err(serde::de::Error::custom("a set needs reps or a duration")),
+        }
+    }
+}
+
+fn is_bodyweight(weight: &f64) -> bool {
+    *weight == 0.0
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,6 +126,20 @@ impl SessionBody {
             return None;
         }
         Some(f64::from(*distance) * 3.6 / f64::from(*duration))
+    }
+
+    pub fn accepted(&self) -> bool {
+        let Self::Strength { exercises } = self else {
+            return true;
+        };
+        exercises.iter().all(|exercise| {
+            exercise.sets.iter().all(|set| match set {
+                ExerciseSet::Reps { reps, weight } => {
+                    *reps >= 1 && weight.is_finite() && *weight >= 0.0
+                }
+                ExerciseSet::Hold { duration } => *duration >= 1,
+            })
+        })
     }
 }
 
@@ -222,12 +275,73 @@ mod tests {
             SessionBody::Strength {
                 exercises: vec![Exercise {
                     name: "squat".into(),
-                    sets: vec![ExerciseSet {
+                    sets: vec![ExerciseSet::Reps {
                         reps: 5,
                         weight: 0.0
                     }]
                 }]
             }
         );
+    }
+
+    #[test]
+    fn a_rep_set_may_omit_its_weight() {
+        let strength: SessionBody = serde_json::from_str(
+            r#"{"sport":"strength","exercises":[{"name":"pull-up","sets":[{"reps":8}]}]}"#,
+        )
+        .unwrap();
+        assert!(strength.accepted());
+        assert_eq!(
+            strength,
+            SessionBody::Strength {
+                exercises: vec![Exercise {
+                    name: "pull-up".into(),
+                    sets: vec![ExerciseSet::Reps {
+                        reps: 8,
+                        weight: 0.0
+                    }]
+                }]
+            }
+        );
+        let stored = serde_json::to_value(&strength).unwrap();
+        assert!(stored["exercises"][0]["sets"][0].get("weight").is_none());
+    }
+
+    #[test]
+    fn a_hold_is_a_duration_in_seconds() {
+        let strength: SessionBody = serde_json::from_str(
+            r#"{"sport":"strength","exercises":[{"name":"plank","sets":[{"duration":45}]}]}"#,
+        )
+        .unwrap();
+        assert!(strength.accepted());
+        assert_eq!(
+            strength,
+            SessionBody::Strength {
+                exercises: vec![Exercise {
+                    name: "plank".into(),
+                    sets: vec![ExerciseSet::Hold { duration: 45 }]
+                }]
+            }
+        );
+    }
+
+    #[test]
+    fn a_set_is_either_reps_or_a_hold() {
+        let both = serde_json::from_str::<SessionBody>(
+            r#"{"sport":"strength","exercises":[{"name":"plank","sets":[{"reps":5,"duration":45}]}]}"#,
+        );
+        assert!(both.is_err());
+
+        let empty: SessionBody = serde_json::from_str(
+            r#"{"sport":"strength","exercises":[{"name":"plank","sets":[{"reps":0}]}]}"#,
+        )
+        .unwrap();
+        assert!(!empty.accepted());
+
+        let zero: SessionBody = serde_json::from_str(
+            r#"{"sport":"strength","exercises":[{"name":"plank","sets":[{"duration":0}]}]}"#,
+        )
+        .unwrap();
+        assert!(!zero.accepted());
     }
 }

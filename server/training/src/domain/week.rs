@@ -90,7 +90,7 @@ mod tests {
             SessionBody::Strength {
                 exercises: vec![Exercise {
                     name: "squat".into(),
-                    sets: vec![ExerciseSet {
+                    sets: vec![ExerciseSet::Reps {
                         reps: 5,
                         weight: 100.0,
                     }],

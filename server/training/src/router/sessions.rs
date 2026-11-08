@@ -65,6 +65,9 @@ async fn create(
     State(state): State<AppState>,
     Json(input): Json<SessionInput>,
 ) -> Result<(StatusCode, Json<Session>), ApiError> {
+    if !input.body.accepted() {
+        return Err(ApiError::BadRequest("Each set needs reps or a duration"));
+    }
     let saved = session::create(&state.db, input.on_date, input.body).await?;
     Ok((StatusCode::CREATED, Json(saved)))
 }
@@ -107,6 +110,9 @@ async fn update(
     Path(id): Path<Uuid>,
     Json(input): Json<SessionInput>,
 ) -> Result<Json<Session>, ApiError> {
+    if !input.body.accepted() {
+        return Err(ApiError::BadRequest("Each set needs reps or a duration"));
+    }
     let saved = session::update(&state.db, id, input.on_date, input.body).await?;
     Ok(Json(saved))
 }
@@ -220,7 +226,7 @@ mod tests {
         SessionBody::Strength {
             exercises: vec![Exercise {
                 name: name.into(),
-                sets: vec![ExerciseSet {
+                sets: vec![ExerciseSet::Reps {
                     reps: 5,
                     weight: 100.0,
                 }],
@@ -250,7 +256,7 @@ mod tests {
                 SessionBody::Strength {
                     exercises: vec![Exercise {
                         name: "squat".into(),
-                        sets: vec![ExerciseSet {
+                        sets: vec![ExerciseSet::Reps {
                             reps: 5,
                             weight: 0.0,
                         }],
@@ -356,7 +362,7 @@ mod tests {
                     SessionBody::Strength {
                         exercises: vec![Exercise {
                             name: "squat".into(),
-                            sets: vec![ExerciseSet {
+                            sets: vec![ExerciseSet::Reps {
                                 reps: 5,
                                 weight: 0.0,
                             }],
