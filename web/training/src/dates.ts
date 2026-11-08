@@ -81,6 +81,12 @@ export function formatRange(monday: string): string {
   return `${range.main} ${range.year}`;
 }
 
+export function weekOffset(fromMonday: string, toMonday: string): number {
+  const from = parseDate(fromMonday).getTime();
+  const to = parseDate(toMonday).getTime();
+  return Math.round((to - from) / (7 * 86_400_000));
+}
+
 export function formatDay(iso: string): string {
   const date = parseDate(iso);
   return `${WEEKDAYS[date.getUTCDay()]} ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]}`;

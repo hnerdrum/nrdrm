@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { addDays, mondayOf, todayIso } from "../dates";
+  import { addDays, mondayOf, todayIso, weekOffset } from "../dates";
   import { listSessions, type LoggedSession } from "../log";
   import NewSession from "./NewSession.svelte";
   import SessionsScreen from "./SessionsScreen.svelte";
@@ -23,6 +23,8 @@
   let returnTo = $state<"week" | "sessions">("week");
   let sessions = $state<LoggedSession[]>([]);
   let status = $state<"loading" | "ready" | "error">("loading");
+  let request = $state(0);
+  let shownMonday = "";
   let wide = $state(
     typeof window !== "undefined" && window.matchMedia("(min-width: 960px)").matches,
   );
@@ -47,6 +49,14 @@
 
   function cancelNew() {
     view = returnTo;
+    window.scrollTo(0, 0);
+  }
+
+  function saved(onDate: string) {
+    offset = Math.min(0, weekOffset(mondayOf(today), mondayOf(onDate)));
+    request += 1;
+    view = returnTo;
+    window.scrollTo(0, 0);
   }
 
   $effect(() => {
@@ -58,9 +68,12 @@
   $effect(() => {
     const from = monday;
     const to = addDays(from, 6);
+    void request;
     let cancelled = false;
-    status = "loading";
-    sessions = [];
+    if (shownMonday !== from) {
+      status = "loading";
+      sessions = [];
+    }
 
     listSessions(from, to)
       .then((result) => {
@@ -72,6 +85,7 @@
           return;
         }
         sessions = result;
+        shownMonday = from;
         status = "ready";
       })
       .catch(() => {
@@ -79,6 +93,7 @@
           return;
         }
         sessions = [];
+        shownMonday = "";
         status = "error";
       });
 
@@ -98,7 +113,7 @@
 </script>
 
 {#if view === "new"}
-  <NewSession oncancel={cancelNew} />
+  <NewSession {today} oncancel={cancelNew} onsaved={saved} {onsignedout} />
 {:else if view === "sessions"}
   <SessionsScreen
     {monday}

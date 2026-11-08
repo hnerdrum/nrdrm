@@ -86,6 +86,36 @@
   animation: rise 0.8s 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
 }
 
+.form-enter > * {
+  animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.form-enter > :nth-child(2) {
+  animation-delay: 0.05s;
+}
+
+.form-enter > :nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.form-enter > :nth-child(4) {
+  animation-delay: 0.15s;
+}
+
+.form-enter > :nth-child(5) {
+  animation-delay: 0.2s;
+}
+
+.form-enter input,
+.form-enter button {
+  scroll-margin-bottom: 7rem;
+}
+
+.rise-in,
+.derived-enter {
+  animation: rise 0.6s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
 @keyframes roll {
   from {
     transform: translateY(0);
@@ -104,7 +134,10 @@
   .week-enter .day,
   .week-enter .count,
   .week-enter .empty,
-  .week-enter .odo {
+  .week-enter .odo,
+  .form-enter > *,
+  .rise-in,
+  .derived-enter {
     animation: none;
   }
 }

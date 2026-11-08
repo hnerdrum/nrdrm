@@ -8,7 +8,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use super::schema::session;
-use crate::domain::session::SessionBody;
+use crate::domain::session::{SessionBody, Sport};
 
 #[derive(Debug)]
 pub enum SessionStoreError {
@@ -67,6 +67,26 @@ pub async fn list(
             .into_iter()
             .map(from_row)
             .collect()
+    })
+    .await
+}
+
+pub async fn latest(
+    pool: &Pool,
+    sport: Sport,
+    through: NaiveDate,
+) -> Result<Option<Session>, SessionStoreError> {
+    let sport = sport.as_str();
+    run(pool, move |conn| {
+        let row = session::table
+            .filter(session::on_date.le(through))
+            .filter(session::body.retrieve_as_text("sport").eq(sport))
+            .order((session::on_date.desc(), session::id.desc()))
+            .select(SessionRow::as_select())
+            .first(conn)
+            .optional()
+            .map_err(store_err)?;
+        row.map(from_row).transpose()
     })
     .await
 }

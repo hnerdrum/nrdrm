@@ -8,11 +8,12 @@ use uuid::Uuid;
 
 use super::main::AppState;
 use crate::database::session::{self, Session, SessionStoreError};
-use crate::domain::session::SessionBody;
+use crate::domain::session::{SessionBody, Sport};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/sessions", axum::routing::get(list).post(create))
+        .route("/api/sessions/latest", axum::routing::get(latest))
         .route(
             "/api/sessions/:id",
             axum::routing::get(read).put(update).delete(remove),
@@ -77,6 +78,20 @@ async fn list(
     }
     let sessions = session::list(&state.db, range.start, range.end).await?;
     Ok(Json(sessions))
+}
+
+#[derive(Debug, Deserialize)]
+struct Latest {
+    sport: Sport,
+    through: NaiveDate,
+}
+
+async fn latest(
+    State(state): State<AppState>,
+    Query(query): Query<Latest>,
+) -> Result<Json<Option<Session>>, ApiError> {
+    let saved = session::latest(&state.db, query.sport, query.through).await?;
+    Ok(Json(saved))
 }
 
 async fn read(
@@ -186,6 +201,29 @@ mod tests {
             )
             .await;
             assert_eq!(status, StatusCode::NO_CONTENT);
+        }
+    }
+
+    async fn save(app: &axum::Router, on_date: NaiveDate, body: SessionBody) -> Session {
+        let (status, bytes) = call(app, "POST", "/api/sessions", Some(&input(on_date, body))).await;
+        assert_eq!(
+            status,
+            StatusCode::CREATED,
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+        parse(&bytes)
+    }
+
+    fn strength(name: &str) -> SessionBody {
+        SessionBody::Strength {
+            exercises: vec![Exercise {
+                name: name.into(),
+                sets: vec![ExerciseSet {
+                    reps: 5,
+                    weight: 100.0,
+                }],
+            }],
         }
     }
 
@@ -497,5 +535,78 @@ mod tests {
         assert_eq!(status, StatusCode::BAD_REQUEST);
         let message: String = parse(&bytes);
         assert_eq!(message, "From is after to");
+    }
+
+    #[tokio::test]
+    async fn latest_is_the_newest_of_that_sport_on_or_before_the_date() {
+        let app = app();
+        let (status, bytes) = call(
+            &app,
+            "GET",
+            "/api/sessions/latest?sport=strength&through=1970-01-01",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let none: Option<Session> = parse(&bytes);
+        assert!(none.is_none());
+
+        let through = NaiveDate::from_ymd_opt(2400, 12, 15).unwrap();
+        let earlier = through - Duration::days(10);
+        let after = through + Duration::days(1);
+        clear(&app, earlier, after).await;
+
+        save(&app, earlier, strength("old")).await;
+        let run = save(
+            &app,
+            through,
+            SessionBody::Run {
+                distance: 5_000,
+                duration: 1_500,
+            },
+        )
+        .await;
+        let first = save(&app, through, strength("squat")).await;
+        let second = save(&app, through, strength("bench")).await;
+        save(&app, after, strength("future")).await;
+
+        let (status, bytes) = call(
+            &app,
+            "GET",
+            &format!("/api/sessions/latest?sport=run&through={through}"),
+            None,
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+        let found: Option<Session> = parse(&bytes);
+        let found = found.expect("a run on or before the date");
+        assert_eq!(found.id, run.id);
+
+        let (status, bytes) = call(
+            &app,
+            "GET",
+            &format!("/api/sessions/latest?sport=strength&through={through}"),
+            None,
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+        let found: Option<Session> = parse(&bytes);
+        let found = found.expect("a strength session on or before the date");
+        let expected = if first.id > second.id { first } else { second };
+        assert_eq!(found.id, expected.id);
+        assert_eq!(found.on_date, through);
+        assert_eq!(found.body, expected.body);
+
+        clear(&app, earlier, after).await;
     }
 }

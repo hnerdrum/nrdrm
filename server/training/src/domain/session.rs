@@ -7,6 +7,26 @@ pub struct Session {
     pub body: SessionBody,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Sport {
+    Run,
+    Ride,
+    Ski,
+    Strength,
+}
+
+impl Sport {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Run => "run",
+            Self::Ride => "ride",
+            Self::Ski => "ski",
+            Self::Strength => "strength",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(
     tag = "sport",
