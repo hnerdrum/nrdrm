@@ -3,18 +3,20 @@
   import {
     emptyInterval,
     intervalBody,
-    intervalPace,
+    intervalReadout,
+    type DistanceSport,
     type DraftInterval,
-    type RunKind,
+    type EffortKind,
   } from "../draft";
-  import { formatDuration, formatKm } from "../format";
+  import { formatDuration, formatKm, sportLabel } from "../format";
   import Button from "./Button.svelte";
   import DistanceFields from "./DistanceFields.svelte";
 
   type IntervalField = "repetitions" | "metres" | "minutes" | "seconds" | "recovery";
 
   type Props = {
-    kind?: RunKind;
+    sport: DistanceSport;
+    kind?: EffortKind;
     kilometres?: string;
     hours?: string;
     minutes?: string;
@@ -23,6 +25,7 @@
   };
 
   let {
+    sport,
     kind = $bindable("distance"),
     kilometres = $bindable(""),
     hours = $bindable(""),
@@ -35,7 +38,7 @@
     "min-h-[52px] w-full min-w-0 rounded-2xl border border-edge bg-bg px-4 font-mono text-lg tabular-nums transition-[border-color] hover:border-muted focus-visible:border-accent focus-visible:outline-offset-1";
 
   const summary = $derived.by(() => {
-    const body = intervalBody(intervals);
+    const body = intervalBody(sport, intervals);
     if (!body) {
       return null;
     }
@@ -89,13 +92,13 @@
 
 <div class="grid gap-7">
   <fieldset class="m-0 grid gap-2 border-0 p-0">
-    <legend class="p-0 text-muted">Run</legend>
+    <legend class="p-0 text-muted">{sportLabel(sport)}</legend>
     <div class="flex gap-2">
       <label class="relative min-w-28">
         <input
           class="peer absolute inset-0 m-0 cursor-pointer opacity-0 focus-visible:outline-none"
           type="radio"
-          name="run-kind"
+          name="effort-kind"
           value="distance"
           checked={kind === "distance"}
           onchange={() => (kind = "distance")}
@@ -110,7 +113,7 @@
         <input
           class="peer absolute inset-0 m-0 cursor-pointer opacity-0 focus-visible:outline-none"
           type="radio"
-          name="run-kind"
+          name="effort-kind"
           value="intervals"
           checked={kind === "intervals"}
           onchange={() => (kind = "intervals")}
@@ -124,11 +127,11 @@
     </div>
   </fieldset>
   {#if kind === "distance"}
-    <DistanceFields sport="run" bind:kilometres bind:hours bind:minutes />
+    <DistanceFields {sport} bind:kilometres bind:hours bind:minutes />
   {:else}
     <div class="rise-in grid gap-7">
       {#each intervals as interval, index (interval.key)}
-        {@const pace = intervalPace(interval)}
+        {@const readout = intervalReadout(sport, interval)}
         <section class="grid gap-5 rounded-3xl border border-line bg-field p-5" aria-label="Interval {index + 1}">
           <h2 class="text-lg font-medium">Interval {index + 1}</h2>
           <div class="grid grid-cols-2 gap-4">
@@ -195,8 +198,8 @@
               oninput={(event) => edit(interval.key, "recovery", text(event))}
             />
           </label>
-          {#if pace}
-            <p class="font-mono text-muted tabular-nums">{pace}</p>
+          {#if readout}
+            <p class="font-mono text-muted tabular-nums">{readout}</p>
           {/if}
           <div class="-ml-2 flex flex-wrap gap-x-1">
             <Button

@@ -38,33 +38,36 @@ pub enum SessionBody {
     Run {
         distance: u32,
         duration: u32,
-        /// Empty for a steady run. Omitted from JSON when empty, so a stored
-        /// `{sport, distance, duration}` run still parses.
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
-        intervals: Vec<RunInterval>,
+        intervals: Vec<Interval>,
     },
     Ride {
         distance: u32,
         duration: u32,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        intervals: Vec<Interval>,
     },
     Ski {
         distance: u32,
         duration: u32,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        intervals: Vec<Interval>,
     },
     Strength {
         exercises: Vec<Exercise>,
     },
 }
 
-/// One block of repeats in a run.
+/// One block of repeats in a run, ride, or ski.
 ///
 /// `duration` is the time of a single repeat, in seconds. `recovery` is the
 /// rest between repeats, in seconds. The rest after the last repeat is not
 /// part of the block, so the session time is the work plus the rests between
-/// repeats. `distance` and `duration` on the run are those totals.
+/// repeats. `distance` and `duration` on the session are those totals.
+/// An empty list is a steady session and is omitted from JSON.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct RunInterval {
+pub struct Interval {
     pub repetitions: u32,
     pub distance: u32,
     pub duration: u32,
@@ -127,11 +130,11 @@ fn is_zero(value: &u32) -> bool {
     *value == 0
 }
 
-fn interval_ok(interval: &RunInterval) -> bool {
+fn interval_ok(interval: &Interval) -> bool {
     interval.repetitions >= 1 && interval.distance >= 1 && interval.duration >= 1
 }
 
-fn interval_totals(intervals: &[RunInterval]) -> Option<(u32, u32)> {
+fn interval_totals(intervals: &[Interval]) -> Option<(u32, u32)> {
     let mut distance = 0u32;
     let mut duration = 0u32;
     for interval in intervals {
@@ -176,7 +179,10 @@ impl SessionBody {
     }
 
     pub fn speed_kmh(&self) -> Option<f64> {
-        let Self::Ride { distance, duration } = self else {
+        let Self::Ride {
+            distance, duration, ..
+        } = self
+        else {
             return None;
         };
         if *duration == 0 {
@@ -203,6 +209,16 @@ impl SessionBody {
                 }
             }
             Self::Run {
+                distance,
+                duration,
+                intervals,
+            }
+            | Self::Ride {
+                distance,
+                duration,
+                intervals,
+            }
+            | Self::Ski {
                 distance,
                 duration,
                 intervals,
@@ -234,6 +250,7 @@ mod tests {
         let ski = SessionBody::Ski {
             distance: 15_000,
             duration: 3_600,
+            intervals: vec![],
         };
         assert_eq!(
             ski.pace(),
@@ -260,6 +277,7 @@ mod tests {
         let ride = SessionBody::Ride {
             distance: 1_000,
             duration: 0,
+            intervals: vec![],
         };
         assert_eq!(ride.speed_kmh(), None);
         assert_eq!(ride.pace(), None);
@@ -270,6 +288,7 @@ mod tests {
         let ride = SessionBody::Ride {
             distance: 36_000,
             duration: 3_600,
+            intervals: vec![],
         };
         let speed = ride.speed_kmh().expect("a ride has a speed");
         assert!((speed - 36.0).abs() < 1e-9, "{speed}");
@@ -333,7 +352,8 @@ mod tests {
             ride,
             SessionBody::Ride {
                 distance: 40000,
-                duration: 3600
+                duration: 3600,
+                intervals: vec![],
             }
         );
 
@@ -343,7 +363,8 @@ mod tests {
             ski,
             SessionBody::Ski {
                 distance: 12000,
-                duration: 3600
+                duration: 3600,
+                intervals: vec![],
             }
         );
 
@@ -453,13 +474,13 @@ mod tests {
                 distance: 5600,
                 duration: 1650,
                 intervals: vec![
-                    RunInterval {
+                    Interval {
                         repetitions: 4,
                         distance: 1000,
                         duration: 220,
                         recovery: 90,
                     },
-                    RunInterval {
+                    Interval {
                         repetitions: 4,
                         distance: 400,
                         duration: 80,
@@ -470,6 +491,14 @@ mod tests {
         );
         let stored = serde_json::to_value(&run).unwrap();
         assert!(stored["intervals"][0].get("recovery").is_some());
+
+        for sport in ["ride", "ski"] {
+            let json = format!(
+                r#"{{"sport":"{sport}","distance":5600,"duration":1650,"intervals":[{{"repetitions":4,"distance":1000,"duration":220,"recovery":90}},{{"repetitions":4,"distance":400,"duration":80,"recovery":60}}]}}"#
+            );
+            let body: SessionBody = serde_json::from_str(&json).unwrap();
+            assert!(body.accepted(), "{sport}");
+        }
 
         let short: SessionBody = serde_json::from_str(
             r#"{"sport":"run","distance":1000,"duration":220,"intervals":[{"repetitions":4,"distance":1000,"duration":220,"recovery":90}]}"#,

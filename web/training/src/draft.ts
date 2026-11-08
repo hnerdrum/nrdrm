@@ -1,10 +1,10 @@
-import type { Ride, Run, RunInterval, Ski, Strength } from './domain';
+import type { Interval, Ride, Run, Ski, Strength } from './domain';
 
 export type DistanceSport = 'run' | 'ride' | 'ski';
 
 export type SetMeasure = 'reps' | 'time';
 
-export type RunKind = 'distance' | 'intervals';
+export type EffortKind = 'distance' | 'intervals';
 
 export type DraftInterval = {
   key: string;
@@ -53,7 +53,7 @@ export function emptyInterval(): DraftInterval {
   };
 }
 
-export function intervalsFrom(intervals: RunInterval[]): DraftInterval[] {
+export function intervalsFrom(intervals: Interval[]): DraftInterval[] {
   return intervals.map((interval) => {
     const minutes = Math.floor(interval.duration / 60);
     return {
@@ -219,7 +219,10 @@ export function derivedEffort(
   };
 }
 
-export function intervalPace(interval: DraftInterval): string | null {
+export function intervalReadout(
+  sport: DistanceSport,
+  interval: DraftInterval,
+): string | null {
   const metres = positiveInt(interval.metres);
   const minutes = nonNegativeInt(interval.minutes);
   const seconds = nonNegativeInt(interval.seconds);
@@ -230,17 +233,24 @@ export function intervalPace(interval: DraftInterval): string | null {
   if (duration < 1) {
     return null;
   }
+  if (sport === 'ride') {
+    const speed = (metres * 3.6) / duration;
+    return `${speed.toFixed(1)} km/h`;
+  }
   const perKm = Math.round((duration * 1000) / metres);
   const paceMinutes = Math.floor(perKm / 60);
   const paceSeconds = perKm % 60;
   return `${paceMinutes}:${String(paceSeconds).padStart(2, '0')} /km`;
 }
 
-export function intervalBody(intervals: DraftInterval[]): Run | null {
+export function intervalBody(
+  sport: DistanceSport,
+  intervals: DraftInterval[],
+): Run | Ride | Ski | null {
   if (intervals.length === 0) {
     return null;
   }
-  const built: RunInterval[] = [];
+  const built: Interval[] = [];
   for (const interval of intervals) {
     const repetitions = positiveInt(interval.repetitions);
     const metres = positiveInt(interval.metres);
@@ -284,7 +294,7 @@ export function intervalBody(intervals: DraftInterval[]): Run | null {
   ) {
     return null;
   }
-  return { sport: 'run', distance, duration, intervals: built };
+  return { sport, distance, duration, intervals: built };
 }
 
 export function strengthBody(exercises: DraftExercise[]): Strength | null {

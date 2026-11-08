@@ -331,6 +331,7 @@ mod tests {
             SessionBody::Ski {
                 distance: 12_000,
                 duration: 3_600,
+                intervals: vec![],
             }
         );
         assert_eq!(body.sessions[1].source, Some(source("ski-2400")));
@@ -370,6 +371,7 @@ mod tests {
             SessionBody::Ski {
                 distance: 15_000,
                 duration: 4_000,
+                intervals: vec![],
             }
         );
 

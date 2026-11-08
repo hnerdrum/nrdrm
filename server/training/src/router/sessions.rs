@@ -276,6 +276,7 @@ mod tests {
                 SessionBody::Ride {
                     distance: 40_000,
                     duration: 3_600,
+                    intervals: vec![],
                 },
             ),
             (
@@ -283,6 +284,7 @@ mod tests {
                 SessionBody::Ski {
                     distance: 12_000,
                     duration: 3_600,
+                    intervals: vec![],
                 },
             ),
             (
@@ -298,6 +300,7 @@ mod tests {
                 SessionBody::Ride {
                     distance: 2_000,
                     duration: 400,
+                    intervals: vec![],
                 },
             ),
         ];
@@ -351,6 +354,7 @@ mod tests {
                     SessionBody::Ride {
                         distance: 40_000,
                         duration: 3_600,
+                        intervals: vec![],
                     },
                 ),
                 (
@@ -358,6 +362,7 @@ mod tests {
                     SessionBody::Ski {
                         distance: 12_000,
                         duration: 3_600,
+                        intervals: vec![],
                     },
                 ),
                 (
@@ -387,6 +392,7 @@ mod tests {
         let ski = SessionBody::Ski {
             distance: 8_000,
             duration: 2_400,
+            intervals: vec![],
         };
         let (status, bytes) = call(&app, "POST", "/api/sessions", Some(&input(monday, ski))).await;
         assert_eq!(
@@ -400,6 +406,7 @@ mod tests {
         let longer = SessionBody::Ski {
             distance: 12_000,
             duration: 3_600,
+            intervals: vec![],
         };
         let (status, bytes) = call(
             &app,

@@ -1,4 +1,4 @@
-export type RunInterval = {
+export type Interval = {
   repetitions: number;
   distance: number;
   duration: number;
@@ -9,19 +9,21 @@ export type Run = {
   sport: 'run';
   distance: number;
   duration: number;
-  intervals?: RunInterval[];
+  intervals?: Interval[];
 };
 
 export type Ride = {
   sport: 'ride';
   distance: number;
   duration: number;
+  intervals?: Interval[];
 };
 
 export type Ski = {
   sport: 'ski';
   distance: number;
   duration: number;
+  intervals?: Interval[];
 };
 
 export type ExerciseSet = {

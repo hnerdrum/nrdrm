@@ -86,10 +86,12 @@ fn planned(summary: &ActivitySummary, source: ActivitySource) -> Option<PlannedS
         ActivityKind::Ride => SessionBody::Ride {
             distance: whole_units(summary.distance_metres?)?,
             duration: whole_units(summary.duration_seconds?)?,
+            intervals: vec![],
         },
         ActivityKind::Ski => SessionBody::Ski {
             distance: whole_units(summary.distance_metres?)?,
             duration: whole_units(summary.duration_seconds?)?,
+            intervals: vec![],
         },
         ActivityKind::Other => return None,
     };
@@ -281,6 +283,7 @@ mod tests {
                 body: SessionBody::Ski {
                     distance: 12_000,
                     duration: 3_600,
+                    intervals: vec![],
                 },
                 source: source("300"),
             }]

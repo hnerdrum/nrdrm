@@ -63,7 +63,7 @@ export function sessionMain(body: SessionBody): {
       plain: true,
     };
   }
-  if (body.sport === 'run' && body.intervals && body.intervals.length > 0) {
+  if (body.intervals && body.intervals.length > 0) {
     if (body.intervals.length === 1) {
       const interval = body.intervals[0];
       return {

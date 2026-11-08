@@ -23,12 +23,11 @@
     strengthBody,
     type DraftExercise,
     type DraftInterval,
-    type RunKind,
+    type EffortKind,
   } from "../draft";
   import { sportLabel } from "../format";
   import Button from "./Button.svelte";
-  import DistanceFields from "./DistanceFields.svelte";
-  import RunEditor from "./RunEditor.svelte";
+  import DistanceEditor from "./DistanceEditor.svelte";
   import SportPicker from "./SportPicker.svelte";
   import StrengthEditor from "./StrengthEditor.svelte";
   import TextField from "./TextField.svelte";
@@ -53,11 +52,13 @@
   let kilometres = $state(seeded?.kilometres ?? "");
   let hours = $state(seeded?.hours ?? "");
   let minutes = $state(seeded?.minutes ?? "");
-  let runKind = $state<RunKind>(
-    editing?.body.sport === "run" && editing.body.intervals?.length ? "intervals" : "distance",
+  let kind = $state<EffortKind>(
+    editing && editing.body.sport !== "strength" && editing.body.intervals?.length
+      ? "intervals"
+      : "distance",
   );
   let intervals = $state<DraftInterval[]>(
-    editing?.body.sport === "run" && editing.body.intervals?.length
+    editing && editing.body.sport !== "strength" && editing.body.intervals?.length
       ? intervalsFrom(editing.body.intervals)
       : [emptyInterval()],
   );
@@ -169,8 +170,8 @@
         error = "Name each exercise. Enter reps or a time for every set.";
         return;
       }
-    } else if (sport === "run" && runKind === "intervals") {
-      body = intervalBody(intervals);
+    } else if (kind === "intervals") {
+      body = intervalBody(sport, intervals);
       if (!body) {
         error = "Enter repeats, metres, and a time for every interval.";
         return;
@@ -240,16 +241,7 @@
       mono
       bind:value={date}
     />
-    {#if sport === "run"}
-      <RunEditor
-        bind:kind={runKind}
-        bind:kilometres
-        bind:hours
-        bind:minutes
-        {intervals}
-        onchange={(next) => (intervals = next)}
-      />
-    {:else if sport === "strength"}
+    {#if sport === "strength"}
       {#if waitingForLast}
         <p class="text-muted" role="status">Loading exercises…</p>
       {:else}
@@ -259,7 +251,15 @@
         <StrengthEditor {exercises} {prefilledFrom} onchange={(next) => (exercises = next)} />
       {/if}
     {:else}
-      <DistanceFields {sport} bind:kilometres bind:hours bind:minutes />
+      <DistanceEditor
+        {sport}
+        bind:kind
+        bind:kilometres
+        bind:hours
+        bind:minutes
+        {intervals}
+        onchange={(next) => (intervals = next)}
+      />
     {/if}
     {#if editing}
       {#if confirming}

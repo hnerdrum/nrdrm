@@ -20,7 +20,9 @@ pub fn week_totals(sessions: &[Session], monday: NaiveDate) -> WeekTotals {
             continue;
         }
         match session.body {
-            SessionBody::Ski { distance, duration } => {
+            SessionBody::Ski {
+                distance, duration, ..
+            } => {
                 totals.ski_seconds += duration;
                 totals.ski_metres += distance;
             }
@@ -59,6 +61,7 @@ mod tests {
                 SessionBody::Ski {
                     distance: 4_000,
                     duration: 1_800,
+                    intervals: vec![],
                 },
             ),
             session(
@@ -66,6 +69,7 @@ mod tests {
                 SessionBody::Ski {
                     distance: 10_000,
                     duration: 3_600,
+                    intervals: vec![],
                 },
             ),
         ];
@@ -119,6 +123,7 @@ mod tests {
                 SessionBody::Ski {
                     distance: 8_000,
                     duration: 2_400,
+                    intervals: vec![],
                 },
             ),
             session(9, SessionBody::Strength { exercises: vec![] }),
@@ -153,6 +158,7 @@ mod tests {
                 SessionBody::Ride {
                     distance: 40_000,
                     duration: 3_600,
+                    intervals: vec![],
                 },
             ),
         ];
