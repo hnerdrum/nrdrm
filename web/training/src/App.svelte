@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import LoginForm from "./components/LoginForm.svelte";
-  import SignedIn from "./components/SignedIn.svelte";
+  import Training from "./components/Training.svelte";
   import { currentSession, login, logout } from "./session";
 
   let screen = $state<"checking" | "login" | "home">("checking");
@@ -34,6 +34,10 @@
       result === "rejected" ? "Wrong email or password." : "Couldn't sign in. Try again.";
   }
 
+  function showLogin() {
+    screen = "login";
+  }
+
   async function onLogout() {
     if (loggingOut) return;
     loggingOut = true;
@@ -51,5 +55,5 @@
 {#if screen === "login"}
   <LoginForm bind:email {error} {submitting} onsubmit={onLogin} />
 {:else if screen === "home"}
-  <SignedIn {loggingOut} {logoutError} onlogout={onLogout} />
+  <Training {loggingOut} {logoutError} onlogout={onLogout} onsignedout={showLogin} />
 {/if}

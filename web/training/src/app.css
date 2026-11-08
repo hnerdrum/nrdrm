@@ -1,8 +1,8 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
-  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-sans: 'Hanken Grotesk', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --color-bg: #13121c;
   --color-fg: #eceaf4;
   --color-muted: #9f9db5;
@@ -11,6 +11,7 @@
   --color-on-accent: #13121c;
   --color-edge: #7e7c96;
   --color-field: #1a1927;
+  --breakpoint-wide: 960px;
 }
 
 @layer base {
@@ -60,8 +61,50 @@
   animation-delay: 0.12s;
 }
 
+.week-header {
+  grid-template-areas:
+    'brand out'
+    'nav nav';
+}
+
+.odo {
+  transform: translateY(calc(var(--v) * -1em));
+}
+
+.week-enter .figs {
+  animation: rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.week-enter .odo {
+  animation: roll 1.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  animation-delay: calc(var(--i) * 70ms + 150ms);
+}
+
+.week-enter .day,
+.week-enter .count,
+.week-enter .empty {
+  animation: rise 0.8s 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes roll {
+  from {
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 960px) {
+  .week-header {
+    grid-template-areas: 'brand nav add out';
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .enter > * {
+  .enter > *,
+  .week-enter .figs,
+  .week-enter .day,
+  .week-enter .count,
+  .week-enter .empty,
+  .week-enter .odo {
     animation: none;
   }
 }
