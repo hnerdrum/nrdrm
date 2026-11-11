@@ -10,7 +10,7 @@ use crate::{
         user_account::find_user_by_id,
     },
     domain::{
-        jwt::{create_jwt_token, decode_jwt_token},
+        jwt::{create_jwt_token, decode_jwt_token, JwtError},
         model::{from_db_user, Auth},
     },
 };
@@ -38,7 +38,15 @@ pub async fn auth_middleware(
         Some(cookie) => match decode_jwt_token(cookie.value(), state.config.auth.secret.clone()) {
             Ok(decoded) => check_token_validity(decoded, state.clone(), cookies.clone()).await,
             Err(err) => {
-                info!("Invalid JWT token: {:?}", err);
+                match err {
+                    JwtError::Expired => info!("Session expired, clearing cookie"),
+                    JwtError::Invalid => info!("Invalid JWT token, clearing cookie"),
+                }
+                cookies.remove(session_cookie(
+                    state.config.auth.cookie_name.clone(),
+                    String::new(),
+                    &state.config.env,
+                ));
                 None
             }
         },

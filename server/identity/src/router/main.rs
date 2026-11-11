@@ -196,4 +196,49 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
         assert!(body.is_empty());
     }
+
+    #[tokio::test]
+    async fn expired_session_is_cleared_so_the_user_can_log_in_again() {
+        let state = test_state();
+        let now = chrono::Utc::now();
+        let user = User {
+            id: uuid::Uuid::new_v4(),
+            email: "ada@example.com".into(),
+        };
+        let auth_token = crate::database::auth_token::AuthToken {
+            id: uuid::Uuid::new_v4(),
+            created_at: now,
+            updated_at: now,
+            status: crate::database::auth_token::TokenStatus::Normal,
+            user_id: user.id,
+            issued_at: now - chrono::Duration::hours(3),
+            expires_at: now - chrono::Duration::hours(2),
+        };
+        let token = create_jwt_token(user, auth_token, state.config.auth.secret.clone()).unwrap();
+
+        let response = init_router(state)
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/v1/me")
+                    .header(header::COOKIE, format!("nrdrm-login={token}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let set_cookie = response
+            .headers()
+            .get(header::SET_COOKIE)
+            .expect("expired session cookie should be cleared")
+            .to_str()
+            .unwrap();
+        assert!(set_cookie.starts_with("nrdrm-login="));
+        assert!(set_cookie.contains("Max-Age=0"));
+        assert!(set_cookie.contains("Path=/"));
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(&body[..], br#"{"auth":null}"#);
+    }
 }

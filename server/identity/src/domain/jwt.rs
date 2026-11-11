@@ -1,3 +1,4 @@
+use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use tracing::error;
@@ -40,17 +41,25 @@ pub fn create_jwt_token(
     })
 }
 
-pub fn decode_jwt_token(token: &str, secret: String) -> Result<Auth, DomainError> {
+#[derive(Debug, PartialEq, Eq)]
+pub enum JwtError {
+    Expired,
+    Invalid,
+}
+
+pub fn decode_jwt_token(token: &str, secret: String) -> Result<Auth, JwtError> {
     decode::<JwtClaims>(
         token,
         &DecodingKey::from_secret(secret.as_bytes()),
         &Validation::default(),
     )
-    .map(|token_data| token_data.claims)
-    .map(|claims| claims.auth)
-    .map_err(|err| {
-        error!("Error when decoding JWT token: {}", err);
-        DomainError::UnknownError
+    .map(|token_data| token_data.claims.auth)
+    .map_err(|err| match err.kind() {
+        ErrorKind::ExpiredSignature => JwtError::Expired,
+        _ => {
+            error!("Error when decoding JWT token: {}", err);
+            JwtError::Invalid
+        }
     })
 }
 
@@ -96,7 +105,7 @@ mod tests {
         let (user, auth_token) = session();
         let encoded = create_jwt_token(user, auth_token, "test-secret".into()).unwrap();
         let err = decode_jwt_token(&encoded, "other-secret".into()).unwrap_err();
-        assert!(matches!(err, DomainError::UnknownError));
+        assert_eq!(err, JwtError::Invalid);
     }
 
     #[test]
@@ -106,6 +115,6 @@ mod tests {
         auth_token.issued_at = auth_token.expires_at - Duration::minutes(1);
         let encoded = create_jwt_token(user, auth_token, "test-secret".into()).unwrap();
         let err = decode_jwt_token(&encoded, "test-secret".into()).unwrap_err();
-        assert!(matches!(err, DomainError::UnknownError));
+        assert_eq!(err, JwtError::Expired);
     }
 }
