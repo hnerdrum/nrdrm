@@ -11,12 +11,7 @@ pub(crate) fn routes(state: &AppState) -> Router<AppState> {
     Router::new()
         .route_service(
             "/api/mcp",
-            http::service(
-                state.db.clone(),
-                Arc::clone(&state.clock),
-                Arc::clone(&state.tokens),
-                &state.config,
-            ),
+            http::service(state.db.clone(), Arc::clone(&state.clock), &state.config),
         )
         .route("/api/oauth-protected-resource", get(metadata))
 }
@@ -36,7 +31,7 @@ mod tests {
 
     use super::super::main::{init_router, test_state};
 
-    const CHALLENGE: &str = "Bearer resource_metadata=\"http://localhost:8080/training/oauth-protected-resource\", scope=\"training\"";
+    const OWNER: &str = "ada@example.com";
     const FROM: &str = "2411-01-25";
     const TO: &str = "2411-02-15";
     const ON_DATE: &str = "2411-02-02";
@@ -49,7 +44,7 @@ mod tests {
         app: &axum::Router,
         method: &str,
         uri: &str,
-        token: Option<&str>,
+        email: Option<&str>,
         origin: Option<&str>,
         body: Option<&str>,
     ) -> (StatusCode, HeaderMap, Vec<u8>) {
@@ -62,8 +57,8 @@ mod tests {
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::ACCEPT, "application/json, text/event-stream");
         }
-        if let Some(token) = token {
-            builder = builder.header(header::AUTHORIZATION, format!("Bearer {token}"));
+        if let Some(email) = email {
+            builder = builder.header("x-nrdrm-email", email);
         }
         if let Some(origin) = origin {
             builder = builder.header(header::ORIGIN, origin);
@@ -118,7 +113,7 @@ mod tests {
             app,
             "POST",
             "/api/mcp",
-            Some("owner"),
+            Some(OWNER),
             None,
             Some(&rpc(
                 id,
@@ -175,36 +170,38 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_missing_token_is_rejected_with_the_protected_resource() {
+    async fn a_missing_email_is_unauthorized() {
         let (status, headers, bytes) =
             send(&app(), "POST", "/api/mcp", None, None, Some(&initialize())).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
-        assert_eq!(headers.get(header::WWW_AUTHENTICATE).unwrap(), CHALLENGE);
+        assert!(headers.get(header::WWW_AUTHENTICATE).is_none());
         assert_eq!(bytes, b"Unauthorized");
     }
 
     #[tokio::test]
-    async fn an_invalid_token_is_rejected_the_same_way() {
-        let (status, headers, _) = send(
-            &app(),
-            "POST",
-            "/api/mcp",
-            Some("nope"),
-            None,
-            Some(&initialize()),
-        )
-        .await;
-        assert_eq!(status, StatusCode::UNAUTHORIZED);
-        assert_eq!(headers.get(header::WWW_AUTHENTICATE).unwrap(), CHALLENGE);
+    async fn a_bearer_token_is_not_a_sign_in() {
+        let app = app();
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/mcp")
+            .header(header::HOST, "localhost")
+            .header(header::CONTENT_TYPE, "application/json")
+            .header(header::ACCEPT, "application/json, text/event-stream")
+            .header(header::AUTHORIZATION, "Bearer owner")
+            .body(Body::from(initialize()))
+            .unwrap();
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        assert!(response.headers().get(header::WWW_AUTHENTICATE).is_none());
     }
 
     #[tokio::test]
-    async fn a_token_for_someone_else_is_forbidden() {
+    async fn a_different_email_is_forbidden() {
         let (status, headers, _) = send(
             &app(),
             "POST",
             "/api/mcp",
-            Some("other"),
+            Some("other@example.com"),
             None,
             Some(&initialize()),
         )
@@ -219,7 +216,7 @@ mod tests {
             &app(),
             "POST",
             "/api/mcp",
-            Some("owner"),
+            Some(OWNER),
             Some("http://evil.example"),
             Some(&initialize()),
         )
@@ -234,7 +231,7 @@ mod tests {
             &app(),
             "POST",
             "/api/mcp",
-            Some("owner"),
+            Some(OWNER),
             Some("http://localhost:3000"),
             Some(&initialize()),
         )
@@ -256,7 +253,7 @@ mod tests {
             &app(),
             "POST",
             "/api/mcp",
-            Some("owner"),
+            Some(OWNER),
             None,
             Some(&rpc(2, "tools/list", json!({}))),
         )
@@ -415,7 +412,7 @@ mod tests {
             &app,
             "POST",
             "/api/mcp",
-            Some("owner"),
+            Some(OWNER),
             None,
             Some(&rpc(
                 8,
@@ -467,25 +464,6 @@ mod tests {
         );
         assert_eq!(body["scopes_supported"], json!(["training"]));
         assert_eq!(body["bearer_methods_supported"], json!(["header"]));
-    }
-
-    #[tokio::test]
-    async fn identity_being_down_is_unavailable() {
-        let (status, headers, bytes) = send(
-            &app(),
-            "POST",
-            "/api/mcp",
-            Some("down"),
-            None,
-            Some(&initialize()),
-        )
-        .await;
-        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
-        assert!(headers.get(header::WWW_AUTHENTICATE).is_none());
-        assert_eq!(
-            bytes,
-            b"The training log can't check this sign-in right now."
-        );
     }
 
     #[tokio::test]

@@ -1,4 +1,7 @@
-//! `/api/mcp` and the protected-resource document a client reads from a 401.
+//! `/api/mcp` and the protected-resource document.
+//!
+//! The gateway checks the bearer token and forwards the caller's email.
+//! This service allows the request only when that email is the owner's.
 
 use std::convert::Infallible;
 use std::future::Future;
@@ -18,14 +21,7 @@ use tower::Service;
 use crate::clock::Clock;
 use crate::config::Config;
 
-use super::auth::{TokenError, TokenVerifier};
 use super::tools::TrainingTools;
-
-pub(crate) fn protected_resource_url(resource: &str) -> String {
-    let resource = resource.trim_end_matches('/');
-    let base = resource.strip_suffix("/mcp").unwrap_or(resource);
-    format!("{base}/oauth-protected-resource")
-}
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
 pub(crate) struct ProtectedResource {
@@ -47,7 +43,6 @@ pub(crate) fn protected_resource(config: &Config) -> ProtectedResource {
 pub(crate) fn service(
     db: Pool,
     clock: Arc<dyn Clock>,
-    tokens: Arc<dyn TokenVerifier>,
     config: &Config,
 ) -> Guard<StreamableHttpService<TrainingTools, NeverSessionManager>> {
     let inner = StreamableHttpService::new(
@@ -61,28 +56,16 @@ pub(crate) fn service(
     );
     Guard {
         inner,
-        tokens,
         owner_email: config.training_owner_email.clone(),
         allowed_origins: config.mcp_allowed_origins.clone(),
-        challenge: challenge(&config.mcp_resource_url),
     }
-}
-
-fn challenge(resource_url: &str) -> HeaderValue {
-    let metadata = protected_resource_url(resource_url);
-    HeaderValue::from_str(&format!(
-        "Bearer resource_metadata=\"{metadata}\", scope=\"training\""
-    ))
-    .expect("protected resource URL is a header value")
 }
 
 #[derive(Clone)]
 pub(crate) struct Guard<S> {
     inner: S,
-    tokens: Arc<dyn TokenVerifier>,
     owner_email: String,
     allowed_origins: Vec<String>,
-    challenge: HeaderValue,
 }
 
 impl<S> Service<Request<Body>> for Guard<S>
@@ -101,12 +84,10 @@ where
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let mut inner = self.inner.clone();
-        let tokens = Arc::clone(&self.tokens);
         let owner_email = self.owner_email.clone();
-        let challenge = self.challenge.clone();
         let post = req.method() == Method::POST;
         let origin_ok = origin_allowed(req.headers(), &self.allowed_origins);
-        let token = bearer(req.headers()).map(str::to_string);
+        let email = caller_email(req.headers());
         Box::pin(async move {
             if !post {
                 return Ok(method_not_allowed());
@@ -114,14 +95,11 @@ where
             if !origin_ok {
                 return Ok(forbidden());
             }
-            let Some(token) = token else {
-                return Ok(unauthorized(&challenge));
+            let Some(email) = email else {
+                return Ok(unauthorized());
             };
-            match tokens.verify(&token).await {
-                Ok(caller) if caller.email == owner_email => {}
-                Ok(_) => return Ok(forbidden()),
-                Err(TokenError::Invalid) => return Ok(unauthorized(&challenge)),
-                Err(TokenError::Unavailable) => return Ok(unavailable()),
+            if email != owner_email {
+                return Ok(forbidden());
             }
             let response = inner
                 .call(req)
@@ -142,17 +120,13 @@ fn origin_allowed(headers: &HeaderMap, allowed: &[String]) -> bool {
     allowed.iter().any(|candidate| candidate == origin)
 }
 
-fn bearer(headers: &HeaderMap) -> Option<&str> {
-    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
-    let (scheme, token) = value.split_once(' ')?;
-    if !scheme.eq_ignore_ascii_case("bearer") {
-        return None;
-    }
-    let token = token.trim();
-    if token.is_empty() {
+fn caller_email(headers: &HeaderMap) -> Option<String> {
+    let value = headers.get("x-nrdrm-email")?.to_str().ok()?;
+    let email = value.trim();
+    if email.is_empty() {
         None
     } else {
-        Some(token)
+        Some(email.to_string())
     }
 }
 
@@ -171,16 +145,13 @@ fn method_not_allowed() -> Response {
         .into_response()
 }
 
-fn unauthorized(challenge: &HeaderValue) -> Response {
+fn unauthorized() -> Response {
     (
         StatusCode::UNAUTHORIZED,
-        [
-            (header::WWW_AUTHENTICATE, challenge.clone()),
-            (
-                header::CONTENT_TYPE,
-                HeaderValue::from_static("text/plain; charset=utf-8"),
-            ),
-        ],
+        [(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("text/plain; charset=utf-8"),
+        )],
         "Unauthorized",
     )
         .into_response()
@@ -196,33 +167,4 @@ fn forbidden() -> Response {
         "Forbidden",
     )
         .into_response()
-}
-
-fn unavailable() -> Response {
-    (
-        StatusCode::SERVICE_UNAVAILABLE,
-        [(
-            header::CONTENT_TYPE,
-            HeaderValue::from_static("text/plain; charset=utf-8"),
-        )],
-        "The training log can't check this sign-in right now.",
-    )
-        .into_response()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_metadata_url_sits_beside_the_mcp_url() {
-        assert_eq!(
-            protected_resource_url("http://localhost:8080/training/mcp"),
-            "http://localhost:8080/training/oauth-protected-resource"
-        );
-        assert_eq!(
-            protected_resource_url("http://localhost:8080/training/mcp/"),
-            "http://localhost:8080/training/oauth-protected-resource"
-        );
-    }
 }

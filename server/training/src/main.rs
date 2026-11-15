@@ -6,7 +6,6 @@ use training::clock::{Clock, OsloClock};
 use training::config::load_config;
 use training::database::connection::create_connection_pool;
 use training::garmin::GarminClient;
-use training::mcp::{ClosedTokens, TokenVerifier};
 use training::router::main::{init_router, AppState};
 
 #[tokio::main]
@@ -22,13 +21,11 @@ async fn main() {
     let activities: Arc<dyn ActivityClient> =
         Arc::new(GarminClient::new(config.garmin_api_key.clone()));
     let clock: Arc<dyn Clock> = Arc::new(OsloClock);
-    let tokens: Arc<dyn TokenVerifier> = Arc::new(ClosedTokens);
     let state = AppState {
         db: pool,
         config,
         activities,
         clock,
-        tokens,
     };
     let nights = state.clone();
     tokio::spawn(training::schedule::nightly(nights));

@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::activities::ActivityClient;
 use crate::clock::Clock;
 use crate::config::Config;
-use crate::mcp::TokenVerifier;
 use axum::{routing::get, Json, Router};
 use deadpool_diesel::postgres::Pool;
 use serde::{Deserialize, Serialize};
@@ -15,7 +14,6 @@ pub struct AppState {
     pub config: Config,
     pub activities: Arc<dyn ActivityClient>,
     pub clock: Arc<dyn Clock>,
-    pub tokens: Arc<dyn TokenVerifier>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -46,7 +44,6 @@ pub(crate) fn test_state() -> AppState {
             garmin_api_key: String::new(),
             mcp_resource_url: "http://localhost:8080/training/mcp".to_string(),
             authorization_server_url: "http://localhost:8080/identity".to_string(),
-            identity_url: "http://localhost:8081".to_string(),
             training_owner_email: "ada@example.com".to_string(),
             mcp_allowed_origins: vec!["http://localhost:3000".to_string()],
         },
@@ -54,7 +51,6 @@ pub(crate) fn test_state() -> AppState {
         clock: Arc::new(crate::clock::FixedClock(
             chrono::NaiveDate::from_ymd_opt(2026, 11, 8).unwrap(),
         )),
-        tokens: Arc::new(crate::mcp::auth::FakeTokens),
     }
 }
 

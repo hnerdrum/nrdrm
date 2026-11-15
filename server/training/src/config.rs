@@ -9,7 +9,6 @@ pub struct Config {
     pub garmin_api_key: String,
     pub mcp_resource_url: String,
     pub authorization_server_url: String,
-    pub identity_url: String,
     pub training_owner_email: String,
     pub mcp_allowed_origins: Vec<String>,
 }
@@ -24,7 +23,6 @@ pub fn load_config() -> Config {
     let mcp_resource_url = env_or("MCP_RESOURCE_URL", "http://localhost:8080/training/mcp");
     let authorization_server_url =
         env_or("AUTHORIZATION_SERVER_URL", "http://localhost:8080/identity");
-    let identity_url = env_or("IDENTITY_URL", "http://localhost:8081");
     let training_owner_email = env::var("TRAINING_OWNER_EMAIL")
         .unwrap_or_default()
         .trim()
@@ -37,7 +35,6 @@ pub fn load_config() -> Config {
         garmin_api_key,
         mcp_resource_url,
         authorization_server_url,
-        identity_url,
         training_owner_email,
         mcp_allowed_origins,
     }
