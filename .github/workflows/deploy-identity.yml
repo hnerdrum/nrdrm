@@ -65,6 +65,7 @@ jobs:
       image_name: nrdrm-identity
       dockerfile: server/identity/Dockerfile
       context: server/identity
+      extra_environment_variables: '{"OAUTH_ISSUER":"${{ vars.OAUTH_ISSUER }}","OAUTH_RESOURCES":"${{ vars.OAUTH_RESOURCES }}"}'
     secrets:
       SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
       CONTAINER_REGISTRY_ENDPOINT: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}

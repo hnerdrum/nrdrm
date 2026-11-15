@@ -13,6 +13,7 @@ import gleam/http.{Delete, Get, Post, Put}
 import gleam/http/request.{type Request}
 import gleam/http/response.{type Response}
 import gleam/list
+import gleam/option.{None}
 import gleam/set
 
 pub type Responder =
@@ -63,9 +64,9 @@ pub fn routing() -> Routing {
         response_headers: set.new(),
         rules: [
           rule("webhooks/github", [Post], Public),
-          rule("complete", [Post], Bearer("agents")),
-          rule("runs", [Post], Bearer("agents")),
-          rule("runs/*", [Get], Bearer("agents")),
+          rule("complete", [Post], Bearer("agents", None)),
+          rule("runs", [Post], Bearer("agents", None)),
+          rule("runs/*", [Get], Bearer("agents", None)),
         ],
       ),
     ],

@@ -1,15 +1,21 @@
 import app/request_id
 import app/router
 import app/transport
+import config/path_pattern
+import config/routing
 import fixture
+import gleam/bytes_tree
 import gleam/erlang/process
 import gleam/http
 import gleam/http/request.{type Request}
 import gleam/http/response
+import gleam/int
 import gleam/list
 import gleam/option.{Some}
+import gleam/set
 import gleam/string
 import gleeunit/should
+import mist
 import wisp
 import wisp/testing
 
@@ -628,6 +634,58 @@ pub fn non_bearer_authorization_is_unauthorized_test() {
 
   response.status |> should.equal(401)
   sent |> should.equal([])
+}
+
+pub fn upstream_redirect_is_returned_to_the_caller_test() {
+  let assert Ok(server) =
+    mist.new(fn(req) {
+      case req.path {
+        "/api/v1/oauth/authorize" ->
+          response.new(303)
+          |> response.set_header("location", "/landed")
+          |> response.set_body(mist.Bytes(bytes_tree.from_string("go")))
+        "/landed" ->
+          response.new(200)
+          |> response.set_body(mist.Bytes(bytes_tree.from_string("followed")))
+        _ ->
+          response.new(500)
+          |> response.set_body(mist.Bytes(bytes_tree.from_string(req.path)))
+      }
+    })
+    |> mist.bind("127.0.0.1")
+    |> mist.port(0)
+    |> mist.after_start(fn(_, _, _) { Nil })
+    |> mist.start_http_server
+
+  let port = mist.get_port(server)
+  let assert Ok(base_request) =
+    routing.parse_base_url(
+      "http://127.0.0.1:" <> int.to_string(port) <> "/api/v1",
+    )
+  let upstream = routing.Upstream("identity", base_request, 2000)
+  let assert Ok(pattern) = path_pattern.parse("oauth/authorize")
+  let route =
+    routing.Route(
+      prefix: "identity",
+      upstream: upstream,
+      request_headers: set.new(),
+      response_headers: set.from_list(["location"]),
+      rules: [
+        routing.Rule(path: pattern, methods: [http.Get], auth: routing.Public),
+      ],
+    )
+  let ctx =
+    fixture.context_with_routing(
+      routing.Routing(identity: upstream, upstreams: [upstream], routes: [route]),
+      transport.new(),
+    )
+
+  let response =
+    router.handle_request(testing.get("/identity/oauth/authorize", []), ctx)
+
+  response.status |> should.equal(303)
+  response.get_header(response, "location") |> should.equal(Ok("/landed"))
+  testing.string_body(response) |> should.equal("go")
 }
 
 pub fn bearer_route_without_token_is_unauthorized_test() {
