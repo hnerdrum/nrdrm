@@ -31,6 +31,7 @@ pub struct Config {
     pub boot_time: String,
     pub api_version: String,
     pub oauth_resources: Vec<String>,
+    pub oauth_issuer: String,
 }
 
 #[derive(Debug, Clone)]
@@ -58,6 +59,7 @@ pub fn load_config() -> Config {
         boot_time: Utc::now().to_rfc3339(),
         api_version: build_id.chars().take(7).collect(),
         oauth_resources: oauth_resources_from_env(),
+        oauth_issuer: env::var("OAUTH_ISSUER").unwrap_or_default(),
     }
 }
 

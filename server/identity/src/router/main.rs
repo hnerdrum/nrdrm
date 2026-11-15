@@ -2,6 +2,7 @@ use super::authorize::{
     oauth_authorize_get, oauth_authorize_post, oauth_register, OAUTH_BODY_LIMIT,
 };
 use super::middleware::{auth_middleware, session_cookie};
+use super::token::{oauth_authorization_server_metadata, oauth_token};
 use crate::config::Config;
 #[cfg(test)]
 use crate::config::{AuthConfig, Environment};
@@ -13,10 +14,7 @@ use crate::domain::jwt::create_jwt_token;
 use crate::domain::model::{
     login_user, Auth, HealthCheck, LoginInput, TokenValidation, User, UserSettings,
 };
-use crate::domain::oauth::{
-    introspect_access_token, issue_access_token, IntrospectRequest, Introspection, TokenRequest,
-    TokenResponse,
-};
+use crate::domain::oauth::{introspect_access_token, IntrospectRequest, Introspection};
 use axum::extract::DefaultBodyLimit;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
@@ -54,8 +52,12 @@ pub fn init_router(state: AppState) -> Router {
                 .route("/me", get(me_handler))
                 .route("/login", post(login_handler))
                 .route("/logout", post(logout_handler))
-                .route("/oauth/token", post(oauth_token_handler))
+                .route("/oauth/token", post(oauth_token))
                 .route("/oauth/introspect", post(oauth_introspect_handler))
+                .route(
+                    "/oauth-authorization-server/identity",
+                    get(oauth_authorization_server_metadata),
+                )
                 .route(
                     "/oauth/register",
                     post(oauth_register).layer(DefaultBodyLimit::max(OAUTH_BODY_LIMIT)),
@@ -117,14 +119,6 @@ async fn logout_handler(cookies: Cookies, State(state): State<AppState>) -> Stat
     StatusCode::NO_CONTENT
 }
 
-async fn oauth_token_handler(
-    State(state): State<AppState>,
-    Json(input): Json<TokenRequest>,
-) -> Result<Json<TokenResponse>, DomainError> {
-    let token = issue_access_token(&state.db, input).await?;
-    Ok(Json(token))
-}
-
 async fn oauth_introspect_handler(
     State(state): State<AppState>,
     Json(input): Json<IntrospectRequest>,
@@ -178,6 +172,7 @@ pub(crate) fn test_state() -> AppState {
             boot_time: "2026-11-07T00:00:00Z".into(),
             api_version: "test".into(),
             oauth_resources: vec!["http://localhost:8080/training/mcp".into()],
+            oauth_issuer: "http://localhost:8080/identity".into(),
         },
     }
 }

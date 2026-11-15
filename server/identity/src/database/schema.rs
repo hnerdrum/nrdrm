@@ -17,6 +17,7 @@ diesel::table! {
         expires_at -> Timestamptz,
         revoked_at -> Nullable<Timestamptz>,
         user_id -> Nullable<Uuid>,
+        scope -> Nullable<Text>,
     }
 }
 
@@ -72,6 +73,23 @@ diesel::table! {
 }
 
 diesel::table! {
+    refresh_token (id) {
+        id -> Uuid,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        token_hash -> Text,
+        client_id -> Uuid,
+        user_id -> Uuid,
+        resource -> Text,
+        scope -> Text,
+        family_id -> Uuid,
+        expires_at -> Timestamptz,
+        revoked_at -> Nullable<Timestamptz>,
+        replaced_by -> Nullable<Uuid>,
+    }
+}
+
+diesel::table! {
     user_account (id) {
         id -> Uuid,
         created_at -> Timestamptz,
@@ -87,6 +105,8 @@ diesel::joinable!(auth_token -> user_account (user_id));
 diesel::joinable!(authorization_code -> oauth_client (client_id));
 diesel::joinable!(authorization_code -> user_account (user_id));
 diesel::joinable!(oauth_client_audience -> oauth_client (client_id));
+diesel::joinable!(refresh_token -> oauth_client (client_id));
+diesel::joinable!(refresh_token -> user_account (user_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     access_token,
@@ -94,5 +114,6 @@ diesel::allow_tables_to_appear_in_same_query!(
     authorization_code,
     oauth_client,
     oauth_client_audience,
+    refresh_token,
     user_account,
 );

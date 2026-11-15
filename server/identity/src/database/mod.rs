@@ -4,5 +4,6 @@ pub mod authorization_code;
 pub mod connection;
 pub mod error;
 pub mod oauth_client;
+pub mod refresh_token;
 pub mod schema;
 pub mod user_account;

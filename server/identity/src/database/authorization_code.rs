@@ -1,5 +1,6 @@
 use chrono::prelude::*;
 use diesel::prelude::*;
+use diesel::PgConnection;
 use uuid::Uuid;
 
 use super::{error::DatabaseError, schema::authorization_code};
@@ -32,6 +33,57 @@ pub struct NewAuthorizationCode {
     pub resource: String,
     pub scope: String,
     pub expires_at: DateTime<Utc>,
+}
+
+pub enum ConsumedCode {
+    Fresh(AuthorizationCode),
+    AlreadyUsed,
+    Unknown,
+}
+
+/// Marks the code used. A second presentation finds it already used.
+pub async fn consume_authorization_code(
+    pool: &Pool,
+    code_hash: String,
+) -> Result<ConsumedCode, DatabaseError> {
+    let conn = pool
+        .get()
+        .await
+        .map_err(|_| DatabaseError::ConnectionError)?;
+
+    conn.interact(move |conn| consume_code(conn, code_hash))
+        .await
+        .map_err(|_| DatabaseError::UnknownError)?
+}
+
+fn consume_code(conn: &mut PgConnection, code_hash: String) -> Result<ConsumedCode, DatabaseError> {
+    let updated = diesel::update(
+        authorization_code::table
+            .filter(authorization_code::code_hash.eq(code_hash.clone()))
+            .filter(authorization_code::used_at.is_null()),
+    )
+    .set((
+        authorization_code::used_at.eq(Utc::now()),
+        authorization_code::updated_at.eq(Utc::now()),
+    ))
+    .get_result::<AuthorizationCode>(conn)
+    .optional()
+    .map_err(DatabaseError::from_diesel)?;
+
+    if let Some(code) = updated {
+        return Ok(ConsumedCode::Fresh(code));
+    }
+
+    let existing = authorization_code::table
+        .filter(authorization_code::code_hash.eq(code_hash))
+        .first::<AuthorizationCode>(conn)
+        .optional()
+        .map_err(DatabaseError::from_diesel)?;
+
+    Ok(match existing {
+        Some(_) => ConsumedCode::AlreadyUsed,
+        None => ConsumedCode::Unknown,
+    })
 }
 
 pub async fn insert_authorization_code(

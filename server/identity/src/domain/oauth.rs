@@ -6,15 +6,16 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 use crate::database::{
-    access_token::{find_access_token_by_hash, insert_access_token},
+    access_token::{find_access_token_by_hash, insert_access_token, NewAccessToken},
     connection::DBClient,
     error::DatabaseError,
     oauth_client::{client_has_audience, find_client_by_id, insert_client},
+    user_account::find_user_by_id,
 };
 
 use super::error::DomainError;
 
-const ACCESS_TOKEN_TTL_SECONDS: i64 = 3600;
+pub(crate) const ACCESS_TOKEN_TTL_SECONDS: i64 = 3600;
 
 #[derive(Deserialize, Debug)]
 pub struct TokenRequest {
@@ -29,6 +30,10 @@ pub struct TokenResponse {
     pub access_token: String,
     pub token_type: String,
     pub expires_in: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -47,6 +52,12 @@ pub struct Introspection {
     pub aud: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub exp: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sub: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
 }
 
 pub struct RegisteredClient {
@@ -100,7 +111,7 @@ pub async fn issue_access_token(
         info!("Client {client_id} has no secret");
         return Err(DomainError::InvalidCredentialsError);
     };
-    if !hashes_match(stored_hash, &hash_credential(&input.client_secret)) {
+    if !constant_eq(stored_hash, &hash_credential(&input.client_secret)) {
         info!("Invalid secret for client {client_id}");
         return Err(DomainError::InvalidCredentialsError);
     }
@@ -123,10 +134,14 @@ pub async fn issue_access_token(
     let expires_at = Utc::now() + Duration::seconds(ACCESS_TOKEN_TTL_SECONDS);
     insert_access_token(
         db,
-        hash_credential(&access_token),
-        client_id,
-        input.audience,
-        expires_at,
+        NewAccessToken {
+            token_hash: hash_credential(&access_token),
+            client_id,
+            audience: input.audience,
+            expires_at,
+            user_id: None,
+            scope: None,
+        },
     )
     .await
     .map_err(|err| {
@@ -138,6 +153,8 @@ pub async fn issue_access_token(
         access_token,
         token_type: "Bearer".to_string(),
         expires_in: ACCESS_TOKEN_TTL_SECONDS,
+        refresh_token: None,
+        scope: None,
     })
 }
 
@@ -174,12 +191,34 @@ pub async fn introspect_access_token(
         }
     };
 
+    let (sub, email, scope) = match token.user_id {
+        None => (None, None, None),
+        Some(user_id) => {
+            let user = match find_user_by_id(db, user_id).await {
+                Ok(user) => user,
+                Err(DatabaseError::NotFoundError) => return Ok(inactive()),
+                Err(err) => {
+                    error!("Encountered unexpected database error: {:?}", err);
+                    return Err(DomainError::UnknownError);
+                }
+            };
+            (
+                Some(user.id.to_string()),
+                Some(user.email),
+                token.scope.clone(),
+            )
+        }
+    };
+
     Ok(Introspection {
         active: true,
         client_id: Some(token.client_id),
         client_name: Some(client.name),
         aud: Some(token.audience),
         exp: Some(token.expires_at.timestamp()),
+        sub,
+        email,
+        scope,
     })
 }
 
@@ -203,6 +242,9 @@ fn inactive() -> Introspection {
         client_name: None,
         aud: None,
         exp: None,
+        sub: None,
+        email: None,
+        scope: None,
     }
 }
 
@@ -211,7 +253,7 @@ pub(crate) fn hash_credential(value: &str) -> String {
     URL_SAFE_NO_PAD.encode(digest)
 }
 
-fn hashes_match(stored: &str, presented: &str) -> bool {
+pub(crate) fn constant_eq(stored: &str, presented: &str) -> bool {
     if stored.len() != presented.len() {
         return false;
     }
