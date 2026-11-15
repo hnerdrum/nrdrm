@@ -23,6 +23,8 @@ on:
         required: true
       CONTAINER_ID:
         required: true
+      TRAINING_OWNER_EMAIL:
+        required: false
 
 jobs:
   deploy:
@@ -58,16 +60,22 @@ jobs:
           PROD_ENV: ${{ vars.PROD_ENV }}
           EXTRA_ENV: ${{ inputs.extra_environment_variables }}
           IMAGE_NAME: ${{ inputs.image_name }}
+          TRAINING_OWNER_EMAIL: ${{ secrets.TRAINING_OWNER_EMAIL }}
         run: |
           payload=$(jq -n \
             --arg image "$CONTAINER_REGISTRY/$IMAGE_NAME:$GIT_SHA" \
             --arg build_id "$GIT_SHA" \
             --arg env "$PROD_ENV" \
             --argjson extra "$EXTRA_ENV" \
+            --arg owner_email "$TRAINING_OWNER_EMAIL" \
             '{
               redeploy: true,
               registry_image: $image,
-              environment_variables: ({BUILD_ID: $build_id, ENV: $env} + $extra)
+              environment_variables: (
+                {BUILD_ID: $build_id, ENV: $env}
+                + $extra
+                + (if $owner_email == "" then {} else {TRAINING_OWNER_EMAIL: $owner_email} end)
+              )
             }')
           curl --fail-with-body --request PATCH \
             --header "X-Auth-Token: $SCALEWAY_API_KEY" \
