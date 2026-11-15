@@ -1,6 +1,13 @@
+use super::authorize::{
+    oauth_authorize_get, oauth_authorize_post, oauth_register, OAUTH_BODY_LIMIT,
+};
 use super::middleware::{auth_middleware, session_cookie};
 use crate::config::Config;
+#[cfg(test)]
+use crate::config::{AuthConfig, Environment};
 use crate::database::auth_token::create_auth_token;
+#[cfg(test)]
+use crate::database::connection::create_connection_pool;
 use crate::domain::error::DomainError;
 use crate::domain::jwt::create_jwt_token;
 use crate::domain::model::{
@@ -10,6 +17,7 @@ use crate::domain::oauth::{
     introspect_access_token, issue_access_token, IntrospectRequest, Introspection, TokenRequest,
     TokenResponse,
 };
+use axum::extract::DefaultBodyLimit;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::{extract::State, routing::get, routing::post, Json, Router};
@@ -47,7 +55,17 @@ pub fn init_router(state: AppState) -> Router {
                 .route("/login", post(login_handler))
                 .route("/logout", post(logout_handler))
                 .route("/oauth/token", post(oauth_token_handler))
-                .route("/oauth/introspect", post(oauth_introspect_handler)),
+                .route("/oauth/introspect", post(oauth_introspect_handler))
+                .route(
+                    "/oauth/register",
+                    post(oauth_register).layer(DefaultBodyLimit::max(OAUTH_BODY_LIMIT)),
+                )
+                .route(
+                    "/oauth/authorize",
+                    get(oauth_authorize_get)
+                        .post(oauth_authorize_post)
+                        .layer(DefaultBodyLimit::max(OAUTH_BODY_LIMIT)),
+                ),
         )
         .layer(TraceLayer::new_for_http().on_response(
             trace::DefaultOnResponse::new().latency_unit(tower_http::LatencyUnit::Micros),
@@ -115,58 +133,62 @@ async fn oauth_introspect_handler(
     Ok(Json(introspection))
 }
 
-async fn handle_valid_user(
-    state: AppState,
+pub(crate) async fn start_session(
+    state: &AppState,
     user: User,
-    cookies: Cookies,
-) -> Result<Json<User>, DomainError> {
+    cookies: &Cookies,
+) -> Result<String, DomainError> {
     let auth_token = create_auth_token(&state.db, user.clone())
         .await
         .map_err(|err| {
             error!("Encountered unexpected database error: {:?}", err);
             DomainError::UnknownError
         })?;
-    let token = create_jwt_token(
-        user.clone(),
-        auth_token.clone(),
-        state.config.auth.secret.clone(),
-    )?;
-
+    let token = create_jwt_token(user, auth_token, state.config.auth.secret.clone())?;
     cookies.add(session_cookie(
         state.config.auth.cookie_name.clone(),
-        token,
+        token.clone(),
         &state.config.env,
     ));
+    Ok(token)
+}
+
+async fn handle_valid_user(
+    state: AppState,
+    user: User,
+    cookies: Cookies,
+) -> Result<Json<User>, DomainError> {
+    start_session(&state, user.clone(), &cookies).await?;
     Ok(Json(user))
+}
+
+#[cfg(test)]
+pub(crate) fn test_state() -> AppState {
+    AppState {
+        db: create_connection_pool("postgres://nrdrm:nrdrm@localhost:5433/identity".into()),
+        config: Config {
+            env: Environment::Dev,
+            port: "8081".into(),
+            database_url: "postgres://nrdrm:nrdrm@localhost:5433/identity".into(),
+            log_level: "info".into(),
+            auth: AuthConfig {
+                secret: "test-secret".into(),
+                cookie_name: "nrdrm-login".into(),
+            },
+            boot_time: "2026-11-07T00:00:00Z".into(),
+            api_version: "test".into(),
+            oauth_resources: vec!["http://localhost:8080/training/mcp".into()],
+        },
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{AuthConfig, Environment};
-    use crate::database::connection::create_connection_pool;
     use axum::body::Body;
     use axum::http::{header, Request, StatusCode};
     use http_body_util::BodyExt;
     use tower::ServiceExt;
-
-    fn test_state() -> AppState {
-        AppState {
-            db: create_connection_pool("postgres://nrdrm:nrdrm@localhost:5433/identity".into()),
-            config: Config {
-                env: Environment::Dev,
-                port: "8081".into(),
-                database_url: "postgres://nrdrm:nrdrm@localhost:5433/identity".into(),
-                log_level: "info".into(),
-                auth: AuthConfig {
-                    secret: "test-secret".into(),
-                    cookie_name: "nrdrm-login".into(),
-                },
-                boot_time: "2026-11-07T00:00:00Z".into(),
-                api_version: "test".into(),
-            },
-        }
-    }
 
     #[tokio::test]
     async fn logout_clears_the_session_cookie() {

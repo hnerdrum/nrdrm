@@ -30,6 +30,7 @@ pub struct Config {
     pub auth: AuthConfig,
     pub boot_time: String,
     pub api_version: String,
+    pub oauth_resources: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,7 +57,18 @@ pub fn load_config() -> Config {
         },
         boot_time: Utc::now().to_rfc3339(),
         api_version: build_id.chars().take(7).collect(),
+        oauth_resources: oauth_resources_from_env(),
     }
+}
+
+fn oauth_resources_from_env() -> Vec<String> {
+    env::var("OAUTH_RESOURCES")
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|resource| !resource.is_empty())
+        .map(str::to_string)
+        .collect()
 }
 
 fn load_env() -> Environment {

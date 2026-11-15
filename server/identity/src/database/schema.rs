@@ -36,12 +36,31 @@ diesel::table! {
 }
 
 diesel::table! {
+    authorization_code (id) {
+        id -> Uuid,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+        code_hash -> Text,
+        client_id -> Uuid,
+        user_id -> Uuid,
+        redirect_uri -> Text,
+        code_challenge -> Text,
+        resource -> Text,
+        scope -> Text,
+        expires_at -> Timestamptz,
+        used_at -> Nullable<Timestamptz>,
+    }
+}
+
+diesel::table! {
     oauth_client (id) {
         id -> Uuid,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         name -> Text,
-        secret_hash -> Text,
+        secret_hash -> Nullable<Text>,
+        redirect_uris -> Array<Nullable<Text>>,
+        registered_via -> Text,
     }
 }
 
@@ -65,11 +84,14 @@ diesel::table! {
 diesel::joinable!(access_token -> oauth_client (client_id));
 diesel::joinable!(access_token -> user_account (user_id));
 diesel::joinable!(auth_token -> user_account (user_id));
+diesel::joinable!(authorization_code -> oauth_client (client_id));
+diesel::joinable!(authorization_code -> user_account (user_id));
 diesel::joinable!(oauth_client_audience -> oauth_client (client_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
     access_token,
     auth_token,
+    authorization_code,
     oauth_client,
     oauth_client_audience,
     user_account,

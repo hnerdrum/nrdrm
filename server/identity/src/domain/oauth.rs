@@ -96,7 +96,11 @@ pub async fn issue_access_token(
             }
         })?;
 
-    if !hashes_match(&client.secret_hash, &hash_credential(&input.client_secret)) {
+    let Some(stored_hash) = client.secret_hash.as_deref() else {
+        info!("Client {client_id} has no secret");
+        return Err(DomainError::InvalidCredentialsError);
+    };
+    if !hashes_match(stored_hash, &hash_credential(&input.client_secret)) {
         info!("Invalid secret for client {client_id}");
         return Err(DomainError::InvalidCredentialsError);
     }
@@ -202,7 +206,7 @@ fn inactive() -> Introspection {
     }
 }
 
-fn hash_credential(value: &str) -> String {
+pub(crate) fn hash_credential(value: &str) -> String {
     let digest = Sha256::digest(value.as_bytes());
     URL_SAFE_NO_PAD.encode(digest)
 }
@@ -218,7 +222,7 @@ fn hashes_match(stored: &str, presented: &str) -> bool {
     diff == 0
 }
 
-fn random_token() -> String {
+pub(crate) fn random_token() -> String {
     let mut bytes = [0u8; 32];
     bytes[..16].copy_from_slice(Uuid::new_v4().as_bytes());
     bytes[16..].copy_from_slice(Uuid::new_v4().as_bytes());
