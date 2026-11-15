@@ -5,7 +5,7 @@ import gleam/http.{type Method}
 import gleam/http/request.{type Request}
 import gleam/json
 import gleam/list
-import gleam/option.{None}
+import gleam/option.{type Option, None, Some}
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
@@ -36,7 +36,9 @@ pub type Rule {
 pub type Auth {
   Public
   Session
-  Bearer(audience: String)
+  /// When `scope` is set, the audience is the MCP resource URL and the token
+  /// must include that scope.
+  Bearer(audience: String, scope: Option(String))
 }
 
 const reserved_prefixes = ["_gateway"]
@@ -136,17 +138,20 @@ fn build(
   let identity = resolve("identity_upstream", file.identity_upstream)
   let routes =
     list.map(file.routes, fn(spec) {
-      use upstream <- result.map(resolve(
-        "route \"" <> spec.prefix <> "\"",
-        spec.upstream,
-      ))
-      Route(
-        prefix: spec.prefix,
-        upstream: upstream,
-        request_headers: spec.request_headers,
-        response_headers: spec.response_headers,
-        rules: spec.rules,
-      )
+      let owner = "route \"" <> spec.prefix <> "\""
+      let upstream = resolve(owner, spec.upstream)
+      let rules = resolve_rules(owner, spec.rules, lookup)
+      case upstream, rules {
+        Ok(upstream), Ok(rules) ->
+          Ok(Route(
+            prefix: spec.prefix,
+            upstream: upstream,
+            request_headers: spec.request_headers,
+            response_headers: spec.response_headers,
+            rules: rules,
+          ))
+        _, _ -> Error(list.append(errors_of(upstream), errors_of(rules)))
+      }
     })
 
   let errors =
@@ -193,6 +198,54 @@ fn build_upstream(
         <> url
         <> "\" is not an absolute http(s) URL without a query string",
       ])
+  }
+}
+
+fn resolve_rules(
+  owner: String,
+  rules: List(Rule),
+  lookup: fn(String) -> Result(String, Nil),
+) -> Result(List(Rule), List(String)) {
+  let resolved = list.map(rules, resolve_rule(owner, _, lookup))
+  case list.flat_map(resolved, errors_of) {
+    [] -> Ok(list.filter_map(resolved, fn(rule) { rule }))
+    errors -> Error(errors)
+  }
+}
+
+fn resolve_rule(
+  owner: String,
+  rule: Rule,
+  lookup: fn(String) -> Result(String, Nil),
+) -> Result(Rule, List(String)) {
+  use auth <- result.map(resolve_auth(owner, rule.auth, lookup))
+  Rule(..rule, auth: auth)
+}
+
+fn resolve_auth(
+  owner: String,
+  auth: Auth,
+  lookup: fn(String) -> Result(String, Nil),
+) -> Result(Auth, List(String)) {
+  case auth {
+    Bearer(audience, scope) -> {
+      use audience <- result.try(
+        interpolate.interpolate(audience, lookup)
+        |> result.map_error(list.map(_, fn(error) { owner <> ": " <> error })),
+      )
+      case scope {
+        Some(_) ->
+          case string.ends_with(audience, "/mcp") {
+            True -> Ok(Bearer(audience, scope))
+            False ->
+              Error([
+                owner <> ": audience \"" <> audience <> "\" must end with /mcp",
+              ])
+          }
+        None -> Ok(Bearer(audience, scope))
+      }
+    }
+    other -> Ok(other)
   }
 }
 
@@ -284,15 +337,28 @@ fn auth_decoder() -> Decoder(Auth) {
   }
   let bearer = {
     use audience <- decode.subfield(["bearer", "audience"], decode.string)
+    use scope <- decode.then(decode.optionally_at(
+      ["bearer", "scope"],
+      None,
+      scope_decoder(),
+    ))
     case audience {
       "" -> decode.failure(Public, "")
-      _ -> decode.success(Bearer(audience))
+      _ -> decode.success(Bearer(audience, scope))
     }
   }
   decode.one_of(keyword, [bearer])
   |> decode.collapse_errors(
     "\"public\", \"session\" or {\"bearer\": {\"audience\": \"...\"}}",
   )
+}
+
+fn scope_decoder() -> Decoder(Option(String)) {
+  use scope <- decode.then(decode.string)
+  case string.trim(scope) {
+    "" -> decode.failure(None, "a non-empty scope")
+    scope -> decode.success(Some(scope))
+  }
 }
 
 fn prefix_decoder() -> Decoder(String) {

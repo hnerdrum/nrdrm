@@ -8,13 +8,13 @@ Gleam reverse proxy. No database. Routing lives in [`gateway.json`](gateway.json
 just gateway run       # env bootstrap, then gleam run
 ```
 
-Listens on `PORT`. CORS: `ALLOWED_ORIGINS`. Upstream URLs come from `RECIPES_URL`, `IDENTITY_URL`, `AGENTS_URL` and `TRAINING_URL` (locally `:8000`, `:8081`, `:8090` and `:8082`, see `.env.example`). Every one of these must be set. If your `.env` predates them, copy the new lines from `.env.example`.
+Listens on `PORT`. CORS: `ALLOWED_ORIGINS`. Upstream URLs come from `RECIPES_URL`, `IDENTITY_URL`, `AGENTS_URL` and `TRAINING_URL` (locally `:8000`, `:8081`, `:8090` and `:8082`, see `.env.example`). `MCP_RESOURCE_URL` is the public training MCP address, such as `http://localhost:8080/training/mcp`. Every one of these must be set. If your `.env` predates them, copy the new lines from `.env.example`.
 
 ## Config
 
 `gateway.json` has three parts:
 
-- `upstreams`: the backends, each with a `name`, a `url` and a `timeout_ms`. A `url` can reference environment variables as `${NAME}`.
+- `upstreams`: the backends, each with a `name`, a `url` and a `timeout_ms`. A `url`, and a bearer rule's `audience`, can reference environment variables as `${NAME}`.
 - `routes`: requests for `/<prefix>/...` go to the route's `upstream`. Only headers in `request_headers` reach the upstream, and only headers in `response_headers` (plus `content-type`) come back. Headers the gateway sets itself (`x-request-id` and `x-nrdrm-*`) always reach the upstream and need no `request_headers` entry. The prefix `_gateway` is reserved.
 - `identity_upstream`: the upstream the gateway asks to check sessions and bearer tokens.
 
@@ -22,11 +22,12 @@ Each route lists `rules`. The first rule whose `path` and `methods` match the re
 
 - `"public"`: forwarded as is.
 - `"session"`: identity must accept the caller's session cookie. Cookies identity sets while checking it, such as a refreshed session, are returned to the caller.
-- `{"bearer": {"audience": "agents"}}`: identity must introspect the `Authorization: Bearer` token as active for that audience. The gateway then sends the token's client name to the upstream as `x-nrdrm-client`, and does not send the token itself.
+- `{"bearer": {"audience": "agents"}}`: identity must introspect the `Authorization: Bearer` token as active for that audience. The gateway then sends the token's client name to the upstream as `x-nrdrm-client`, and does not send the token itself. If identity cannot be reached, the response is 401.
+- `{"bearer": {"audience": "${MCP_RESOURCE_URL}", "scope": "training"}}`: the token must be active for that audience, its scope must include `training`, and introspection must include an email. The gateway sends that email as `x-nrdrm-email` and does not send the token. A missing, inactive, wrong-audience, or wrong-scope token is 401 with `WWW-Authenticate: Bearer resource_metadata="<metadata URL>", scope="training"`. The metadata URL is the audience with a trailing `/mcp` replaced by `/oauth-protected-resource`. If identity cannot be reached, the response is 503 and carries no challenge, so the client does not start a new sign-in. Another method on that same path is 405.
 
 On the recipes routes, creates and reads are public. Updates and deletes need a session. The recipes server does not check auth itself.
 
-A request that matches no rule gets a 404, including a listed path called with a method its rules don't list. Only what `gateway.json` lists is reachable, so a new upstream endpoint needs a rule before clients can call it. Identity's `validate-token` and `oauth/introspect` are deliberately unlisted: only the gateway calls them, and it calls identity directly.
+A request that matches no rule gets a 404, including a listed path called with a method its rules don't list. The exception is a scoped bearer path such as `/training/mcp`: another method there is 405. Only what `gateway.json` lists is reachable, so a new upstream endpoint needs a rule before clients can call it. Identity's `validate-token` and `oauth/introspect` are deliberately unlisted: only the gateway calls them, and it calls identity directly.
 
 A rule's `path` is matched segment by segment against the path after `/<prefix>`: a literal segment matches itself, `*` matches exactly one segment, and `**` (last segment only) matches any remaining segments, including none.
 

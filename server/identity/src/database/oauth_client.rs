@@ -16,7 +16,9 @@ pub struct OauthClient {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub name: String,
-    pub secret_hash: String,
+    pub secret_hash: Option<String>,
+    pub redirect_uris: Vec<Option<String>>,
+    pub registered_via: String,
 }
 
 pub async fn find_client_by_id(pool: &Pool, id: Uuid) -> Result<OauthClient, DatabaseError> {
@@ -76,6 +78,8 @@ pub async fn insert_client(
                 .values((
                     oauth_client::name.eq(name),
                     oauth_client::secret_hash.eq(secret_hash),
+                    oauth_client::redirect_uris.eq(Vec::<Option<String>>::new()),
+                    oauth_client::registered_via.eq("manual"),
                 ))
                 .get_result::<OauthClient>(conn)?;
             diesel::insert_into(oauth_client_audience::table)
@@ -87,6 +91,32 @@ pub async fn insert_client(
             Ok(client)
         })
         .map_err(DatabaseError::from_diesel)
+    })
+    .await
+    .map_err(|_| DatabaseError::UnknownError)?
+}
+
+pub async fn insert_public_client(
+    pool: &Pool,
+    name: String,
+    redirect_uris: Vec<String>,
+) -> Result<OauthClient, DatabaseError> {
+    let conn = pool
+        .get()
+        .await
+        .map_err(|_| DatabaseError::ConnectionError)?;
+
+    let redirect_uris = redirect_uris.into_iter().map(Some).collect::<Vec<_>>();
+    conn.interact(move |conn| {
+        diesel::insert_into(oauth_client::table)
+            .values((
+                oauth_client::name.eq(name),
+                oauth_client::secret_hash.eq(None::<String>),
+                oauth_client::redirect_uris.eq(redirect_uris),
+                oauth_client::registered_via.eq("dynamic"),
+            ))
+            .get_result::<OauthClient>(conn)
+            .map_err(DatabaseError::from_diesel)
     })
     .await
     .map_err(|_| DatabaseError::UnknownError)?

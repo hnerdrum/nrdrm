@@ -24,6 +24,7 @@ struct Health {
 pub fn init_router(state: AppState) -> Router {
     super::sessions::routes()
         .merge(super::sync::routes())
+        .merge(super::mcp::routes(&state))
         .route("/api/health", get(health))
         .layer(TraceLayer::new_for_http().on_response(
             trace::DefaultOnResponse::new().latency_unit(tower_http::LatencyUnit::Micros),
@@ -41,6 +42,10 @@ pub(crate) fn test_state() -> AppState {
             database_url,
             log_level: "info".to_string(),
             garmin_api_key: String::new(),
+            mcp_resource_url: "http://localhost:8080/training/mcp".to_string(),
+            authorization_server_url: "http://localhost:8080/identity".to_string(),
+            training_owner_email: "ada@example.com".to_string(),
+            mcp_allowed_origins: vec!["http://localhost:3000".to_string()],
         },
         activities: Arc::new(EmptyActivities),
         clock: Arc::new(crate::clock::FixedClock(

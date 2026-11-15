@@ -18,7 +18,14 @@ pub type Introspection {
     active: Bool,
     audience: Option(String),
     client_name: Option(String),
+    email: Option(String),
+    scope: Option(String),
   )
+}
+
+pub type IntrospectError {
+  NoBearerToken
+  IdentityUnavailable
 }
 
 /// `set_cookies` are the cookies identity set while checking the session, such
@@ -70,8 +77,10 @@ pub fn introspect(
   transport: Transport,
   identity: Upstream,
   incoming_request: Request,
-) -> Result(Introspection, Nil) {
-  use token <- result.try(bearer_token(incoming_request))
+) -> Result(Introspection, IntrospectError) {
+  use token <- result.try(
+    bearer_token(incoming_request) |> result.replace_error(NoBearerToken),
+  )
   let body =
     json.object([#("token", json.string(token))])
     |> json.to_string
@@ -84,9 +93,11 @@ pub fn introspect(
     |> request.set_body(body)
   case transport(req, identity.timeout_ms) {
     Ok(response.Response(status: 200, body: body, ..)) ->
-      json.parse_bits(body, introspection_decoder())
-      |> result.replace_error(Nil)
-    _ -> Error(Nil)
+      case json.parse_bits(body, introspection_decoder()) {
+        Ok(introspection) -> Ok(introspection)
+        Error(_) -> Error(IdentityUnavailable)
+      }
+    _ -> Error(IdentityUnavailable)
   }
 }
 
@@ -117,5 +128,15 @@ fn introspection_decoder() -> decode.Decoder(Introspection) {
     None,
     decode.optional(decode.string),
   )
-  decode.success(Introspection(active, audience, client_name))
+  use email <- decode.optional_field(
+    "email",
+    None,
+    decode.optional(decode.string),
+  )
+  use scope <- decode.optional_field(
+    "scope",
+    None,
+    decode.optional(decode.string),
+  )
+  decode.success(Introspection(active, audience, client_name, email, scope))
 }

@@ -40,8 +40,8 @@ pub struct Auth {
 
 #[derive(Deserialize, Debug)]
 pub struct LoginInput {
-    email: String,
-    password: String,
+    pub(crate) email: String,
+    pub(crate) password: String,
 }
 
 pub async fn login_user(db: DBClient, input: LoginInput) -> Result<User, DomainError> {

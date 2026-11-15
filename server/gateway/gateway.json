@@ -34,12 +34,24 @@
       "prefix": "identity",
       "upstream": "identity",
       "request_headers": ["content-type", "cookie"],
-      "response_headers": ["set-cookie"],
+      "response_headers": [
+        "set-cookie",
+        "location",
+        "content-security-policy",
+        "referrer-policy",
+        "cache-control"
+      ],
       "rules": [
         { "path": "health", "methods": ["GET"], "auth": "public" },
         { "path": "me", "methods": ["GET"], "auth": "public" },
         { "path": "login", "methods": ["POST"], "auth": "public" },
         { "path": "logout", "methods": ["POST"], "auth": "public" },
+        { "path": "oauth/register", "methods": ["POST"], "auth": "public" },
+        {
+          "path": "oauth/authorize",
+          "methods": ["GET", "POST"],
+          "auth": "public"
+        },
         { "path": "oauth/token", "methods": ["POST"], "auth": "public" }
       ]
     },
@@ -75,7 +87,13 @@
     {
       "prefix": "training",
       "upstream": "training",
-      "request_headers": ["content-type", "cookie"],
+      "request_headers": [
+        "content-type",
+        "cookie",
+        "accept",
+        "mcp-protocol-version",
+        "origin"
+      ],
       "response_headers": ["set-cookie"],
       "rules": [
         { "path": "health", "methods": ["GET"], "auth": "public" },
@@ -85,6 +103,32 @@
           "path": "sessions/*",
           "methods": ["GET", "PUT", "DELETE"],
           "auth": "session"
+        },
+        {
+          "path": "oauth-protected-resource",
+          "methods": ["GET"],
+          "auth": "public"
+        },
+        {
+          "path": "mcp",
+          "methods": ["POST"],
+          "auth": {
+            "bearer": {
+              "audience": "${MCP_RESOURCE_URL}",
+              "scope": "training"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "prefix": ".well-known",
+      "upstream": "identity",
+      "rules": [
+        {
+          "path": "oauth-authorization-server/identity",
+          "methods": ["GET"],
+          "auth": "public"
         }
       ]
     }

@@ -42,10 +42,18 @@ jobs:
           tool: just@1.58.0
       - uses: dtolnay/rust-toolchain@1.99
       - name: Install native libraries
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libpq-dev
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libpq-dev postgresql-client
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server/identity
+      - name: Migrate
+        working-directory: server/identity
+        env:
+          DATABASE_URL: postgres://nrdrm:nrdrm@localhost:5433/identity
+        run: |
+          for f in migrations/*/up.sql; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
       - name: just identity test
         run: just identity test
 
@@ -57,6 +65,7 @@ jobs:
       image_name: nrdrm-identity
       dockerfile: server/identity/Dockerfile
       context: server/identity
+      extra_environment_variables: '{"OAUTH_ISSUER":"${{ vars.OAUTH_ISSUER }}","OAUTH_RESOURCES":"${{ vars.OAUTH_RESOURCES }}"}'
     secrets:
       SCALEWAY_API_KEY: ${{ secrets.SCALEWAY_API_KEY }}
       CONTAINER_REGISTRY_ENDPOINT: ${{ secrets.CONTAINER_REGISTRY_ENDPOINT }}
