@@ -2,6 +2,7 @@
   import { onMount, tick, untrack } from "svelte";
   import { createMutation, createQuery } from "@tanstack/svelte-query";
   import { isUnauthorized } from "../api/client";
+  import { listPresets, presetsQueryKey, type Preset } from "../api/presets";
   import {
     createSession,
     deleteSession,
@@ -14,6 +15,7 @@
   import type { SessionBody } from "../domain";
   import { sportLabel } from "../format";
   import Button from "./Button.svelte";
+  import PresetPicker from "./PresetPicker.svelte";
   import SessionBodyEditor from "./SessionBodyEditor.svelte";
   import SportPicker from "./SportPicker.svelte";
   import TextField from "./TextField.svelte";
@@ -34,6 +36,7 @@
   let sport = $state<SessionBody["sport"]>(editing?.body.sport ?? "run");
   let date = $state(editing?.onDate ?? untrack(() => today));
   let prefilledFrom = $state<string | null>(null);
+  let picked = $state<Preset | null>(null);
   let error = $state("");
   let confirming = $state(false);
   let applied = untrack(() => editing != null);
@@ -41,6 +44,12 @@
   const latest = createQuery(() => ({
     queryKey: [...sessionsQueryKey, "latest", "strength", today],
     queryFn: () => latestSession("strength", today),
+    enabled: editing == null,
+  }));
+
+  const presets = createQuery(() => ({
+    queryKey: presetsQueryKey,
+    queryFn: listPresets,
     enabled: editing == null,
   }));
 
@@ -62,9 +71,14 @@
     onSuccess: () => ondeleted?.(),
   }));
 
-  const waitingForLast = $derived(editing == null && sport === "strength" && latest.isPending);
+  /** A strength preset filled the exercises, so the last strength session
+   * doesn't. */
+  const pickedStrength = $derived(picked?.body.sport === "strength");
+  const waitingForLast = $derived(
+    editing == null && !pickedStrength && sport === "strength" && latest.isPending,
+  );
   const loadError = $derived(
-    latest.isError && !isUnauthorized(latest.error)
+    !pickedStrength && latest.isError && !isUnauthorized(latest.error)
       ? "Couldn't load your last strength session."
       : "",
   );
@@ -102,6 +116,22 @@
     editor.seed(result.body);
     prefilledFrom = result.onDate;
   });
+
+  /** Fill the form from a preset and switch to its sport. It replaces what
+   * was there. After a strength preset, the last strength session no longer
+   * fills the exercises, even if it loads later. */
+  function pick(preset: Preset) {
+    if (!editor) {
+      return;
+    }
+    picked = preset;
+    if (preset.body.sport === "strength") {
+      applied = true;
+      prefilledFrom = null;
+    }
+    editor.fill(preset.body);
+    clearError();
+  }
 
   function clearError() {
     error = "";
@@ -188,7 +218,15 @@
     <h1 class="text-[clamp(2.5rem,12vw,3rem)] leading-none font-light tracking-tighter">
       {editing ? "Edit session" : "New session"}
     </h1>
+    {#if !editing && presets.data && presets.data.length > 0}
+      <PresetPicker presets={presets.data} {picked} onpick={pick} />
+    {/if}
     <SportPicker bind:sport locked={editing != null} />
+    {#if picked && picked.body.sport === sport}
+      <p class="-mt-3 text-muted" role="status">
+        From {picked.name}. Change what you need.
+      </p>
+    {/if}
     <TextField
       id="session-date"
       label="Date"
