@@ -6,6 +6,7 @@
     createPreset,
     deletePreset,
     isNameTaken,
+    presetNameProblem,
     updatePreset,
     type Preset,
   } from "../api/presets";
@@ -14,8 +15,6 @@
   import SessionBodyEditor from "./SessionBodyEditor.svelte";
   import SportPicker from "./SportPicker.svelte";
   import TextField from "./TextField.svelte";
-
-  const NAME_LIMIT = 60;
 
   type Props = {
     preset?: Preset | null;
@@ -84,13 +83,9 @@
     if (save.isPending || remove.isPending || confirming || !editor) {
       return;
     }
-    const trimmed = name.trim();
-    if (!trimmed) {
-      error = "Name the preset.";
-      return;
-    }
-    if ([...trimmed].length > NAME_LIMIT) {
-      error = `Keep the name to ${NAME_LIMIT} characters.`;
+    const nameProblem = presetNameProblem(name);
+    if (nameProblem) {
+      error = nameProblem;
       return;
     }
     const body = editor.build();
@@ -98,7 +93,7 @@
       error = body;
       return;
     }
-    save.mutate({ name: trimmed, body });
+    save.mutate({ name: name.trim(), body });
   }
 
   async function askDelete() {

@@ -16,6 +16,7 @@
   import { sportLabel } from "../format";
   import Button from "./Button.svelte";
   import PresetPicker from "./PresetPicker.svelte";
+  import SaveAsPreset from "./SaveAsPreset.svelte";
   import SessionBodyEditor from "./SessionBodyEditor.svelte";
   import SportPicker from "./SportPicker.svelte";
   import TextField from "./TextField.svelte";
@@ -33,6 +34,7 @@
   const editing = untrack(() => session);
 
   let editor = $state<ReturnType<typeof SessionBodyEditor>>();
+  let presetSaver = $state<ReturnType<typeof SaveAsPreset>>();
   let sport = $state<SessionBody["sport"]>(editing?.body.sport ?? "run");
   let date = $state(editing?.onDate ?? untrack(() => today));
   let prefilledFrom = $state<string | null>(null);
@@ -135,6 +137,7 @@
 
   function clearError() {
     error = "";
+    presetSaver?.clearError();
     if (save.isError) {
       save.reset();
     }
@@ -245,6 +248,12 @@
       {prefilledFrom}
     />
     {#if editing}
+      {#if !confirming}
+        <SaveAsPreset
+          bind:this={presetSaver}
+          build={() => editor?.build() ?? "The form isn't ready yet."}
+        />
+      {/if}
       {#if confirming}
         <div
           class="grid gap-3 rounded-3xl border border-edge bg-field p-5"

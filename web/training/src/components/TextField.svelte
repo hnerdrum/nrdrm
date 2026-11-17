@@ -11,6 +11,7 @@
     mono?: boolean;
     value?: string;
     element?: HTMLInputElement | null;
+    onkeydown?: (event: KeyboardEvent) => void;
   };
 
   let {
@@ -25,6 +26,7 @@
     mono = false,
     value = $bindable(""),
     element = $bindable(null),
+    onkeydown,
   }: Props = $props();
 
   const fieldClass = $derived(
@@ -47,6 +49,7 @@
     {autocomplete}
     {inputmode}
     {max}
+    {onkeydown}
     bind:this={element}
     bind:value
     class={fieldClass}
