@@ -31,6 +31,14 @@ just identity create-client agents-caller agents
 
 That prints `name`, `audience`, `client_id`, `client_secret`, and `secret_hash`. It does not write to the database. Store the secret. Insert `secret_hash`, not the secret.
 
+## Local test user
+
+```bash
+just identity seed
+```
+
+Migrates, then adds `test@test.com` with password `test`. Running it again changes nothing. It refuses to run when `ENV=prod` or when `DATABASE_URL` is not on `localhost`.
+
 ## Test
 
 ```bash
