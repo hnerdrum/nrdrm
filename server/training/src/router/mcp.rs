@@ -274,16 +274,35 @@ mod tests {
         assert_eq!(
             names,
             [
+                "create_preset",
+                "delete_preset",
                 "delete_session",
                 "latest_session",
+                "list_presets",
                 "log_ride",
                 "log_run",
                 "log_ski",
                 "log_strength",
+                "update_preset",
                 "update_session",
                 "week",
             ]
         );
+        let list_presets = tools
+            .iter()
+            .find(|tool| tool["name"] == "list_presets")
+            .unwrap();
+        assert_eq!(list_presets["annotations"]["readOnlyHint"], true);
+        let delete_preset = tools
+            .iter()
+            .find(|tool| tool["name"] == "delete_preset")
+            .unwrap();
+        assert_eq!(delete_preset["annotations"]["destructiveHint"], true);
+        let create_preset = tools
+            .iter()
+            .find(|tool| tool["name"] == "create_preset")
+            .unwrap();
+        assert_eq!(create_preset["annotations"]["readOnlyHint"], false);
         let week = tools.iter().find(|tool| tool["name"] == "week").unwrap();
         assert_eq!(week["annotations"]["readOnlyHint"], true);
         let latest = tools
@@ -403,6 +422,149 @@ mod tests {
         assert!(soft_deleted(&db, Uuid::parse_str(&id).unwrap()).await);
 
         forget(&db, Uuid::parse_str(&id).unwrap()).await;
+    }
+
+    /// The message of a tool call that fails as a tool error.
+    async fn tool_error(app: &axum::Router, id: u64, name: &str, arguments: Value) -> String {
+        let body = tool(app, id, name, arguments).await;
+        assert_eq!(body["result"]["isError"], true, "{body}");
+        body["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    }
+
+    #[tokio::test]
+    async fn a_preset_is_created_listed_changed_and_deleted() {
+        let app = app();
+        let tag = Uuid::new_v4().simple().to_string();
+        let name = format!("Lower body {tag}");
+
+        let created = tool(
+            &app,
+            20,
+            "create_preset",
+            json!({
+                "name": format!("  {name} "),
+                "sport": "strength",
+                "exercises": [
+                    { "name": "squat", "sets": [{ "reps": 5, "weight_kg": 100 }] },
+                    { "name": "plank", "sets": [{ "hold_seconds": 45 }] }
+                ]
+            }),
+        )
+        .await;
+        let preset = &created["result"]["structuredContent"];
+        assert_eq!(preset["name"], name);
+        assert_eq!(preset["sport"], "strength");
+        assert_eq!(
+            preset["text"],
+            format!("Preset \"{name}\", strength: squat 5 × 100 kg. plank 45s.")
+        );
+        let id = preset["id"].as_str().unwrap().to_string();
+
+        let thousands = tool(
+            &app,
+            21,
+            "create_preset",
+            json!({
+                "name": format!("Thousands {tag}"),
+                "sport": "run",
+                "intervals": [{ "repetitions": 6, "distance_m": 1000, "seconds": 220, "recovery_seconds": 90 }]
+            }),
+        )
+        .await;
+        let thousands = &thousands["result"]["structuredContent"];
+        assert_eq!(thousands["kilometres"], 6.0);
+        assert_eq!(thousands["minutes"], 29.5);
+        let thousands_id = thousands["id"].as_str().unwrap().to_string();
+
+        let listed = tool(&app, 22, "list_presets", json!({ "sport": "strength" })).await;
+        let listed = &listed["result"]["structuredContent"];
+        let names: Vec<&str> = listed["presets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|preset| preset["name"].as_str().unwrap())
+            .collect();
+        assert!(names.contains(&name.as_str()), "{names:?}");
+        assert!(!names.iter().any(|listed| listed.starts_with("Thousands")));
+        assert!(listed["text"]
+            .as_str()
+            .unwrap()
+            .contains(&format!("Preset \"{name}\", strength")));
+
+        assert_eq!(
+            tool_error(
+                &app,
+                23,
+                "create_preset",
+                json!({
+                    "name": name.to_uppercase(),
+                    "sport": "ride",
+                    "distance_km": 40,
+                    "minutes": 60
+                }),
+            )
+            .await,
+            format!("A preset named \"{}\" already exists", name.to_uppercase())
+        );
+        assert_eq!(
+            tool_error(
+                &app,
+                24,
+                "create_preset",
+                json!({ "name": format!("Empty {tag}"), "sport": "strength", "exercises": [] }),
+            )
+            .await,
+            "Name each exercise and give it a set"
+        );
+
+        let renamed = format!("Legs {tag}");
+        let changed = tool(
+            &app,
+            25,
+            "update_preset",
+            json!({
+                "id": id,
+                "name": renamed,
+                "exercises": [{ "name": "squat", "sets": [{ "reps": 5, "weight_kg": 105 }] }]
+            }),
+        )
+        .await;
+        let changed = &changed["result"]["structuredContent"];
+        assert_eq!(changed["name"], renamed);
+        assert_eq!(
+            changed["text"],
+            format!("Preset \"{renamed}\", strength: squat 5 × 105 kg.")
+        );
+        assert_eq!(
+            tool_error(
+                &app,
+                26,
+                "update_preset",
+                json!({ "id": id, "minutes": 30 })
+            )
+            .await,
+            "A strength session has no distance or time"
+        );
+
+        let deleted = tool(&app, 27, "delete_preset", json!({ "id": id })).await;
+        assert!(deleted["result"]["structuredContent"]["text"]
+            .as_str()
+            .unwrap()
+            .starts_with(&format!("Deleted. Preset \"{renamed}\"")));
+        assert_eq!(
+            tool_error(
+                &app,
+                28,
+                "update_preset",
+                json!({ "id": id, "name": "Gone" })
+            )
+            .await,
+            "Preset not found"
+        );
+        tool(&app, 29, "delete_preset", json!({ "id": thousands_id })).await;
     }
 
     #[tokio::test]

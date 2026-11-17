@@ -14,6 +14,7 @@ const TOO_LONG: &str = "That session is too long to store";
 const FROM_INTERVALS: &str = "This session's distance and time come from its intervals";
 const STRENGTH_DISTANCE: &str = "A strength session has no distance or time";
 const DISTANCE_EXERCISES: &str = "Exercises belong on a strength session";
+const STRENGTH_EXERCISES: &str = "A strength session needs exercises";
 
 /// A session ready to store: a date and a body the domain accepts.
 #[derive(Debug, Clone, PartialEq)]
@@ -62,6 +63,45 @@ pub fn apply_update(
         on_date: update.on_date.unwrap_or(on_date),
         body: merge_body(body, update)?,
     })
+}
+
+/// A body with no date, from the fields the log tools take. A strength body
+/// takes exercises; a run, ride or ski takes a distance and a time, or
+/// intervals, in the same units and with the same totals as `prepare_run`.
+pub fn body_from_input(
+    sport: Sport,
+    distance_km: Option<f64>,
+    minutes: Option<f64>,
+    intervals: &[IntervalInput],
+    exercises: Option<&[ExerciseInput]>,
+) -> Result<SessionBody, &'static str> {
+    if sport == Sport::Strength {
+        if distance_km.is_some() || minutes.is_some() || !intervals.is_empty() {
+            return Err(STRENGTH_DISTANCE);
+        }
+        return strength_body(exercises.ok_or(STRENGTH_EXERCISES)?);
+    }
+    if exercises.is_some() {
+        return Err(DISTANCE_EXERCISES);
+    }
+    distance_from_input(
+        sport,
+        &DistanceSession {
+            on_date: None,
+            distance_km,
+            minutes,
+            intervals: intervals.to_vec(),
+        },
+    )
+}
+
+/// `body` with the fields in `update` changed, by the rules `update_session`
+/// follows. The update's date, if any, is not part of a body.
+pub fn update_body(
+    body: &SessionBody,
+    update: &SessionUpdate,
+) -> Result<SessionBody, &'static str> {
+    merge_body(body, update)
 }
 
 fn prepare_distance(
@@ -703,5 +743,104 @@ mod tests {
         let text = serde_json::to_string(&strength).unwrap();
         assert!(text.contains("weight_kg"), "{text}");
         assert!(text.contains("hold_seconds"), "{text}");
+    }
+
+    #[test]
+    fn a_body_without_a_date_uses_the_log_units() {
+        let steady = body_from_input(Sport::Ride, Some(40.0), Some(60.0), &[], None).unwrap();
+        assert_eq!(
+            steady,
+            SessionBody::Ride {
+                distance: 40_000,
+                duration: 3_600,
+                intervals: vec![],
+            }
+        );
+
+        let repeats = [IntervalInput {
+            repetitions: 6,
+            distance_m: 1_000,
+            seconds: 220,
+            recovery_seconds: 90,
+        }];
+        let intervals = body_from_input(Sport::Run, None, None, &repeats, None).unwrap();
+        assert_eq!(
+            intervals,
+            SessionBody::Run {
+                distance: 6_000,
+                duration: 1_770,
+                intervals: vec![Interval {
+                    repetitions: 6,
+                    distance: 1_000,
+                    duration: 220,
+                    recovery: 90,
+                }],
+            }
+        );
+
+        let lifts = [ExerciseInput {
+            name: "squat".into(),
+            sets: vec![SetInput {
+                reps: Some(5),
+                weight_kg: Some(100.0),
+                hold_seconds: None,
+            }],
+        }];
+        let strength = body_from_input(Sport::Strength, None, None, &[], Some(&lifts)).unwrap();
+        assert_eq!(
+            strength,
+            SessionBody::Strength {
+                exercises: vec![Exercise {
+                    name: "squat".into(),
+                    sets: vec![ExerciseSet::Reps {
+                        reps: 5,
+                        weight: 100.0
+                    }],
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn a_body_without_a_date_keeps_each_sport_to_its_fields() {
+        assert_eq!(
+            body_from_input(Sport::Strength, None, None, &[], None),
+            Err(STRENGTH_EXERCISES)
+        );
+        assert_eq!(
+            body_from_input(Sport::Strength, Some(5.0), None, &[], Some(&[])),
+            Err(STRENGTH_DISTANCE)
+        );
+        assert_eq!(
+            body_from_input(Sport::Ski, Some(10.0), Some(60.0), &[], Some(&[])),
+            Err(DISTANCE_EXERCISES)
+        );
+        assert_eq!(
+            body_from_input(Sport::Run, None, Some(30.0), &[], None),
+            Err("A run needs a distance in kilometres")
+        );
+    }
+
+    #[test]
+    fn a_body_update_follows_the_session_rules() {
+        let changed = update_body(
+            &steady(10_000, 3_000),
+            &SessionUpdate {
+                minutes: Some(55.0),
+                ..SessionUpdate::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(changed, steady(10_000, 3_300));
+        assert_eq!(
+            update_body(
+                &steady(10_000, 3_000),
+                &SessionUpdate {
+                    exercises: Some(vec![]),
+                    ..SessionUpdate::default()
+                },
+            ),
+            Err(DISTANCE_EXERCISES)
+        );
     }
 }

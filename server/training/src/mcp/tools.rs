@@ -1,4 +1,5 @@
-//! The eight tools an agent calls on the training log.
+//! The twelve tools an agent calls on the training log: eight for sessions
+//! and four for presets.
 
 use std::sync::Arc;
 
@@ -12,15 +13,21 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::clock::Clock;
+use crate::database::preset::{self, PresetStoreError};
 use crate::database::session::{self, SessionStoreError};
+use crate::domain::preset::{body_rejection, preset_name};
 use crate::domain::session::Sport;
 use crate::domain::week::{week_totals, WeekTotals};
 
-use super::convert::{apply_update, prepare_ride, prepare_run, prepare_ski, prepare_strength};
-use super::input::{
-    DeleteQuery, DistanceSession, LatestQuery, SportName, StrengthSession, UpdateQuery, WeekQuery,
+use super::convert::{
+    apply_update, body_from_input, prepare_ride, prepare_run, prepare_ski, prepare_strength,
+    update_body,
 };
-use super::render::{render, RenderedSession};
+use super::input::{
+    DeleteQuery, DistanceSession, LatestQuery, PresetIdQuery, PresetInput, PresetUpdateQuery,
+    PresetsQuery, SportName, StrengthSession, UpdateQuery, WeekQuery,
+};
+use super::render::{render, render_preset, RenderedPreset, RenderedSession};
 
 #[derive(Clone)]
 pub(crate) struct TrainingTools {
@@ -213,6 +220,108 @@ impl TrainingTools {
         rendered.text = format!("Deleted. {}", rendered.text);
         Ok(Json(rendered))
     }
+
+    #[tool(
+        description = "The presets: named sessions with no date, kept to log the same session again. All of them, or those of one sport.",
+        annotations(
+            read_only_hint = true,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn list_presets(
+        &self,
+        Parameters(query): Parameters<PresetsQuery>,
+    ) -> Result<Json<Presets>, String> {
+        let stored = preset::list(&self.db, query.sport.map(sport))
+            .await
+            .map_err(|err| explain_preset(err, ""))?;
+        let presets: Vec<RenderedPreset> = stored.iter().map(render_preset).collect();
+        let text = describe_presets(&presets);
+        Ok(Json(Presets { presets, text }))
+    }
+
+    #[tool(
+        description = "Save a preset: a name and a session with no date. Distance is kilometres and time is minutes, as in the log tools. A strength preset has exercises. Names are unique regardless of case.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn create_preset(
+        &self,
+        Parameters(input): Parameters<PresetInput>,
+    ) -> Result<Json<RenderedPreset>, String> {
+        let name = preset_name(&input.name).map_err(str::to_string)?;
+        let body = body_from_input(
+            sport(input.sport),
+            input.distance_km,
+            input.minutes,
+            &input.intervals,
+            input.exercises.as_deref(),
+        )
+        .map_err(str::to_string)?;
+        if let Some(message) = body_rejection(&body) {
+            return Err(message.to_string());
+        }
+        let saved = preset::create(&self.db, name.clone(), body)
+            .await
+            .map_err(|err| explain_preset(err, &name))?;
+        Ok(Json(render_preset(&saved)))
+    }
+
+    #[tool(
+        description = "Change one preset. A field that is omitted stays as it is, and the sport stays the same. Sessions already logged from it don't change.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn update_preset(
+        &self,
+        Parameters(query): Parameters<PresetUpdateQuery>,
+    ) -> Result<Json<RenderedPreset>, String> {
+        let stored = preset::find(&self.db, query.id)
+            .await
+            .map_err(|err| explain_preset(err, ""))?;
+        let name = match &query.name {
+            Some(name) => preset_name(name).map_err(str::to_string)?,
+            None => stored.name.clone(),
+        };
+        let body = update_body(&stored.body, &query.change()).map_err(str::to_string)?;
+        if let Some(message) = body_rejection(&body) {
+            return Err(message.to_string());
+        }
+        let saved = preset::update(&self.db, query.id, name.clone(), body)
+            .await
+            .map_err(|err| explain_preset(err, &name))?;
+        Ok(Json(render_preset(&saved)))
+    }
+
+    #[tool(
+        description = "Delete one preset. Sessions already logged from it stay.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = true,
+            open_world_hint = false
+        )
+    )]
+    async fn delete_preset(
+        &self,
+        Parameters(query): Parameters<PresetIdQuery>,
+    ) -> Result<Json<RenderedPreset>, String> {
+        let stored = preset::find(&self.db, query.id)
+            .await
+            .map_err(|err| explain_preset(err, ""))?;
+        preset::delete(&self.db, query.id)
+            .await
+            .map_err(|err| explain_preset(err, ""))?;
+        let mut rendered = render_preset(&stored);
+        rendered.text = format!("Deleted. {}", rendered.text);
+        Ok(Json(rendered))
+    }
 }
 
 #[tool_handler(router = self.tool_router)]
@@ -238,6 +347,12 @@ struct Week {
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
+struct Presets {
+    presets: Vec<RenderedPreset>,
+    text: String,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
 struct Latest {
     session: Option<RenderedSession>,
     text: String,
@@ -259,6 +374,32 @@ fn explain(err: SessionStoreError) -> String {
             "Couldn't reach the training log.".to_string()
         }
     }
+}
+
+fn explain_preset(err: PresetStoreError, name: &str) -> String {
+    match err {
+        PresetStoreError::NotFound => "Preset not found".to_string(),
+        PresetStoreError::NameTaken => format!("A preset named \"{name}\" already exists"),
+        PresetStoreError::Connection | PresetStoreError::Unknown => {
+            "Couldn't reach the training log.".to_string()
+        }
+    }
+}
+
+fn describe_presets(presets: &[RenderedPreset]) -> String {
+    if presets.is_empty() {
+        return "No presets.".to_string();
+    }
+    let mut text = if presets.len() == 1 {
+        "1 preset.".to_string()
+    } else {
+        format!("{} presets.", presets.len())
+    };
+    for preset in presets {
+        text.push(' ');
+        text.push_str(&preset.text);
+    }
+    text
 }
 
 fn monday_of(date: NaiveDate) -> NaiveDate {
