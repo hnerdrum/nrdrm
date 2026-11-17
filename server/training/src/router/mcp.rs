@@ -279,10 +279,12 @@ mod tests {
                 "delete_session",
                 "latest_session",
                 "list_presets",
+                "log_preset",
                 "log_ride",
                 "log_run",
                 "log_ski",
                 "log_strength",
+                "save_session_as_preset",
                 "update_preset",
                 "update_session",
                 "week",
@@ -565,6 +567,163 @@ mod tests {
             "Preset not found"
         );
         tool(&app, 29, "delete_preset", json!({ "id": thousands_id })).await;
+    }
+
+    #[tokio::test]
+    async fn a_preset_is_logged_by_name_or_id_and_a_session_becomes_a_preset() {
+        let state = test_state();
+        let db = state.db.clone();
+        let app = init_router(state);
+        let tag = Uuid::new_v4().simple().to_string();
+        let name = format!("Leg day {tag}");
+
+        let created = tool(
+            &app,
+            40,
+            "create_preset",
+            json!({
+                "name": name,
+                "sport": "strength",
+                "exercises": [{ "name": "squat", "sets": [{ "reps": 5, "weight_kg": 100 }] }]
+            }),
+        )
+        .await;
+        let preset_id = created["result"]["structuredContent"]["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+
+        // By name, in another case, on today's date (the test clock's).
+        let by_name = tool(
+            &app,
+            41,
+            "log_preset",
+            json!({ "name": format!("  {} ", name.to_lowercase()) }),
+        )
+        .await;
+        let first = &by_name["result"]["structuredContent"];
+        assert_eq!(first["on_date"], "2026-11-08");
+        assert_eq!(
+            first["text"],
+            format!("Logged from preset \"{name}\". Strength on 2026-11-08: squat 5 × 100 kg.")
+        );
+        let first_id = Uuid::parse_str(first["id"].as_str().unwrap()).unwrap();
+
+        // By id, on a given date.
+        let by_id = tool(
+            &app,
+            42,
+            "log_preset",
+            json!({ "id": preset_id, "on_date": ON_DATE }),
+        )
+        .await;
+        let second = &by_id["result"]["structuredContent"];
+        assert_eq!(second["on_date"], ON_DATE);
+        let second_id = Uuid::parse_str(second["id"].as_str().unwrap()).unwrap();
+
+        // Changing the preset leaves the logged copies alone.
+        tool(
+            &app,
+            43,
+            "update_preset",
+            json!({
+                "id": preset_id,
+                "exercises": [{ "name": "squat", "sets": [{ "reps": 5, "weight_kg": 105 }] }]
+            }),
+        )
+        .await;
+        let (status, _, bytes) = send(
+            &app,
+            "GET",
+            &format!("/api/sessions/{first_id}"),
+            None,
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            parse(&bytes)["body"]["exercises"][0]["sets"][0]["weight"],
+            100.0
+        );
+
+        let missing = tool_error(
+            &app,
+            44,
+            "log_preset",
+            json!({ "name": format!("nope {tag}") }),
+        )
+        .await;
+        assert!(
+            missing.starts_with(&format!("Preset \"nope {tag}\" not found. Presets: ")),
+            "{missing}"
+        );
+        assert!(missing.contains(&name), "{missing}");
+        for (id, arguments) in [
+            (45, json!({ "id": preset_id, "name": name })),
+            (46, json!({ "on_date": ON_DATE })),
+        ] {
+            assert_eq!(
+                tool_error(&app, id, "log_preset", arguments).await,
+                "Give the preset's id or its name, not both"
+            );
+        }
+
+        // A logged session becomes a preset; the session stays.
+        let kept_name = format!("From the log {tag}");
+        let kept = tool(
+            &app,
+            47,
+            "save_session_as_preset",
+            json!({ "session_id": second_id, "name": kept_name }),
+        )
+        .await;
+        let kept = &kept["result"]["structuredContent"];
+        assert_eq!(kept["name"], kept_name);
+        assert_eq!(
+            kept["text"],
+            format!("Preset \"{kept_name}\", strength: squat 5 × 100 kg.")
+        );
+        let kept_id = kept["id"].as_str().unwrap().to_string();
+        assert_eq!(
+            tool_error(
+                &app,
+                48,
+                "save_session_as_preset",
+                json!({ "session_id": second_id, "name": kept_name.to_uppercase() }),
+            )
+            .await,
+            format!(
+                "A preset named \"{}\" already exists",
+                kept_name.to_uppercase()
+            )
+        );
+        assert_eq!(
+            tool_error(
+                &app,
+                49,
+                "save_session_as_preset",
+                json!({ "session_id": Uuid::new_v4(), "name": format!("Ghost {tag}") }),
+            )
+            .await,
+            "Session not found"
+        );
+        let (status, _, _) = send(
+            &app,
+            "GET",
+            &format!("/api/sessions/{second_id}"),
+            None,
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+
+        for id in [preset_id, kept_id] {
+            tool(&app, 50, "delete_preset", json!({ "id": id })).await;
+        }
+        forget(&db, first_id).await;
+        forget(&db, second_id).await;
     }
 
     #[tokio::test]

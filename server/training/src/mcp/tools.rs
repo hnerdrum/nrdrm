@@ -1,5 +1,5 @@
-//! The twelve tools an agent calls on the training log: eight for sessions
-//! and four for presets.
+//! The fourteen tools an agent calls on the training log: eight for sessions
+//! and six for presets.
 
 use std::sync::Arc;
 
@@ -24,8 +24,9 @@ use super::convert::{
     update_body,
 };
 use super::input::{
-    DeleteQuery, DistanceSession, LatestQuery, PresetIdQuery, PresetInput, PresetUpdateQuery,
-    PresetsQuery, SportName, StrengthSession, UpdateQuery, WeekQuery,
+    DeleteQuery, DistanceSession, LatestQuery, LogPresetQuery, PresetIdQuery, PresetInput,
+    PresetUpdateQuery, PresetsQuery, SaveAsPresetQuery, SportName, StrengthSession, UpdateQuery,
+    WeekQuery,
 };
 use super::render::{render, render_preset, RenderedPreset, RenderedSession};
 
@@ -54,6 +55,21 @@ impl TrainingTools {
             .await
             .map_err(explain)?;
         Ok(Json(render(&session)))
+    }
+
+    /// Why no preset has `name`, with the names there are, so the agent can
+    /// try again without listing them first.
+    async fn missing_preset(&self, name: &str) -> String {
+        let mut text = format!("Preset \"{}\" not found.", name.trim());
+        match preset::list(&self.db, None).await {
+            Ok(presets) if presets.is_empty() => text.push_str(" There are no presets yet."),
+            Ok(presets) => {
+                let names: Vec<&str> = presets.iter().map(|preset| preset.name.as_str()).collect();
+                text.push_str(&format!(" Presets: {}.", names.join(", ")));
+            }
+            Err(_) => {}
+        }
+        text
     }
 }
 
@@ -322,13 +338,72 @@ impl TrainingTools {
         rendered.text = format!("Deleted. {}", rendered.text);
         Ok(Json(rendered))
     }
+
+    #[tool(
+        description = "Log a session from a preset, by its id or its name (regardless of case). The session is a copy: change it afterwards with update_session. The date defaults to today in Europe/Oslo.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn log_preset(
+        &self,
+        Parameters(query): Parameters<LogPresetQuery>,
+    ) -> Result<Json<RenderedSession>, String> {
+        let stored = match (query.id, &query.name) {
+            (Some(id), None) => preset::find(&self.db, id)
+                .await
+                .map_err(|err| explain_preset(err, ""))?,
+            (None, Some(name)) => {
+                match preset::find_by_name(&self.db, name.trim().to_string()).await {
+                    Ok(found) => found,
+                    Err(PresetStoreError::NotFound) => return Err(self.missing_preset(name).await),
+                    Err(err) => return Err(explain_preset(err, name)),
+                }
+            }
+            _ => return Err("Give the preset's id or its name, not both".to_string()),
+        };
+        let on_date = query.on_date.unwrap_or_else(|| self.clock.today());
+        let session = session::create(&self.db, on_date, stored.body.clone())
+            .await
+            .map_err(explain)?;
+        let mut rendered = render(&session);
+        rendered.text = format!("Logged from preset \"{}\". {}", stored.name, rendered.text);
+        Ok(Json(rendered))
+    }
+
+    #[tool(
+        description = "Keep a logged session as a new preset, under a name. The session stays as it is.",
+        annotations(
+            read_only_hint = false,
+            destructive_hint = false,
+            open_world_hint = false
+        )
+    )]
+    async fn save_session_as_preset(
+        &self,
+        Parameters(query): Parameters<SaveAsPresetQuery>,
+    ) -> Result<Json<RenderedPreset>, String> {
+        let name = preset_name(&query.name).map_err(str::to_string)?;
+        let stored = session::find(&self.db, query.session_id)
+            .await
+            .map_err(explain)?;
+        if let Some(message) = body_rejection(&stored.body) {
+            return Err(message.to_string());
+        }
+        let saved = preset::create(&self.db, name.clone(), stored.body)
+            .await
+            .map_err(|err| explain_preset(err, &name))?;
+        Ok(Json(render_preset(&saved)))
+    }
 }
 
 #[tool_handler(router = self.tool_router)]
 impl ServerHandler for TrainingTools {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
-            "The owner's training log. Distance is kilometres and time is minutes. A week runs Monday to Sunday, Europe/Oslo.",
+            "The owner's training log. Distance is kilometres and time is minutes. A week runs Monday to Sunday, Europe/Oslo. A preset is a named session with no date for a session the owner repeats, such as a strength routine or an interval set. To log one, use log_preset with its name; list_presets shows them all.",
         )
     }
 }
