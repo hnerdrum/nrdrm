@@ -23,6 +23,7 @@ struct Health {
 
 pub fn init_router(state: AppState) -> Router {
     super::sessions::routes()
+        .merge(super::presets::routes())
         .merge(super::sync::routes())
         .merge(super::mcp::routes(&state))
         .route("/api/health", get(health))

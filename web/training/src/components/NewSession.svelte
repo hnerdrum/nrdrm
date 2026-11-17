@@ -2,6 +2,7 @@
   import { onMount, tick, untrack } from "svelte";
   import { createMutation, createQuery } from "@tanstack/svelte-query";
   import { isUnauthorized } from "../api/client";
+  import { listPresets, presetsQueryKey, type Preset } from "../api/presets";
   import {
     createSession,
     deleteSession,
@@ -12,24 +13,12 @@
   } from "../api/sessions";
   import { formatDay } from "../dates";
   import type { SessionBody } from "../domain";
-  import {
-    distanceBody,
-    distanceDraft,
-    emptyExercise,
-    emptyInterval,
-    exercisesFrom,
-    intervalBody,
-    intervalsFrom,
-    strengthBody,
-    type DraftExercise,
-    type DraftInterval,
-    type EffortKind,
-  } from "../draft";
   import { sportLabel } from "../format";
   import Button from "./Button.svelte";
-  import DistanceEditor from "./DistanceEditor.svelte";
+  import PresetPicker from "./PresetPicker.svelte";
+  import SaveAsPreset from "./SaveAsPreset.svelte";
+  import SessionBodyEditor from "./SessionBodyEditor.svelte";
   import SportPicker from "./SportPicker.svelte";
-  import StrengthEditor from "./StrengthEditor.svelte";
   import TextField from "./TextField.svelte";
 
   type Props = {
@@ -43,29 +32,13 @@
   let { today, session = null, oncancel, onsaved, ondeleted }: Props = $props();
 
   const editing = untrack(() => session);
-  const seeded = untrack(() =>
-    editing && editing.body.sport !== "strength" ? distanceDraft(editing.body) : null,
-  );
 
+  let editor = $state<ReturnType<typeof SessionBodyEditor>>();
+  let presetSaver = $state<ReturnType<typeof SaveAsPreset>>();
   let sport = $state<SessionBody["sport"]>(editing?.body.sport ?? "run");
   let date = $state(editing?.onDate ?? untrack(() => today));
-  let kilometres = $state(seeded?.kilometres ?? "");
-  let hours = $state(seeded?.hours ?? "");
-  let minutes = $state(seeded?.minutes ?? "");
-  let kind = $state<EffortKind>(
-    editing && editing.body.sport !== "strength" && editing.body.intervals?.length
-      ? "intervals"
-      : "distance",
-  );
-  let intervals = $state<DraftInterval[]>(
-    editing && editing.body.sport !== "strength" && editing.body.intervals?.length
-      ? intervalsFrom(editing.body.intervals)
-      : [emptyInterval()],
-  );
-  let exercises = $state<DraftExercise[]>(
-    editing?.body.sport === "strength" ? exercisesFrom(editing.body) : [],
-  );
   let prefilledFrom = $state<string | null>(null);
+  let picked = $state<Preset | null>(null);
   let error = $state("");
   let confirming = $state(false);
   let applied = untrack(() => editing != null);
@@ -73,6 +46,12 @@
   const latest = createQuery(() => ({
     queryKey: [...sessionsQueryKey, "latest", "strength", today],
     queryFn: () => latestSession("strength", today),
+    enabled: editing == null,
+  }));
+
+  const presets = createQuery(() => ({
+    queryKey: presetsQueryKey,
+    queryFn: listPresets,
     enabled: editing == null,
   }));
 
@@ -94,9 +73,14 @@
     onSuccess: () => ondeleted?.(),
   }));
 
-  const waitingForLast = $derived(editing == null && sport === "strength" && latest.isPending);
+  /** A strength preset filled the exercises, so the last strength session
+   * doesn't. */
+  const pickedStrength = $derived(picked?.body.sport === "strength");
+  const waitingForLast = $derived(
+    editing == null && !pickedStrength && sport === "strength" && latest.isPending,
+  );
   const loadError = $derived(
-    latest.isError && !isUnauthorized(latest.error)
+    !pickedStrength && latest.isError && !isUnauthorized(latest.error)
       ? "Couldn't load your last strength session."
       : "",
   );
@@ -117,25 +101,43 @@
   });
 
   $effect(() => {
-    if (editing || applied || latest.isPending) {
+    if (editing || applied || latest.isPending || !editor) {
       return;
     }
     applied = true;
     const result = latest.data;
-    if (latest.isError || result == null || result.body.sport !== "strength") {
-      exercises = [emptyExercise()];
+    if (
+      latest.isError ||
+      result == null ||
+      result.body.sport !== "strength" ||
+      result.body.exercises.length === 0
+    ) {
+      editor.seed({ sport: "strength", exercises: [] });
       return;
     }
-    if (result.body.exercises.length === 0) {
-      exercises = [emptyExercise()];
-      return;
-    }
-    exercises = exercisesFrom(result.body);
+    editor.seed(result.body);
     prefilledFrom = result.onDate;
   });
 
+  /** Fill the form from a preset and switch to its sport. It replaces what
+   * was there. After a strength preset, the last strength session no longer
+   * fills the exercises, even if it loads later. */
+  function pick(preset: Preset) {
+    if (!editor) {
+      return;
+    }
+    picked = preset;
+    if (preset.body.sport === "strength") {
+      applied = true;
+      prefilledFrom = null;
+    }
+    editor.fill(preset.body);
+    clearError();
+  }
+
   function clearError() {
     error = "";
+    presetSaver?.clearError();
     if (save.isError) {
       save.reset();
     }
@@ -163,25 +165,13 @@
       return;
     }
 
-    let body: SessionBody | null;
-    if (sport === "strength") {
-      body = strengthBody(exercises);
-      if (!body) {
-        error = "Name each exercise. Enter reps or a time for every set.";
-        return;
-      }
-    } else if (kind === "intervals") {
-      body = intervalBody(sport, intervals);
-      if (!body) {
-        error = "Enter repeats, and metres or a time, for every interval.";
-        return;
-      }
-    } else {
-      body = distanceBody(sport, kilometres, hours, minutes);
-      if (!body) {
-        error = "Enter a distance and a time.";
-        return;
-      }
+    const body = editor?.build();
+    if (body === undefined) {
+      return;
+    }
+    if (typeof body === "string") {
+      error = body;
+      return;
     }
     if (!acceptableDate(date)) {
       error = "Pick a date.";
@@ -231,7 +221,15 @@
     <h1 class="text-[clamp(2.5rem,12vw,3rem)] leading-none font-light tracking-tighter">
       {editing ? "Edit session" : "New session"}
     </h1>
+    {#if !editing && presets.data && presets.data.length > 0}
+      <PresetPicker presets={presets.data} {picked} onpick={pick} />
+    {/if}
     <SportPicker bind:sport locked={editing != null} />
+    {#if picked && picked.body.sport === sport}
+      <p class="-mt-3 text-muted" role="status">
+        From {picked.name}. Change what you need.
+      </p>
+    {/if}
     <TextField
       id="session-date"
       label="Date"
@@ -241,27 +239,21 @@
       mono
       bind:value={date}
     />
-    {#if sport === "strength"}
-      {#if waitingForLast}
-        <p class="text-muted" role="status">Loading exercises…</p>
-      {:else}
-        {#if loadError}
-          <p class="text-muted" role="status">{loadError}</p>
-        {/if}
-        <StrengthEditor {exercises} {prefilledFrom} onchange={(next) => (exercises = next)} />
-      {/if}
-    {:else}
-      <DistanceEditor
-        {sport}
-        bind:kind
-        bind:kilometres
-        bind:hours
-        bind:minutes
-        {intervals}
-        onchange={(next) => (intervals = next)}
-      />
-    {/if}
+    <SessionBodyEditor
+      bind:this={editor}
+      bind:sport
+      initial={editing?.body ?? null}
+      loadingExercises={waitingForLast}
+      exercisesNote={loadError}
+      {prefilledFrom}
+    />
     {#if editing}
+      {#if !confirming}
+        <SaveAsPreset
+          bind:this={presetSaver}
+          build={() => editor?.build() ?? "The form isn't ready yet."}
+        />
+      {/if}
       {#if confirming}
         <div
           class="grid gap-3 rounded-3xl border border-edge bg-field p-5"

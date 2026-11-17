@@ -7,6 +7,16 @@ pub mod sql_types {
 }
 
 diesel::table! {
+    training_preset (id) {
+        id -> Uuid,
+        name -> Text,
+        body -> Jsonb,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
+    }
+}
+
+diesel::table! {
     training_session (id) {
         id -> Uuid,
         on_date -> Date,
@@ -28,4 +38,8 @@ diesel::table! {
 
 diesel::joinable!(training_session_source -> training_session (session_id));
 
-diesel::allow_tables_to_appear_in_same_query!(training_session, training_session_source,);
+diesel::allow_tables_to_appear_in_same_query!(
+    training_preset,
+    training_session,
+    training_session_source,
+);

@@ -7,6 +7,7 @@
   } from "@tanstack/svelte-query";
   import { identityQueryKey } from "./api/identity";
   import { isUnauthorized } from "./api/client";
+  import { presetsQueryKey } from "./api/presets";
   import { sessionsQueryKey } from "./api/sessions";
   import App from "./App.svelte";
   import Button from "./components/Button.svelte";
@@ -37,6 +38,7 @@
   function signOut() {
     queryClient.setQueryData(identityQueryKey, null);
     void queryClient.removeQueries({ queryKey: sessionsQueryKey });
+    void queryClient.removeQueries({ queryKey: presetsQueryKey });
   }
 </script>
 

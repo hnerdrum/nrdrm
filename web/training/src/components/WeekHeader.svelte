@@ -10,10 +10,12 @@
     onprevious: () => void;
     onnext: () => void;
     onadd: () => void;
+    onpresets: () => void;
     onlogout: () => void;
   };
 
-  let { monday, atCurrent, loggingOut, onprevious, onnext, onadd, onlogout }: Props = $props();
+  let { monday, atCurrent, loggingOut, onprevious, onnext, onadd, onpresets, onlogout }: Props =
+    $props();
 
   const range = $derived(rangeParts(monday));
   const weekNumber = $derived(isoWeek(monday));
@@ -44,7 +46,8 @@
   <div class="hidden [grid-area:add] wide:block">
     <AddSessionButton onclick={onadd} />
   </div>
-  <div class="-mr-3 [grid-area:out]">
+  <div class="-mr-3 flex [grid-area:out]">
+    <Button variant="quiet" onclick={onpresets}>Presets</Button>
     <Button variant="quiet" type="button" disabled={loggingOut} onclick={onlogout}>Log out</Button>
   </div>
 </header>

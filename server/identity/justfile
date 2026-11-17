@@ -20,6 +20,26 @@ create-client name audience:
 create-user email password: env
     cargo run --bin create-user -- {{ email }} {{ password }}
 
+# Add the local test user, test@test.com with password "test". Safe to run
+# again. Refuses any database that is not on this machine.
+seed: env
+    #!/usr/bin/env bash
+    set -euo pipefail
+    url="${DATABASE_URL:-$(sed -n 's/^DATABASE_URL=//p' .env)}"
+    if [[ "${ENV:-dev}" == "prod" || ! "$url" =~ @(localhost|127\.0\.0\.1)[:/] ]]; then
+      echo "seed only runs against a local database" >&2
+      exit 1
+    fi
+    diesel migration run
+    if output=$(cargo run -q --bin create-user -- test@test.com test 2>&1); then
+      echo "$output"
+    elif [[ "$output" == *"user already exists"* ]]; then
+      echo "test@test.com already exists"
+    else
+      echo "$output" >&2
+      exit 1
+    fi
+
 env dest=".env":
     #!/usr/bin/env bash
     set -euo pipefail

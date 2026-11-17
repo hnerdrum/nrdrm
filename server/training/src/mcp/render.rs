@@ -1,5 +1,6 @@
 use uuid::Uuid;
 
+use crate::database::preset::Preset as StoredPreset;
 use crate::database::session::Session as StoredSession;
 use crate::domain::session::{Exercise, ExerciseSet, Interval, SessionBody, Sport};
 use crate::domain::source::ActivitySource;
@@ -38,17 +39,50 @@ pub struct RenderedSource {
     pub activity_id: String,
 }
 
-pub fn render(session: &StoredSession) -> RenderedSession {
-    let sport = sport_of(&session.body);
-    let (kilometres, minutes, pace, speed_kmh, intervals, exercises) = match &session.body {
-        SessionBody::Strength { exercises } => (
-            None,
-            None,
-            None,
-            None,
-            Vec::new(),
-            exercises.iter().map(exercise_input).collect(),
-        ),
+/// A preset in the units an agent reads back.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct RenderedPreset {
+    pub id: Uuid,
+    pub name: String,
+    pub sport: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kilometres: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minutes: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pace: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speed_kmh: Option<f64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub intervals: Vec<IntervalInput>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exercises: Vec<ExerciseInput>,
+    pub text: String,
+}
+
+/// A body's fields in the units an agent reads, without a date.
+struct BodyFields {
+    sport: Sport,
+    kilometres: Option<f64>,
+    minutes: Option<f64>,
+    pace: Option<String>,
+    speed_kmh: Option<f64>,
+    intervals: Vec<IntervalInput>,
+    exercises: Vec<ExerciseInput>,
+}
+
+fn body_fields(body: &SessionBody) -> BodyFields {
+    let sport = sport_of(body);
+    match body {
+        SessionBody::Strength { exercises } => BodyFields {
+            sport,
+            kilometres: None,
+            minutes: None,
+            pace: None,
+            speed_kmh: None,
+            intervals: Vec::new(),
+            exercises: exercises.iter().map(exercise_input).collect(),
+        },
         SessionBody::Run {
             distance,
             duration,
@@ -63,59 +97,63 @@ pub fn render(session: &StoredSession) -> RenderedSession {
             distance,
             duration,
             intervals,
-        } => (
-            Some(f64::from(*distance) / 1000.0),
-            Some(f64::from(*duration) / 60.0),
-            session
-                .body
+        } => BodyFields {
+            sport,
+            kilometres: Some(f64::from(*distance) / 1000.0),
+            minutes: Some(f64::from(*duration) / 60.0),
+            pace: body
                 .pace()
                 .map(|pace| format!("{}:{:02} /km", pace.minutes, pace.seconds)),
-            session.body.speed_kmh(),
-            intervals.iter().map(interval_input).collect(),
-            Vec::new(),
-        ),
-    };
+            speed_kmh: body.speed_kmh(),
+            intervals: intervals.iter().map(interval_input).collect(),
+            exercises: Vec::new(),
+        },
+    }
+}
 
+pub fn render(session: &StoredSession) -> RenderedSession {
+    let fields = body_fields(&session.body);
     RenderedSession {
         id: session.id,
         on_date: session.on_date,
-        sport: sport.as_str().to_string(),
-        kilometres,
-        minutes,
-        pace,
-        speed_kmh,
-        intervals,
-        exercises,
+        sport: fields.sport.as_str().to_string(),
+        kilometres: fields.kilometres,
+        minutes: fields.minutes,
+        pace: fields.pace,
+        speed_kmh: fields.speed_kmh,
+        intervals: fields.intervals,
+        exercises: fields.exercises,
         source: session.source.as_ref().map(rendered_source),
         text: describe(session),
     }
 }
 
+pub fn render_preset(preset: &StoredPreset) -> RenderedPreset {
+    let fields = body_fields(&preset.body);
+    let lead = format!("Preset \"{}\", {}", preset.name, fields.sport.as_str());
+    RenderedPreset {
+        id: preset.id,
+        name: preset.name.clone(),
+        sport: fields.sport.as_str().to_string(),
+        kilometres: fields.kilometres,
+        minutes: fields.minutes,
+        pace: fields.pace,
+        speed_kmh: fields.speed_kmh,
+        intervals: fields.intervals,
+        exercises: fields.exercises,
+        text: describe_body(&lead, &preset.body),
+    }
+}
+
 fn describe(session: &StoredSession) -> String {
-    let mut text = match &session.body {
-        SessionBody::Strength { exercises } => describe_strength(session.on_date, exercises),
-        SessionBody::Run {
-            distance,
-            duration,
-            intervals,
-        }
-        | SessionBody::Ride {
-            distance,
-            duration,
-            intervals,
-        }
-        | SessionBody::Ski {
-            distance,
-            duration,
-            intervals,
-        } => describe_distance(
-            &session.body,
-            session.on_date,
-            *distance,
-            *duration,
-            intervals,
-        ),
+    let name = match sport_of(&session.body) {
+        Sport::Run => "Run",
+        Sport::Ride => "Ride",
+        Sport::Ski => "Ski",
+        Sport::Strength => "Strength",
     };
+    let lead = format!("{name} on {}", session.on_date);
+    let mut text = describe_body(&lead, &session.body);
     if session.source.is_some() {
         text.push(' ');
         text.push_str("From Garmin.");
@@ -123,21 +161,37 @@ fn describe(session: &StoredSession) -> String {
     text
 }
 
+/// `lead` names what the body belongs to, such as "Run on 2026-11-08".
+fn describe_body(lead: &str, body: &SessionBody) -> String {
+    match body {
+        SessionBody::Strength { exercises } => describe_strength(lead, exercises),
+        SessionBody::Run {
+            distance,
+            duration,
+            intervals,
+        }
+        | SessionBody::Ride {
+            distance,
+            duration,
+            intervals,
+        }
+        | SessionBody::Ski {
+            distance,
+            duration,
+            intervals,
+        } => describe_distance(lead, body, *distance, *duration, intervals),
+    }
+}
+
 fn describe_distance(
+    lead: &str,
     body: &SessionBody,
-    on_date: chrono::NaiveDate,
     distance: u32,
     duration: u32,
     intervals: &[Interval],
 ) -> String {
-    let name = match sport_of(body) {
-        Sport::Run => "Run",
-        Sport::Ride => "Ride",
-        Sport::Ski => "Ski",
-        Sport::Strength => "Strength",
-    };
     let mut text = format!(
-        "{name} on {on_date}, {} km in {}",
+        "{lead}, {} km in {}",
         format_km(distance),
         format_duration(duration),
     );
@@ -161,16 +215,16 @@ fn describe_distance(
     text
 }
 
-fn describe_strength(on_date: chrono::NaiveDate, exercises: &[Exercise]) -> String {
+fn describe_strength(lead: &str, exercises: &[Exercise]) -> String {
     let work = exercises
         .iter()
         .map(format_exercise)
         .collect::<Vec<_>>()
         .join(". ");
     if work.is_empty() {
-        format!("Strength on {on_date}.")
+        format!("{lead}.")
     } else {
-        format!("Strength on {on_date}: {work}.")
+        format!("{lead}: {work}.")
     }
 }
 
@@ -459,6 +513,80 @@ mod tests {
         assert_eq!(
             rendered.text,
             "Ski on 2026-11-08, 12 km in 60 min, 5:00 /km. From Garmin."
+        );
+    }
+
+    fn preset(name: &str, body: SessionBody) -> StoredPreset {
+        StoredPreset {
+            id: Uuid::nil(),
+            name: name.to_string(),
+            body,
+        }
+    }
+
+    #[test]
+    fn an_interval_preset_reads_back_without_a_date() {
+        let rendered = render_preset(&preset(
+            "Thousands",
+            SessionBody::Run {
+                distance: 6_000,
+                duration: 1_770,
+                intervals: vec![Interval {
+                    repetitions: 6,
+                    distance: 1_000,
+                    duration: 220,
+                    recovery: 90,
+                }],
+            },
+        ));
+        assert_eq!(rendered.name, "Thousands");
+        assert_eq!(rendered.sport, "run");
+        assert_eq!(rendered.kilometres, Some(6.0));
+        assert_eq!(rendered.minutes, Some(29.5));
+        assert_eq!(
+            rendered.intervals,
+            vec![IntervalInput {
+                repetitions: 6,
+                distance_m: 1_000,
+                seconds: 220,
+                recovery_seconds: 90,
+            }]
+        );
+        assert_eq!(
+            rendered.text,
+            "Preset \"Thousands\", run, 6 km in 29:30, 4:55 /km. 6 × 1000 m in 3:40, 1:30 rest."
+        );
+    }
+
+    #[test]
+    fn a_strength_preset_reads_back_its_lifts() {
+        let rendered = render_preset(&preset(
+            "Lower body",
+            SessionBody::Strength {
+                exercises: vec![
+                    Exercise {
+                        name: "squat".into(),
+                        sets: vec![
+                            ExerciseSet::Reps {
+                                reps: 5,
+                                weight: 100.0
+                            };
+                            2
+                        ],
+                    },
+                    Exercise {
+                        name: "plank".into(),
+                        sets: vec![ExerciseSet::Hold { duration: 45 }],
+                    },
+                ],
+            },
+        ));
+        assert_eq!(rendered.sport, "strength");
+        assert_eq!(rendered.kilometres, None);
+        assert_eq!(rendered.exercises.len(), 2);
+        assert_eq!(
+            rendered.text,
+            "Preset \"Lower body\", strength: squat 5 × 100 kg, 5 × 100 kg. plank 45s."
         );
     }
 }

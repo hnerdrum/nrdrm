@@ -27,3 +27,17 @@ _Avoid_: core, engine, backend
 **Drift**:
 A mismatch between the Schema and the live Postgres catalog (tables, columns, nullability, keys, uniques, enums).
 _Avoid_: migration, schema diff
+
+# Training
+
+The owner's training log: sessions of running, riding, skiing and strength, a web app and an MCP server. "Preset" in the Recipes section above (under **Include**) is unrelated.
+
+## Language
+
+**Session**:
+One logged workout on a date. Its body is a run, ride or ski (a distance and a time, or interval blocks) or a strength session (exercises with sets).
+_Avoid_: activity (that is a Garmin record a session may be imported from), workout
+
+**Preset**:
+A named session body with no date, kept to start new sessions from. Logging a session from a preset copies the body; changing the preset later leaves logged sessions alone.
+_Avoid_: template, routine, workout, plan, favourite

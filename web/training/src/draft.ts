@@ -1,4 +1,4 @@
-import type { Interval, Ride, Run, Ski, Strength } from './domain';
+import type { Interval, Ride, Run, SessionBody, Ski, Strength } from './domain';
 
 export type DistanceSport = 'run' | 'ride' | 'ski';
 
@@ -365,4 +365,76 @@ export function strengthBody(exercises: DraftExercise[]): Strength | null {
     built.push({ name, sets });
   }
   return { sport: 'strength', exercises: built };
+}
+
+/** The run, ride and ski fields. They are shared, so switching between
+ * those sports keeps what was typed. */
+export type DistanceDraft = {
+  kind: EffortKind;
+  kilometres: string;
+  hours: string;
+  minutes: string;
+  intervals: DraftInterval[];
+};
+
+export function emptyDistanceDraft(): DistanceDraft {
+  return {
+    kind: 'distance',
+    kilometres: '',
+    hours: '',
+    minutes: '',
+    intervals: [emptyInterval()],
+  };
+}
+
+/** The form fields that show a body: the distance fields for a run, ride or
+ * ski, or the exercises for a strength session. */
+export type BodyDraft =
+  | { sport: DistanceSport; distance: DistanceDraft }
+  | { sport: 'strength'; exercises: DraftExercise[] };
+
+export function draftFrom(body: SessionBody): BodyDraft {
+  if (body.sport === 'strength') {
+    return { sport: 'strength', exercises: exercisesFrom(body) };
+  }
+  const hasIntervals = (body.intervals?.length ?? 0) > 0;
+  return {
+    sport: body.sport,
+    distance: {
+      ...distanceDraft(body),
+      kind: hasIntervals ? 'intervals' : 'distance',
+      intervals: hasIntervals
+        ? intervalsFrom(body.intervals ?? [])
+        : [emptyInterval()],
+    },
+  };
+}
+
+/** The body the form shows for `sport`, or what to fix before it can be
+ * saved. */
+export function buildBody(
+  sport: SessionBody['sport'],
+  distance: DistanceDraft,
+  exercises: DraftExercise[],
+): SessionBody | string {
+  if (sport === 'strength') {
+    return (
+      strengthBody(exercises) ??
+      'Name each exercise. Enter reps or a time for every set.'
+    );
+  }
+  if (distance.kind === 'intervals') {
+    return (
+      intervalBody(sport, distance.intervals) ??
+      'Enter repeats, and metres or a time, for every interval.'
+    );
+  }
+  return (
+    distanceBody(
+      sport,
+      distance.kilometres,
+      distance.hours,
+      distance.minutes,
+    ) ?? 'Enter a distance and a time.'
+  );
 }

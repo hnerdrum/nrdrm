@@ -16,4 +16,4 @@ pub use convert::{
 pub use input::{
     DistanceSession, ExerciseInput, IntervalInput, SessionUpdate, SetInput, StrengthSession,
 };
-pub use render::{render, RenderedSession, RenderedSource};
+pub use render::{render, render_preset, RenderedPreset, RenderedSession, RenderedSource};

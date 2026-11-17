@@ -153,3 +153,90 @@ impl UpdateQuery {
 pub struct DeleteQuery {
     pub id: Uuid,
 }
+
+/// The presets to list: those of one sport, or every one when omitted.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PresetsQuery {
+    #[serde(default)]
+    pub sport: Option<SportName>,
+}
+
+/// A new preset: a name and a session body with no date, in the units the
+/// log tools take.
+///
+/// A strength preset has `exercises`. A run, ride or ski has `distance_km`
+/// and `minutes`, or `intervals`, whose repeats are then totalled.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PresetInput {
+    pub name: String,
+    pub sport: SportName,
+    #[serde(default)]
+    pub distance_km: Option<f64>,
+    #[serde(default)]
+    pub minutes: Option<f64>,
+    #[serde(default)]
+    pub intervals: Vec<IntervalInput>,
+    #[serde(default)]
+    pub exercises: Option<Vec<ExerciseInput>>,
+}
+
+/// One preset and the fields to change. Omitted fields stay as they are, and
+/// so does the sport. `intervals` or `exercises`, when present, replace that
+/// list.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PresetUpdateQuery {
+    pub id: Uuid,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub distance_km: Option<f64>,
+    #[serde(default)]
+    pub minutes: Option<f64>,
+    #[serde(default)]
+    pub intervals: Option<Vec<IntervalInput>>,
+    #[serde(default)]
+    pub exercises: Option<Vec<ExerciseInput>>,
+}
+
+impl PresetUpdateQuery {
+    pub(crate) fn change(&self) -> SessionUpdate {
+        SessionUpdate {
+            on_date: None,
+            distance_km: self.distance_km,
+            minutes: self.minutes,
+            intervals: self.intervals.clone(),
+            exercises: self.exercises.clone(),
+        }
+    }
+}
+
+/// The preset to delete.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PresetIdQuery {
+    pub id: Uuid,
+}
+
+/// The preset to log, by `id` or by `name` (regardless of case), and the day.
+/// Give one of `id` and `name`. `on_date` defaults to today in Europe/Oslo.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct LogPresetQuery {
+    #[serde(default)]
+    pub id: Option<Uuid>,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub on_date: Option<NaiveDate>,
+}
+
+/// A logged session to keep as a new preset, and the preset's name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct SaveAsPresetQuery {
+    pub session_id: Uuid,
+    pub name: String,
+}

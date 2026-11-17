@@ -3,14 +3,17 @@
   import { createMutation, createQuery, useQueryClient } from "@tanstack/svelte-query";
   import { isUnauthorized } from "../api/client";
   import { identityQueryKey, logout } from "../api/identity";
+  import { presetsQueryKey, type Preset } from "../api/presets";
   import { listSessions, sessionsQueryKey, type LoggedSession } from "../api/sessions";
   import { describeSync, describeSyncFailure, syncGarmin } from "../api/sync";
   import { addDays, mondayOf, todayIso, weekOffset } from "../dates";
   import NewSession from "./NewSession.svelte";
+  import PresetForm from "./PresetForm.svelte";
+  import PresetsScreen from "./PresetsScreen.svelte";
   import SessionsScreen from "./SessionsScreen.svelte";
   import WeekScreen from "./WeekScreen.svelte";
 
-  type View = "week" | "sessions" | "new" | "edit";
+  type View = "week" | "sessions" | "new" | "edit" | "presets" | "preset-new" | "preset-edit";
 
   const queryClient = useQueryClient();
   const today = todayIso();
@@ -18,6 +21,7 @@
   let view = $state<View>("week");
   let returnTo = $state<"week" | "sessions">("week");
   let editing = $state<LoggedSession | null>(null);
+  let editingPreset = $state<Preset | null>(null);
   let wide = $state(
     typeof window !== "undefined" && window.matchMedia("(min-width: 960px)").matches,
   );
@@ -46,6 +50,7 @@
     onSuccess: () => {
       queryClient.setQueryData(identityQueryKey, null);
       void queryClient.removeQueries({ queryKey: sessionsQueryKey });
+      void queryClient.removeQueries({ queryKey: presetsQueryKey });
     },
   }));
 
@@ -105,6 +110,26 @@
     void queryClient.invalidateQueries({ queryKey: sessionsQueryKey });
   }
 
+  function openPresets() {
+    view = "presets";
+    window.scrollTo(0, 0);
+  }
+
+  function openPreset(preset: Preset | null) {
+    editingPreset = preset;
+    view = preset ? "preset-edit" : "preset-new";
+  }
+
+  function closePreset() {
+    editingPreset = null;
+    openPresets();
+  }
+
+  function presetsChanged() {
+    void queryClient.invalidateQueries({ queryKey: presetsQueryKey });
+    closePreset();
+  }
+
   function onLogout() {
     if (logoutMutation.isPending) {
       return;
@@ -161,6 +186,21 @@
   <NewSession {today} oncancel={closeForm} onsaved={saved} />
 {:else if view === "edit" && editing}
   <NewSession {today} session={editing} oncancel={closeForm} onsaved={saved} ondeleted={deleted} />
+{:else if view === "presets"}
+  <PresetsScreen
+    onback={() => (view = "week")}
+    onadd={() => openPreset(null)}
+    onopen={openPreset}
+  />
+{:else if view === "preset-new"}
+  <PresetForm oncancel={closePreset} onsaved={presetsChanged} />
+{:else if view === "preset-edit" && editingPreset}
+  <PresetForm
+    preset={editingPreset}
+    oncancel={closePreset}
+    onsaved={presetsChanged}
+    ondeleted={presetsChanged}
+  />
 {:else if view === "sessions"}
   <SessionsScreen
     {monday}
@@ -189,6 +229,7 @@
     onadd={openNew}
     onopen={openEdit}
     onsessions={() => (view = "sessions")}
+    onpresets={openPresets}
     onlogout={onLogout}
   />
 {/if}
