@@ -104,6 +104,12 @@
           "methods": ["GET", "PUT", "DELETE"],
           "auth": "session"
         },
+        { "path": "presets", "methods": ["GET", "POST"], "auth": "session" },
+        {
+          "path": "presets/*",
+          "methods": ["GET", "PUT", "DELETE"],
+          "auth": "session"
+        },
         {
           "path": "oauth-protected-resource",
           "methods": ["GET"],
