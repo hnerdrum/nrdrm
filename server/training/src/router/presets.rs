@@ -122,7 +122,7 @@ async fn remove(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::session::{Exercise, ExerciseSet, Interval};
+    use crate::domain::session::{Block, Exercise, ExerciseSet, Interval};
     use crate::router::main::{init_router, test_state};
     use axum::body::Body;
     use axum::http::Request;
@@ -174,8 +174,8 @@ mod tests {
 
     fn leg_day() -> SessionBody {
         SessionBody::Strength {
-            exercises: vec![
-                Exercise {
+            blocks: vec![
+                Block::Exercise(Exercise {
                     name: "squat".into(),
                     sets: vec![
                         ExerciseSet::Reps {
@@ -184,11 +184,11 @@ mod tests {
                         };
                         3
                     ],
-                },
-                Exercise {
+                }),
+                Block::Exercise(Exercise {
                     name: "plank".into(),
                     sets: vec![ExerciseSet::Hold { duration: 60 }],
-                },
+                }),
             ],
         }
     }
@@ -197,12 +197,12 @@ mod tests {
         SessionBody::Run {
             distance: 6_000,
             duration: 1_770,
-            intervals: vec![Interval {
+            blocks: vec![Block::Repeats(Interval {
                 repetitions: 6,
                 distance: 1_000,
                 duration: 220,
                 recovery: 90,
-            }],
+            })],
         }
     }
 
@@ -379,12 +379,12 @@ mod tests {
                 "A preset needs a distance and a time",
             ),
             (
-                json!({ "name": unique("Empty"), "body": { "sport": "strength", "exercises": [] } }),
+                json!({ "name": unique("Empty"), "body": { "sport": "strength", "blocks": [] } }),
                 "Name each exercise and give it a set",
             ),
             (
-                json!({ "name": unique("Short"), "body": { "sport": "run", "distance": 1000, "duration": 220, "intervals": [{ "repetitions": 4, "distance": 1000, "duration": 220 }] } }),
-                "Each interval needs repeats, and a distance or a time",
+                json!({ "name": unique("Short"), "body": { "sport": "run", "distance": 1000, "duration": 220, "blocks": [{ "kind": "repeats", "repetitions": 4, "distance": 1000, "duration": 220 }] } }),
+                "The blocks add up to more than the session",
             ),
         ];
         for (input, message) in cases {

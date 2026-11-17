@@ -35,8 +35,12 @@ The owner's training log: sessions of running, riding, skiing and strength, a we
 ## Language
 
 **Session**:
-One logged workout on a date. Its body is a run, ride or ski (a distance and a time, or interval blocks) or a strength session (exercises with sets).
+One logged workout on a date. Its body is a sport, for a run, ride or ski the distance and time it took, and an ordered list of blocks. A body with no blocks is a steady session.
 _Avoid_: activity (that is a Garmin record a session may be imported from), workout
+
+**Block**:
+One part of a session body, in order: a steady stretch (warmup, cooldown, easy, tempo), a set of repeats, or an exercise with its sets. A run, ride or ski takes steady and repeats blocks; strength takes steady and exercise blocks. Blocks outline the session and may add up to less than its distance and time, never more.
+_Avoid_: segment, step, phase, lap (that is a Garmin record), interval (repeats are one kind of block)
 
 **Preset**:
 A named session body with no date, kept to start new sessions from. Logging a session from a preset copies the body; changing the preset later leaves logged sessions alone.

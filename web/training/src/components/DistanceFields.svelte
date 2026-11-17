@@ -7,6 +7,8 @@
     kilometres?: string;
     hours?: string;
     minutes?: string;
+    /** What a blank field stands for: the blocks' totals. */
+    blank?: { kilometres: string; hours: string; minutes: string } | null;
   };
 
   let {
@@ -14,9 +16,18 @@
     kilometres = $bindable(""),
     hours = $bindable(""),
     minutes = $bindable(""),
+    blank = null,
   }: Props = $props();
 
-  const readout = $derived(derivedEffort(sport, kilometres, hours, minutes));
+  const timeBlank = $derived(hours.trim() === "" && minutes.trim() === "");
+  const readout = $derived(
+    derivedEffort(
+      sport,
+      kilometres.trim() === "" && blank ? blank.kilometres : kilometres,
+      timeBlank && blank ? blank.hours : hours,
+      timeBlank && blank ? blank.minutes : minutes,
+    ),
+  );
 </script>
 
 <div class="rise-in grid gap-7">
@@ -24,6 +35,7 @@
     id="distance"
     label="Distance (km)"
     inputmode="decimal"
+    placeholder={blank?.kilometres}
     autocomplete="off"
     large
     mono
@@ -34,6 +46,7 @@
       id="hours"
       label="Hours"
       inputmode="numeric"
+      placeholder={timeBlank ? blank?.hours : undefined}
       autocomplete="off"
       large
       mono
@@ -43,6 +56,7 @@
       id="minutes"
       label="Minutes"
       inputmode="numeric"
+      placeholder={timeBlank ? blank?.minutes : undefined}
       autocomplete="off"
       large
       mono

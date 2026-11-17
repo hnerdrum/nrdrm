@@ -128,7 +128,7 @@ async fn remove(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::session::{Exercise, ExerciseSet, SessionBody};
+    use crate::domain::session::{Block, Exercise, ExerciseSet, SessionBody};
     use crate::router::main::{init_router, test_state, AppState};
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
@@ -224,13 +224,13 @@ mod tests {
 
     fn strength(name: &str) -> SessionBody {
         SessionBody::Strength {
-            exercises: vec![Exercise {
+            blocks: vec![Block::Exercise(Exercise {
                 name: name.into(),
                 sets: vec![ExerciseSet::Reps {
                     reps: 5,
                     weight: 100.0,
                 }],
-            }],
+            })],
         }
     }
 
@@ -254,13 +254,13 @@ mod tests {
             (
                 sunday,
                 SessionBody::Strength {
-                    exercises: vec![Exercise {
+                    blocks: vec![Block::Exercise(Exercise {
                         name: "squat".into(),
                         sets: vec![ExerciseSet::Reps {
                             reps: 5,
                             weight: 0.0,
                         }],
-                    }],
+                    })],
                 },
             ),
             (
@@ -268,7 +268,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 5_000,
                     duration: 1_500,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
             (
@@ -276,7 +276,7 @@ mod tests {
                 SessionBody::Ride {
                     distance: 40_000,
                     duration: 3_600,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
             (
@@ -284,7 +284,7 @@ mod tests {
                 SessionBody::Ski {
                     distance: 12_000,
                     duration: 3_600,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
             (
@@ -292,7 +292,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 1_000,
                     duration: 300,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
             (
@@ -300,7 +300,7 @@ mod tests {
                 SessionBody::Ride {
                     distance: 2_000,
                     duration: 400,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
         ];
@@ -346,7 +346,7 @@ mod tests {
                     SessionBody::Run {
                         distance: 5_000,
                         duration: 1_500,
-                        intervals: vec![],
+                        blocks: vec![],
                     },
                 ),
                 (
@@ -354,7 +354,7 @@ mod tests {
                     SessionBody::Ride {
                         distance: 40_000,
                         duration: 3_600,
-                        intervals: vec![],
+                        blocks: vec![],
                     },
                 ),
                 (
@@ -362,19 +362,19 @@ mod tests {
                     SessionBody::Ski {
                         distance: 12_000,
                         duration: 3_600,
-                        intervals: vec![],
+                        blocks: vec![],
                     },
                 ),
                 (
                     sunday,
                     SessionBody::Strength {
-                        exercises: vec![Exercise {
+                        blocks: vec![Block::Exercise(Exercise {
                             name: "squat".into(),
                             sets: vec![ExerciseSet::Reps {
                                 reps: 5,
                                 weight: 0.0,
                             }],
-                        }],
+                        })],
                     },
                 ),
             ]
@@ -392,7 +392,7 @@ mod tests {
         let ski = SessionBody::Ski {
             distance: 8_000,
             duration: 2_400,
-            intervals: vec![],
+            blocks: vec![],
         };
         let (status, bytes) = call(&app, "POST", "/api/sessions", Some(&input(monday, ski))).await;
         assert_eq!(
@@ -406,7 +406,7 @@ mod tests {
         let longer = SessionBody::Ski {
             distance: 12_000,
             duration: 3_600,
-            intervals: vec![],
+            blocks: vec![],
         };
         let (status, bytes) = call(
             &app,
@@ -468,7 +468,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 3_000,
                     duration: 900,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             )),
         )
@@ -503,7 +503,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 4_000,
                     duration: 1_200,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             )),
         )
@@ -582,11 +582,58 @@ mod tests {
             "POST",
             "/api/sessions",
             Some(
-                r#"{"onDate":"2400-05-02","body":{"sport":"strength","exercises":[],"distance":1000}}"#,
+                r#"{"onDate":"2400-05-02","body":{"sport":"strength","blocks":[],"distance":1000}}"#,
             ),
         )
         .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn a_run_keeps_its_warmup_and_cooldown_in_order() {
+        let app = app();
+        let (monday, sunday) = week_containing(2402, 3, 1);
+        clear(&app, monday, sunday).await;
+
+        let body = r#"{"sport":"run","distance":11200,"duration":3300,"blocks":[{"kind":"steady","duration":900,"name":"warmup"},{"kind":"repeats","repetitions":5,"distance":1000,"duration":210,"recovery":90},{"kind":"steady","duration":600,"name":"cooldown"}]}"#;
+        let (status, bytes) = call(
+            &app,
+            "POST",
+            "/api/sessions",
+            Some(&format!(r#"{{"onDate":"{monday}","body":{body}}}"#)),
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::CREATED,
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+        let saved: Session = parse(&bytes);
+
+        let (status, bytes) = call(&app, "GET", &format!("/api/sessions/{}", saved.id), None).await;
+        assert_eq!(status, StatusCode::OK);
+        let read: serde_json::Value = parse(&bytes);
+        assert_eq!(
+            read["body"],
+            serde_json::from_str::<serde_json::Value>(body).unwrap()
+        );
+
+        let short = body.replace(r#""duration":3300"#, r#""duration":2000"#);
+        let (status, bytes) = call(
+            &app,
+            "POST",
+            "/api/sessions",
+            Some(&format!(r#"{{"onDate":"{monday}","body":{short}}}"#)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(
+            parse::<String>(&bytes),
+            "The blocks add up to more than the session"
+        );
+
+        clear(&app, monday, sunday).await;
     }
 
     #[tokio::test]
@@ -651,7 +698,7 @@ mod tests {
             SessionBody::Run {
                 distance: 5_000,
                 duration: 1_500,
-                intervals: vec![],
+                blocks: vec![],
             },
         )
         .await;

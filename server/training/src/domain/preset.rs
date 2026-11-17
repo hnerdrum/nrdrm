@@ -2,7 +2,7 @@
 //! from. Logging a session from a preset copies the body; later changes to
 //! the preset leave logged sessions alone.
 
-use super::session::SessionBody;
+use super::session::{Block, SessionBody};
 
 /// The longest name a preset may have, in characters.
 pub const NAME_LIMIT: usize = 60;
@@ -28,50 +28,47 @@ pub fn preset_name(raw: &str) -> Result<String, &'static str> {
 ///
 /// A preset fills the New session form, so it has to be a body that form
 /// would save: everything a session needs, plus a distance and a time on a
-/// steady session and at least one named exercise with a set.
+/// steady session with no blocks, and on a strength session at least one
+/// exercise block, each exercise named and with a set.
 pub fn body_rejection(body: &SessionBody) -> Option<&'static str> {
     if let Some(message) = body.rejection() {
         return Some(message);
     }
     match body {
-        SessionBody::Run {
-            distance,
-            duration,
-            intervals,
+        SessionBody::Strength { blocks } => {
+            let mut exercises = blocks.iter().filter_map(|block| match block {
+                Block::Exercise(exercise) => Some(exercise),
+                _ => None,
+            });
+            let mut any = false;
+            let named = exercises.all(|exercise| {
+                any = true;
+                !exercise.name.trim().is_empty() && !exercise.sets.is_empty()
+            });
+            (!any || !named).then_some(EXERCISES)
         }
-        | SessionBody::Ride {
-            distance,
-            duration,
-            intervals,
-        }
-        | SessionBody::Ski {
-            distance,
-            duration,
-            intervals,
-        } if intervals.is_empty() && (*distance == 0 || *duration == 0) => Some(STEADY),
-        SessionBody::Strength { exercises }
-            if exercises.is_empty()
-                || exercises.iter().any(|exercise| {
-                    exercise.name.trim().is_empty() || exercise.sets.is_empty()
-                }) =>
-        {
-            Some(EXERCISES)
-        }
-        _ => None,
+        _ => match body.totals() {
+            Some((distance, duration))
+                if body.blocks().is_empty() && (distance == 0 || duration == 0) =>
+            {
+                Some(STEADY)
+            }
+            _ => None,
+        },
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::session::{Exercise, ExerciseSet, Interval};
+    use crate::domain::session::{Exercise, ExerciseSet, Interval, Steady};
 
     fn strength(name: &str, sets: Vec<ExerciseSet>) -> SessionBody {
         SessionBody::Strength {
-            exercises: vec![Exercise {
+            blocks: vec![Block::Exercise(Exercise {
                 name: name.into(),
                 sets,
-            }],
+            })],
         }
     }
 
@@ -98,16 +95,16 @@ mod tests {
         let short = SessionBody::Run {
             distance: 1_000,
             duration: 220,
-            intervals: vec![Interval {
+            blocks: vec![Block::Repeats(Interval {
                 repetitions: 4,
                 distance: 1_000,
                 duration: 220,
                 recovery: 90,
-            }],
+            })],
         };
         assert_eq!(
             body_rejection(&short),
-            Some("Each interval needs repeats, and a distance or a time")
+            Some("The blocks add up to more than the session")
         );
         assert_eq!(
             body_rejection(&strength(
@@ -127,14 +124,14 @@ mod tests {
             let run = SessionBody::Run {
                 distance,
                 duration,
-                intervals: vec![],
+                blocks: vec![],
             };
             assert_eq!(body_rejection(&run), Some(STEADY), "{distance} {duration}");
         }
         let steady = SessionBody::Ride {
             distance: 40_000,
             duration: 3_600,
-            intervals: vec![],
+            blocks: vec![],
         };
         assert_eq!(body_rejection(&steady), None);
     }
@@ -144,12 +141,12 @@ mod tests {
         let timed = SessionBody::Ski {
             distance: 0,
             duration: 480,
-            intervals: vec![Interval {
+            blocks: vec![Block::Repeats(Interval {
                 repetitions: 8,
                 distance: 0,
                 duration: 60,
                 recovery: 0,
-            }],
+            })],
         };
         assert_eq!(body_rejection(&timed), None);
     }
@@ -157,7 +154,7 @@ mod tests {
     #[test]
     fn a_strength_preset_needs_named_exercises_with_sets() {
         assert_eq!(
-            body_rejection(&SessionBody::Strength { exercises: vec![] }),
+            body_rejection(&SessionBody::Strength { blocks: vec![] }),
             Some(EXERCISES)
         );
         assert_eq!(
@@ -165,6 +162,13 @@ mod tests {
             Some(EXERCISES)
         );
         assert_eq!(body_rejection(&strength("squat", vec![])), Some(EXERCISES));
+        let row_only = SessionBody::Strength {
+            blocks: vec![Block::Steady(Steady {
+                duration: 600,
+                ..Steady::default()
+            })],
+        };
+        assert_eq!(body_rejection(&row_only), Some(EXERCISES));
         assert_eq!(
             body_rejection(&strength(
                 "squat",

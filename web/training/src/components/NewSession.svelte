@@ -12,7 +12,7 @@
     type LoggedSession,
   } from "../api/sessions";
   import { formatDay } from "../dates";
-  import type { SessionBody } from "../domain";
+  import { exercisesOf, type SessionBody } from "../domain";
   import { sportLabel } from "../format";
   import Button from "./Button.svelte";
   import PresetPicker from "./PresetPicker.svelte";
@@ -110,9 +110,9 @@
       latest.isError ||
       result == null ||
       result.body.sport !== "strength" ||
-      result.body.exercises.length === 0
+      exercisesOf(result.body).length === 0
     ) {
-      editor.seed({ sport: "strength", exercises: [] });
+      editor.seed({ sport: "strength" });
       return;
     }
     editor.seed(result.body);

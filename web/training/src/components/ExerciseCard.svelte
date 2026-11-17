@@ -4,8 +4,11 @@
 
   type Props = {
     exercise: DraftExercise;
+    /** Its place among all the blocks, for moving it. */
     index: number;
     total: number;
+    /** Its number among the exercises, for its label. */
+    number?: number;
     onname: (name: string) => void;
     onmeasure: (measure: SetMeasure) => void;
     onset: (setKey: string, field: "reps" | "weight" | "minutes" | "seconds", value: string) => void;
@@ -19,6 +22,7 @@
     exercise,
     index,
     total,
+    number = index + 1,
     onname,
     onmeasure,
     onset,
@@ -39,10 +43,10 @@
 
 <section
   class="grid gap-5 rounded-3xl border border-line bg-field p-5"
-  aria-label="Exercise {index + 1}"
+  aria-label="Exercise {number}"
 >
   <label class="grid gap-2" for="exercise-{exercise.key}-name">
-    <span class="text-muted">Exercise {index + 1}</span>
+    <span class="text-muted">Exercise {number}</span>
     <input
       id="exercise-{exercise.key}-name"
       class={inputClass}
@@ -105,7 +109,7 @@
             class="{inputClass} font-mono text-lg tabular-nums"
             inputmode="numeric"
             autocomplete="off"
-            aria-label="Exercise {index + 1} set {setIndex + 1} reps"
+            aria-label="Exercise {number} set {setIndex + 1} reps"
             value={set.reps}
             oninput={(event) => onset(set.key, "reps", text(event))}
           />
@@ -115,14 +119,14 @@
             inputmode="decimal"
             autocomplete="off"
             placeholder="Bodyweight"
-            aria-label="Exercise {index + 1} set {setIndex + 1} weight in kg. Leave empty for bodyweight."
+            aria-label="Exercise {number} set {setIndex + 1} weight in kg. Leave empty for bodyweight."
             value={set.weight}
             oninput={(event) => onset(set.key, "weight", text(event))}
           />
           <Button
             variant="quiet"
             class="px-0"
-            label="Remove set {setIndex + 1} of exercise {index + 1}"
+            label="Remove set {setIndex + 1} of exercise {number}"
             disabled={exercise.sets.length < 2}
             onclick={() => onremoveset(set.key)}
           >
@@ -148,7 +152,7 @@
             class="{inputClass} font-mono text-lg tabular-nums"
             inputmode="numeric"
             autocomplete="off"
-            aria-label="Exercise {index + 1} set {setIndex + 1} minutes"
+            aria-label="Exercise {number} set {setIndex + 1} minutes"
             value={set.minutes}
             oninput={(event) => onset(set.key, "minutes", text(event))}
           />
@@ -157,14 +161,14 @@
             class="{inputClass} font-mono text-lg tabular-nums"
             inputmode="numeric"
             autocomplete="off"
-            aria-label="Exercise {index + 1} set {setIndex + 1} seconds"
+            aria-label="Exercise {number} set {setIndex + 1} seconds"
             value={set.seconds}
             oninput={(event) => onset(set.key, "seconds", text(event))}
           />
           <Button
             variant="quiet"
             class="px-0"
-            label="Remove set {setIndex + 1} of exercise {index + 1}"
+            label="Remove set {setIndex + 1} of exercise {number}"
             disabled={exercise.sets.length < 2}
             onclick={() => onremoveset(set.key)}
           >
@@ -192,6 +196,6 @@
     >
       Move down
     </Button>
-    <Button variant="quiet" disabled={total < 2} onclick={onremove}>Remove exercise</Button>
+    <Button variant="quiet" onclick={onremove}>Remove exercise</Button>
   </div>
 </section>

@@ -137,7 +137,7 @@ impl TrainingTools {
     }
 
     #[tool(
-        description = "Log a run. Distance is kilometres and time is minutes. With intervals, the repeats are the session.",
+        description = "Log a run. Distance is kilometres and time is minutes, for the whole session. Blocks outline it in order: steady parts (warmup, cooldown, tempo) and repeats. With blocks, a distance or time left out is what the blocks add up to; one given may be more, never less.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -152,7 +152,7 @@ impl TrainingTools {
     }
 
     #[tool(
-        description = "Log a ride. Distance is kilometres and time is minutes. With intervals, the repeats are the session.",
+        description = "Log a ride. Distance is kilometres and time is minutes, for the whole session. Blocks outline it in order: steady parts (warmup, cooldown, tempo) and repeats. With blocks, a distance or time left out is what the blocks add up to; one given may be more, never less.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -167,7 +167,7 @@ impl TrainingTools {
     }
 
     #[tool(
-        description = "Log a ski. Distance is kilometres and time is minutes. With intervals, the repeats are the session.",
+        description = "Log a ski. Distance is kilometres and time is minutes, for the whole session. Blocks outline it in order: steady parts (warmup, cooldown, tempo) and repeats. With blocks, a distance or time left out is what the blocks add up to; one given may be more, never less.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -182,7 +182,7 @@ impl TrainingTools {
     }
 
     #[tool(
-        description = "Log a strength session. A set is reps and an optional weight in kilograms, or a hold in seconds.",
+        description = "Log a strength session as blocks in order: exercises, and steady blocks for a warmup such as the rower. A set is reps and an optional weight in kilograms, or a hold in seconds.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -198,7 +198,7 @@ impl TrainingTools {
     }
 
     #[tool(
-        description = "Change one session. A field that is omitted stays as it is, and the sport stays the same.",
+        description = "Change one session. A field that is omitted stays as it is, and the sport stays the same. Blocks, when given, replace every block; a distance or time that was only what the old blocks added up to follows the new ones.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -258,7 +258,7 @@ impl TrainingTools {
     }
 
     #[tool(
-        description = "Save a preset: a name and a session with no date. Distance is kilometres and time is minutes, as in the log tools. A strength preset has exercises. Names are unique regardless of case.",
+        description = "Save a preset: a name and a session with no date. Distance is kilometres and time is minutes, as in the log tools. Blocks work as in the log tools; a strength preset needs an exercise block. Names are unique regardless of case.",
         annotations(
             read_only_hint = false,
             destructive_hint = false,
@@ -274,8 +274,7 @@ impl TrainingTools {
             sport(input.sport),
             input.distance_km,
             input.minutes,
-            &input.intervals,
-            input.exercises.as_deref(),
+            &input.blocks,
         )
         .map_err(str::to_string)?;
         if let Some(message) = body_rejection(&body) {
@@ -403,7 +402,7 @@ impl TrainingTools {
 impl ServerHandler for TrainingTools {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
-            "The owner's training log. Distance is kilometres and time is minutes. A week runs Monday to Sunday, Europe/Oslo. A preset is a named session with no date for a session the owner repeats, such as a strength routine or an interval set. To log one, use log_preset with its name; list_presets shows them all.",
+            "The owner's training log. Distance is kilometres and time is minutes. A week runs Monday to Sunday, Europe/Oslo. A preset is a named session with no date for a session the owner repeats, such as a strength routine or an interval set. To log one, use log_preset with its name; list_presets shows them all. A session is outlined by blocks in order: steady parts, repeats, or exercises. Name a warmup block exactly warmup and a cooldown block exactly cooldown.",
         )
     }
 }
@@ -568,8 +567,7 @@ mod tests {
             minutes: Some(57.0),
             pace: Some("5:42 /km".to_string()),
             speed_kmh: None,
-            intervals: Vec::new(),
-            exercises: Vec::new(),
+            blocks: Vec::new(),
             source: None,
             text: "Run on 2026-11-08, 10 km in 57 min, 5:42 /km.".to_string(),
         };

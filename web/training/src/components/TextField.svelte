@@ -7,6 +7,7 @@
     autocomplete?: HTMLInputElement["autocomplete"];
     inputmode?: "decimal" | "numeric" | "text";
     max?: string;
+    placeholder?: string;
     large?: boolean;
     mono?: boolean;
     value?: string;
@@ -22,6 +23,7 @@
     autocomplete,
     inputmode,
     max,
+    placeholder,
     large = false,
     mono = false,
     value = $bindable(""),
@@ -49,6 +51,7 @@
     {autocomplete}
     {inputmode}
     {max}
+    {placeholder}
     {onkeydown}
     bind:this={element}
     bind:value

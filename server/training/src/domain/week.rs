@@ -39,7 +39,7 @@ mod tests {
     use chrono::NaiveDate;
 
     use super::*;
-    use crate::domain::session::{Exercise, ExerciseSet, SessionBody};
+    use crate::domain::session::{Block, Exercise, ExerciseSet, SessionBody};
 
     fn date(year: i32, month: u32, day: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(year, month, day).unwrap()
@@ -61,7 +61,7 @@ mod tests {
                 SessionBody::Ski {
                     distance: 4_000,
                     duration: 1_800,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
             session(
@@ -69,7 +69,7 @@ mod tests {
                 SessionBody::Ski {
                     distance: 10_000,
                     duration: 3_600,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
         ];
@@ -92,13 +92,13 @@ mod tests {
         let sessions = [session(
             4,
             SessionBody::Strength {
-                exercises: vec![Exercise {
+                blocks: vec![Block::Exercise(Exercise {
                     name: "squat".into(),
                     sets: vec![ExerciseSet::Reps {
                         reps: 5,
                         weight: 100.0,
                     }],
-                }],
+                })],
             },
         )];
 
@@ -123,10 +123,10 @@ mod tests {
                 SessionBody::Ski {
                     distance: 8_000,
                     duration: 2_400,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
-            session(9, SessionBody::Strength { exercises: vec![] }),
+            session(9, SessionBody::Strength { blocks: vec![] }),
         ];
 
         assert_eq!(week_totals(&sessions, monday), WeekTotals::default());
@@ -142,7 +142,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 5_000,
                     duration: 1_500,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
             session(
@@ -150,7 +150,7 @@ mod tests {
                 SessionBody::Run {
                     distance: 1_000,
                     duration: 300,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
             session(
@@ -158,7 +158,7 @@ mod tests {
                 SessionBody::Ride {
                     distance: 40_000,
                     duration: 3_600,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
             ),
         ];

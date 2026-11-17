@@ -449,9 +449,9 @@ mod tests {
             json!({
                 "name": format!("  {name} "),
                 "sport": "strength",
-                "exercises": [
-                    { "name": "squat", "sets": [{ "reps": 5, "weight_kg": 100 }] },
-                    { "name": "plank", "sets": [{ "hold_seconds": 45 }] }
+                "blocks": [
+                    { "kind": "exercise", "name": "squat", "sets": [{ "reps": 5, "weight_kg": 100 }] },
+                    { "kind": "exercise", "name": "plank", "sets": [{ "hold_seconds": 45 }] }
                 ]
             }),
         )
@@ -472,7 +472,7 @@ mod tests {
             json!({
                 "name": format!("Thousands {tag}"),
                 "sport": "run",
-                "intervals": [{ "repetitions": 6, "distance_m": 1000, "seconds": 220, "recovery_seconds": 90 }]
+                "blocks": [{ "kind": "repeats", "repetitions": 6, "distance_m": 1000, "seconds": 220, "recovery_seconds": 90 }]
             }),
         )
         .await;
@@ -516,7 +516,7 @@ mod tests {
                 &app,
                 24,
                 "create_preset",
-                json!({ "name": format!("Empty {tag}"), "sport": "strength", "exercises": [] }),
+                json!({ "name": format!("Empty {tag}"), "sport": "strength", "blocks": [] }),
             )
             .await,
             "Name each exercise and give it a set"
@@ -530,7 +530,7 @@ mod tests {
             json!({
                 "id": id,
                 "name": renamed,
-                "exercises": [{ "name": "squat", "sets": [{ "reps": 5, "weight_kg": 105 }] }]
+                "blocks": [{ "kind": "exercise", "name": "squat", "sets": [{ "reps": 5, "weight_kg": 105 }] }]
             }),
         )
         .await;
@@ -584,7 +584,7 @@ mod tests {
             json!({
                 "name": name,
                 "sport": "strength",
-                "exercises": [{ "name": "squat", "sets": [{ "reps": 5, "weight_kg": 100 }] }]
+                "blocks": [{ "kind": "exercise", "name": "squat", "sets": [{ "reps": 5, "weight_kg": 100 }] }]
             }),
         )
         .await;
@@ -628,7 +628,7 @@ mod tests {
             "update_preset",
             json!({
                 "id": preset_id,
-                "exercises": [{ "name": "squat", "sets": [{ "reps": 5, "weight_kg": 105 }] }]
+                "blocks": [{ "kind": "exercise", "name": "squat", "sets": [{ "reps": 5, "weight_kg": 105 }] }]
             }),
         )
         .await;
@@ -643,7 +643,7 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(
-            parse(&bytes)["body"]["exercises"][0]["sets"][0]["weight"],
+            parse(&bytes)["body"]["blocks"][0]["sets"][0]["weight"],
             100.0
         );
 
@@ -794,6 +794,131 @@ mod tests {
             assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED, "{method}");
             assert_eq!(headers.get(header::ALLOW).unwrap(), "POST");
         }
+    }
+
+    #[tokio::test]
+    async fn a_run_is_logged_and_changed_as_blocks() {
+        let state = test_state();
+        let db = state.db.clone();
+        let app = init_router(state);
+        // A week no other test logs in.
+        let on_date = "2412-03-04";
+
+        let logged = tool(
+            &app,
+            40,
+            "log_run",
+            json!({
+                "on_date": on_date,
+                "distance_km": 11.2,
+                "minutes": 55,
+                "blocks": [
+                    { "kind": "steady", "name": "warmup", "minutes": 15 },
+                    { "kind": "repeats", "repetitions": 5, "distance_m": 1000, "seconds": 210, "recovery_seconds": 90 },
+                    { "kind": "steady", "name": "cooldown", "minutes": 10 }
+                ]
+            }),
+        )
+        .await;
+        let session = &logged["result"]["structuredContent"];
+        assert_eq!(
+            session["text"],
+            "Run on 2412-03-04, 11.2 km in 55 min, 4:55 /km. warmup 15 min; 5 × 1000 m in 3:30, 1:30 rest; cooldown 10 min."
+        );
+        assert_eq!(
+            session["blocks"][0],
+            json!({ "kind": "steady", "name": "warmup", "minutes": 15.0 })
+        );
+        assert_eq!(session["blocks"][1]["kind"], "repeats");
+        let id = session["id"].as_str().unwrap().to_string();
+
+        let (status, _, bytes) = send(
+            &app,
+            "GET",
+            &format!("/api/sessions/{id}"),
+            None,
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let stored: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            stored["body"],
+            json!({
+                "sport": "run",
+                "distance": 11_200,
+                "duration": 3_300,
+                "blocks": [
+                    { "kind": "steady", "duration": 900, "name": "warmup" },
+                    { "kind": "repeats", "repetitions": 5, "distance": 1000, "duration": 210, "recovery": 90 },
+                    { "kind": "steady", "duration": 600, "name": "cooldown" }
+                ]
+            })
+        );
+
+        // The watch's totals stay when the blocks change.
+        let updated = tool(
+            &app,
+            41,
+            "update_session",
+            json!({
+                "id": id,
+                "blocks": [
+                    { "kind": "steady", "name": "warmup", "minutes": 15 },
+                    { "kind": "repeats", "repetitions": 6, "distance_m": 1000, "seconds": 210, "recovery_seconds": 90 }
+                ]
+            }),
+        )
+        .await;
+        let updated = &updated["result"]["structuredContent"];
+        assert_eq!(updated["kilometres"], 11.2);
+        assert_eq!(updated["minutes"], 55.0);
+        assert_eq!(updated["blocks"].as_array().unwrap().len(), 2);
+
+        assert_eq!(
+            tool_error(
+                &app,
+                42,
+                "update_session",
+                json!({ "id": id, "minutes": 30 })
+            )
+            .await,
+            "The blocks add up to more than the session"
+        );
+        assert_eq!(
+            tool_error(
+                &app,
+                43,
+                "update_session",
+                json!({ "id": id, "blocks": [{ "kind": "exercise", "name": "squat", "sets": [{ "reps": 5 }] }] }),
+            )
+            .await,
+            "Exercises belong on a strength session"
+        );
+
+        let summed = tool(
+            &app,
+            44,
+            "log_strength",
+            json!({
+                "on_date": on_date,
+                "blocks": [
+                    { "kind": "steady", "name": "row", "minutes": 10 },
+                    { "kind": "exercise", "name": "squat", "sets": [{ "reps": 5, "weight_kg": 100 }] }
+                ]
+            }),
+        )
+        .await;
+        let strength = &summed["result"]["structuredContent"];
+        assert_eq!(
+            strength["text"],
+            "Strength on 2412-03-04: row 10 min. squat 5 × 100 kg."
+        );
+        let strength_id = strength["id"].as_str().unwrap().to_string();
+
+        forget(&db, Uuid::parse_str(&id).unwrap()).await;
+        forget(&db, Uuid::parse_str(&strength_id).unwrap()).await;
     }
 
     async fn soft_deleted(pool: &deadpool_diesel::postgres::Pool, id: Uuid) -> bool {

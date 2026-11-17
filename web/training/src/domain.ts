@@ -5,27 +5,6 @@ export type Interval = {
   recovery?: number;
 };
 
-export type Run = {
-  sport: 'run';
-  distance: number;
-  duration: number;
-  intervals?: Interval[];
-};
-
-export type Ride = {
-  sport: 'ride';
-  distance: number;
-  duration: number;
-  intervals?: Interval[];
-};
-
-export type Ski = {
-  sport: 'ski';
-  distance: number;
-  duration: number;
-  intervals?: Interval[];
-};
-
 export type ExerciseSet = {
   reps?: number;
   weight?: number;
@@ -37,12 +16,81 @@ export type Exercise = {
   sets: ExerciseSet[];
 };
 
+/** A steady stretch: a warmup, cooldown, easy or tempo part, or the rower
+ * before lifting. Metres and/or seconds. */
+export type Steady = {
+  distance?: number;
+  duration?: number;
+  name?: string;
+};
+
+/** One part of a session, in order. A run, ride or ski takes steady and
+ * repeats blocks; strength takes steady and exercise blocks. */
+export type Block =
+  | ({ kind: 'steady' } & Steady)
+  | ({ kind: 'repeats' } & Interval)
+  | ({ kind: 'exercise' } & Exercise);
+
+export type Run = {
+  sport: 'run';
+  distance: number;
+  duration: number;
+  blocks?: Block[];
+};
+
+export type Ride = {
+  sport: 'ride';
+  distance: number;
+  duration: number;
+  blocks?: Block[];
+};
+
+export type Ski = {
+  sport: 'ski';
+  distance: number;
+  duration: number;
+  blocks?: Block[];
+};
+
 export type Strength = {
   sport: 'strength';
-  exercises: Exercise[];
+  blocks?: Block[];
 };
 
 export type SessionBody = Run | Ride | Ski | Strength;
+
+/** The metres and seconds the blocks account for, as the server counts
+ * them: steady adds both, repeats their work and the rests between, an
+ * exercise nothing. */
+export function blockTotals(blocks: Block[]): {
+  distance: number;
+  duration: number;
+} {
+  let distance = 0;
+  let duration = 0;
+  for (const block of blocks) {
+    if (block.kind === 'steady') {
+      distance += block.distance ?? 0;
+      duration += block.duration ?? 0;
+    } else if (block.kind === 'repeats') {
+      if (block.distance) {
+        distance += block.repetitions * block.distance;
+      }
+      if (block.duration) {
+        duration +=
+          block.repetitions * block.duration +
+          Math.max(block.repetitions - 1, 0) * (block.recovery ?? 0);
+      }
+    }
+  }
+  return { distance, duration };
+}
+
+export function exercisesOf(body: SessionBody): Exercise[] {
+  return (body.blocks ?? []).flatMap((block) =>
+    block.kind === 'exercise' ? [{ name: block.name, sets: block.sets }] : [],
+  );
+}
 
 export type WeekTotals = {
   runSeconds: number;

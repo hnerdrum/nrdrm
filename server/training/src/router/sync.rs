@@ -322,7 +322,7 @@ mod tests {
             SessionBody::Run {
                 distance: 5_000,
                 duration: 1_501,
-                intervals: vec![],
+                blocks: vec![],
             }
         );
         assert_eq!(body.sessions[0].source, Some(source("run-2400")));
@@ -331,7 +331,7 @@ mod tests {
             SessionBody::Ski {
                 distance: 12_000,
                 duration: 3_600,
-                intervals: vec![],
+                blocks: vec![],
             }
         );
         assert_eq!(body.sessions[1].source, Some(source("ski-2400")));
@@ -371,7 +371,7 @@ mod tests {
             SessionBody::Ski {
                 distance: 15_000,
                 duration: 4_000,
-                intervals: vec![],
+                blocks: vec![],
             }
         );
 
@@ -436,7 +436,7 @@ mod tests {
             body: SessionBody::Run {
                 distance: 1_000,
                 duration: 300,
-                intervals: vec![],
+                blocks: vec![],
             },
             source: source("shared-2400"),
         }];
@@ -549,7 +549,7 @@ mod tests {
             SessionBody::Run {
                 distance: 8_000,
                 duration: 2_400,
-                intervals: vec![],
+                blocks: vec![],
             }
         );
 

@@ -81,17 +81,17 @@ fn planned(summary: &ActivitySummary, source: ActivitySource) -> Option<PlannedS
         ActivityKind::Run => SessionBody::Run {
             distance: whole_units(summary.distance_metres?)?,
             duration: whole_units(summary.duration_seconds?)?,
-            intervals: vec![],
+            blocks: vec![],
         },
         ActivityKind::Ride => SessionBody::Ride {
             distance: whole_units(summary.distance_metres?)?,
             duration: whole_units(summary.duration_seconds?)?,
-            intervals: vec![],
+            blocks: vec![],
         },
         ActivityKind::Ski => SessionBody::Ski {
             distance: whole_units(summary.distance_metres?)?,
             duration: whole_units(summary.duration_seconds?)?,
-            intervals: vec![],
+            blocks: vec![],
         },
         ActivityKind::Other => return None,
     };
@@ -187,7 +187,7 @@ mod tests {
                 body: SessionBody::Run {
                     distance: 10_235,
                     duration: 3_120,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
                 source: source("100"),
             }]
@@ -239,7 +239,7 @@ mod tests {
             SessionBody::Run {
                 distance: 5_000,
                 duration: 1_500,
-                intervals: vec![],
+                blocks: vec![],
             }
         );
         assert!(plan.skipped.is_empty());
@@ -283,7 +283,7 @@ mod tests {
                 body: SessionBody::Ski {
                     distance: 12_000,
                     duration: 3_600,
-                    intervals: vec![],
+                    blocks: vec![],
                 },
                 source: source("300"),
             }]

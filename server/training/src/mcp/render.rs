@@ -2,10 +2,10 @@ use uuid::Uuid;
 
 use crate::database::preset::Preset as StoredPreset;
 use crate::database::session::Session as StoredSession;
-use crate::domain::session::{Exercise, ExerciseSet, Interval, SessionBody, Sport};
+use crate::domain::session::{Block, Exercise, ExerciseSet, Interval, SessionBody, Sport, Steady};
 use crate::domain::source::ActivitySource;
 
-use super::input::{ExerciseInput, IntervalInput, SetInput};
+use super::input::{BlockInput, SetInput};
 
 /// A stored session in the units an agent reads back.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -22,9 +22,7 @@ pub struct RenderedSession {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speed_kmh: Option<f64>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub intervals: Vec<IntervalInput>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub exercises: Vec<ExerciseInput>,
+    pub blocks: Vec<BlockInput>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<RenderedSource>,
     pub text: String,
@@ -54,9 +52,7 @@ pub struct RenderedPreset {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub speed_kmh: Option<f64>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub intervals: Vec<IntervalInput>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub exercises: Vec<ExerciseInput>,
+    pub blocks: Vec<BlockInput>,
     pub text: String,
 }
 
@@ -67,46 +63,30 @@ struct BodyFields {
     minutes: Option<f64>,
     pace: Option<String>,
     speed_kmh: Option<f64>,
-    intervals: Vec<IntervalInput>,
-    exercises: Vec<ExerciseInput>,
+    blocks: Vec<BlockInput>,
 }
 
 fn body_fields(body: &SessionBody) -> BodyFields {
-    let sport = sport_of(body);
-    match body {
-        SessionBody::Strength { exercises } => BodyFields {
+    let sport = body.sport();
+    let blocks = body.blocks().iter().map(block_input).collect();
+    match body.totals() {
+        None => BodyFields {
             sport,
             kilometres: None,
             minutes: None,
             pace: None,
             speed_kmh: None,
-            intervals: Vec::new(),
-            exercises: exercises.iter().map(exercise_input).collect(),
+            blocks,
         },
-        SessionBody::Run {
-            distance,
-            duration,
-            intervals,
-        }
-        | SessionBody::Ride {
-            distance,
-            duration,
-            intervals,
-        }
-        | SessionBody::Ski {
-            distance,
-            duration,
-            intervals,
-        } => BodyFields {
+        Some((distance, duration)) => BodyFields {
             sport,
-            kilometres: Some(f64::from(*distance) / 1000.0),
-            minutes: Some(f64::from(*duration) / 60.0),
+            kilometres: Some(f64::from(distance) / 1000.0),
+            minutes: Some(f64::from(duration) / 60.0),
             pace: body
                 .pace()
                 .map(|pace| format!("{}:{:02} /km", pace.minutes, pace.seconds)),
             speed_kmh: body.speed_kmh(),
-            intervals: intervals.iter().map(interval_input).collect(),
-            exercises: Vec::new(),
+            blocks,
         },
     }
 }
@@ -121,8 +101,7 @@ pub fn render(session: &StoredSession) -> RenderedSession {
         minutes: fields.minutes,
         pace: fields.pace,
         speed_kmh: fields.speed_kmh,
-        intervals: fields.intervals,
-        exercises: fields.exercises,
+        blocks: fields.blocks,
         source: session.source.as_ref().map(rendered_source),
         text: describe(session),
     }
@@ -139,14 +118,13 @@ pub fn render_preset(preset: &StoredPreset) -> RenderedPreset {
         minutes: fields.minutes,
         pace: fields.pace,
         speed_kmh: fields.speed_kmh,
-        intervals: fields.intervals,
-        exercises: fields.exercises,
+        blocks: fields.blocks,
         text: describe_body(&lead, &preset.body),
     }
 }
 
 fn describe(session: &StoredSession) -> String {
-    let name = match sport_of(&session.body) {
+    let name = match session.body.sport() {
         Sport::Run => "Run",
         Sport::Ride => "Ride",
         Sport::Ski => "Ski",
@@ -163,33 +141,13 @@ fn describe(session: &StoredSession) -> String {
 
 /// `lead` names what the body belongs to, such as "Run on 2026-11-08".
 fn describe_body(lead: &str, body: &SessionBody) -> String {
-    match body {
-        SessionBody::Strength { exercises } => describe_strength(lead, exercises),
-        SessionBody::Run {
-            distance,
-            duration,
-            intervals,
-        }
-        | SessionBody::Ride {
-            distance,
-            duration,
-            intervals,
-        }
-        | SessionBody::Ski {
-            distance,
-            duration,
-            intervals,
-        } => describe_distance(lead, body, *distance, *duration, intervals),
+    match body.totals() {
+        None => describe_strength(lead, body.blocks()),
+        Some((distance, duration)) => describe_distance(lead, body, distance, duration),
     }
 }
 
-fn describe_distance(
-    lead: &str,
-    body: &SessionBody,
-    distance: u32,
-    duration: u32,
-    intervals: &[Interval],
-) -> String {
+fn describe_distance(lead: &str, body: &SessionBody, distance: u32, duration: u32) -> String {
     let mut text = format!(
         "{lead}, {} km in {}",
         format_km(distance),
@@ -202,29 +160,52 @@ fn describe_distance(
         text.push_str(&format!(", {} km/h", format_number(speed)));
     }
     text.push('.');
-    if !intervals.is_empty() {
-        let repeats = intervals
+    if !body.blocks().is_empty() {
+        let blocks = body
+            .blocks()
             .iter()
-            .map(format_interval)
+            .map(format_block)
             .collect::<Vec<_>>()
             .join("; ");
         text.push(' ');
-        text.push_str(&repeats);
+        text.push_str(&blocks);
         text.push('.');
     }
     text
 }
 
-fn describe_strength(lead: &str, exercises: &[Exercise]) -> String {
-    let work = exercises
+fn describe_strength(lead: &str, blocks: &[Block]) -> String {
+    let work = blocks
         .iter()
-        .map(format_exercise)
+        .map(format_block)
         .collect::<Vec<_>>()
         .join(". ");
     if work.is_empty() {
         format!("{lead}.")
     } else {
         format!("{lead}: {work}.")
+    }
+}
+
+fn format_block(block: &Block) -> String {
+    match block {
+        Block::Steady(steady) => format_steady(steady),
+        Block::Repeats(interval) => format_interval(interval),
+        Block::Exercise(exercise) => format_exercise(exercise),
+    }
+}
+
+fn format_steady(steady: &Steady) -> String {
+    let name = steady.name.as_deref().map(str::trim).unwrap_or("steady");
+    match (steady.distance >= 1, steady.duration >= 1) {
+        (true, true) => format!(
+            "{name} {} km in {}",
+            format_km(steady.distance),
+            format_duration(steady.duration)
+        ),
+        (true, false) => format!("{name} {} km", format_km(steady.distance)),
+        (false, true) => format!("{name} {}", format_duration(steady.duration)),
+        (false, false) => name.to_string(),
     }
 }
 
@@ -309,28 +290,23 @@ fn format_number(value: f64) -> String {
         .to_string()
 }
 
-fn sport_of(body: &SessionBody) -> Sport {
-    match body {
-        SessionBody::Run { .. } => Sport::Run,
-        SessionBody::Ride { .. } => Sport::Ride,
-        SessionBody::Ski { .. } => Sport::Ski,
-        SessionBody::Strength { .. } => Sport::Strength,
-    }
-}
-
-fn interval_input(interval: &Interval) -> IntervalInput {
-    IntervalInput {
-        repetitions: interval.repetitions,
-        distance_m: interval.distance,
-        seconds: interval.duration,
-        recovery_seconds: interval.recovery,
-    }
-}
-
-fn exercise_input(exercise: &Exercise) -> ExerciseInput {
-    ExerciseInput {
-        name: exercise.name.clone(),
-        sets: exercise.sets.iter().map(set_input).collect(),
+fn block_input(block: &Block) -> BlockInput {
+    match block {
+        Block::Steady(steady) => BlockInput::Steady {
+            name: steady.name.clone(),
+            distance_km: (steady.distance >= 1).then(|| f64::from(steady.distance) / 1000.0),
+            minutes: (steady.duration >= 1).then(|| f64::from(steady.duration) / 60.0),
+        },
+        Block::Repeats(interval) => BlockInput::Repeats {
+            repetitions: interval.repetitions,
+            distance_m: interval.distance,
+            seconds: interval.duration,
+            recovery_seconds: interval.recovery,
+        },
+        Block::Exercise(exercise) => BlockInput::Exercise {
+            name: exercise.name.clone(),
+            sets: exercise.sets.iter().map(set_input).collect(),
+        },
     }
 }
 
@@ -359,7 +335,7 @@ fn rendered_source(source: &ActivitySource) -> RenderedSource {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::session::{Exercise, ExerciseSet, Interval, SessionBody};
+    use crate::domain::session::{Block, Exercise, ExerciseSet, Interval, SessionBody};
     use crate::domain::source::ActivityProvider;
     use chrono::NaiveDate;
 
@@ -382,7 +358,7 @@ mod tests {
             SessionBody::Run {
                 distance: 10_000,
                 duration: 3_420,
-                intervals: vec![],
+                blocks: vec![],
             },
             None,
         ));
@@ -391,7 +367,7 @@ mod tests {
         assert_eq!(rendered.minutes, Some(57.0));
         assert_eq!(rendered.pace.as_deref(), Some("5:42 /km"));
         assert_eq!(rendered.speed_kmh, None);
-        assert!(rendered.intervals.is_empty());
+        assert!(rendered.blocks.is_empty());
         assert_eq!(
             rendered.text,
             "Run on 2026-11-08, 10 km in 57 min, 5:42 /km."
@@ -404,7 +380,7 @@ mod tests {
             SessionBody::Ride {
                 distance: 36_000,
                 duration: 3_600,
-                intervals: vec![],
+                blocks: vec![],
             },
             None,
         ));
@@ -423,19 +399,19 @@ mod tests {
             SessionBody::Run {
                 distance: 5_600,
                 duration: 1_650,
-                intervals: vec![
-                    Interval {
+                blocks: vec![
+                    Block::Repeats(Interval {
                         repetitions: 4,
                         distance: 1000,
                         duration: 220,
                         recovery: 90,
-                    },
-                    Interval {
+                    }),
+                    Block::Repeats(Interval {
                         repetitions: 4,
                         distance: 400,
                         duration: 80,
                         recovery: 60,
-                    },
+                    }),
                 ],
             },
             None,
@@ -443,9 +419,16 @@ mod tests {
         assert!((rendered.kilometres.unwrap() - 5.6).abs() < 1e-9);
         assert_eq!(rendered.minutes, Some(27.5));
         assert_eq!(rendered.pace.as_deref(), Some("4:55 /km"));
-        assert_eq!(rendered.intervals.len(), 2);
-        assert_eq!(rendered.intervals[0].distance_m, 1000);
-        assert_eq!(rendered.intervals[0].recovery_seconds, 90);
+        assert_eq!(rendered.blocks.len(), 2);
+        assert_eq!(
+            rendered.blocks[0],
+            BlockInput::Repeats {
+                repetitions: 4,
+                distance_m: 1000,
+                seconds: 220,
+                recovery_seconds: 90,
+            }
+        );
         assert_eq!(
             rendered.text,
             "Run on 2026-11-08, 5.6 km in 27:30, 4:55 /km. 4 × 1000 m in 3:40, 1:30 rest; 4 × 400 m in 1:20, 1:00 rest."
@@ -456,25 +439,25 @@ mod tests {
     fn a_strength_session_reads_back_its_lifts() {
         let rendered = render(&stored(
             SessionBody::Strength {
-                exercises: vec![
-                    Exercise {
+                blocks: vec![
+                    Block::Exercise(Exercise {
                         name: "squat".into(),
                         sets: vec![ExerciseSet::Reps {
                             reps: 5,
                             weight: 100.0,
                         }],
-                    },
-                    Exercise {
+                    }),
+                    Block::Exercise(Exercise {
                         name: "plank".into(),
                         sets: vec![ExerciseSet::Hold { duration: 45 }],
-                    },
-                    Exercise {
+                    }),
+                    Block::Exercise(Exercise {
                         name: "pull-up".into(),
                         sets: vec![ExerciseSet::Reps {
                             reps: 8,
                             weight: 0.0,
                         }],
-                    },
+                    }),
                 ],
             },
             None,
@@ -482,10 +465,14 @@ mod tests {
         assert_eq!(rendered.sport, "strength");
         assert_eq!(rendered.kilometres, None);
         assert_eq!(rendered.minutes, None);
-        assert_eq!(rendered.exercises.len(), 3);
-        assert_eq!(rendered.exercises[0].sets[0].weight_kg, Some(100.0));
-        assert_eq!(rendered.exercises[2].sets[0].weight_kg, None);
-        assert_eq!(rendered.exercises[1].sets[0].hold_seconds, Some(45));
+        assert_eq!(rendered.blocks.len(), 3);
+        let set = |index: usize| match &rendered.blocks[index] {
+            BlockInput::Exercise { sets, .. } => sets[0],
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(set(0).weight_kg, Some(100.0));
+        assert_eq!(set(2).weight_kg, None);
+        assert_eq!(set(1).hold_seconds, Some(45));
         assert_eq!(
             rendered.text,
             "Strength on 2026-11-08: squat 5 × 100 kg. plank 45s. pull-up 8."
@@ -498,7 +485,7 @@ mod tests {
             SessionBody::Ski {
                 distance: 12_000,
                 duration: 3_600,
-                intervals: vec![],
+                blocks: vec![],
             },
             Some(ActivitySource {
                 provider: ActivityProvider::Garmin,
@@ -531,12 +518,12 @@ mod tests {
             SessionBody::Run {
                 distance: 6_000,
                 duration: 1_770,
-                intervals: vec![Interval {
+                blocks: vec![Block::Repeats(Interval {
                     repetitions: 6,
                     distance: 1_000,
                     duration: 220,
                     recovery: 90,
-                }],
+                })],
             },
         ));
         assert_eq!(rendered.name, "Thousands");
@@ -544,8 +531,8 @@ mod tests {
         assert_eq!(rendered.kilometres, Some(6.0));
         assert_eq!(rendered.minutes, Some(29.5));
         assert_eq!(
-            rendered.intervals,
-            vec![IntervalInput {
+            rendered.blocks,
+            vec![BlockInput::Repeats {
                 repetitions: 6,
                 distance_m: 1_000,
                 seconds: 220,
@@ -563,8 +550,8 @@ mod tests {
         let rendered = render_preset(&preset(
             "Lower body",
             SessionBody::Strength {
-                exercises: vec![
-                    Exercise {
+                blocks: vec![
+                    Block::Exercise(Exercise {
                         name: "squat".into(),
                         sets: vec![
                             ExerciseSet::Reps {
@@ -573,20 +560,109 @@ mod tests {
                             };
                             2
                         ],
-                    },
-                    Exercise {
+                    }),
+                    Block::Exercise(Exercise {
                         name: "plank".into(),
                         sets: vec![ExerciseSet::Hold { duration: 45 }],
-                    },
+                    }),
                 ],
             },
         ));
         assert_eq!(rendered.sport, "strength");
         assert_eq!(rendered.kilometres, None);
-        assert_eq!(rendered.exercises.len(), 2);
+        assert_eq!(rendered.blocks.len(), 2);
         assert_eq!(
             rendered.text,
             "Preset \"Lower body\", strength: squat 5 × 100 kg, 5 × 100 kg. plank 45s."
         );
+    }
+
+    #[test]
+    fn steady_blocks_read_back_in_order_around_the_repeats() {
+        use crate::domain::session::Steady;
+        let rendered = render(&stored(
+            SessionBody::Run {
+                distance: 11_200,
+                duration: 3_300,
+                blocks: vec![
+                    Block::Steady(Steady {
+                        duration: 900,
+                        name: Some("warmup".into()),
+                        ..Steady::default()
+                    }),
+                    Block::Repeats(Interval {
+                        repetitions: 5,
+                        distance: 1_000,
+                        duration: 210,
+                        recovery: 90,
+                    }),
+                    Block::Steady(Steady {
+                        distance: 2_000,
+                        duration: 600,
+                        name: None,
+                    }),
+                ],
+            },
+            None,
+        ));
+        assert!(
+            rendered
+                .text
+                .ends_with("warmup 15 min; 5 × 1000 m in 3:30, 1:30 rest; steady 2 km in 10 min."),
+            "{}",
+            rendered.text
+        );
+        assert_eq!(
+            rendered.blocks,
+            vec![
+                BlockInput::Steady {
+                    name: Some("warmup".into()),
+                    distance_km: None,
+                    minutes: Some(15.0),
+                },
+                BlockInput::Repeats {
+                    repetitions: 5,
+                    distance_m: 1_000,
+                    seconds: 210,
+                    recovery_seconds: 90,
+                },
+                BlockInput::Steady {
+                    name: None,
+                    distance_km: Some(2.0),
+                    minutes: Some(10.0),
+                },
+            ]
+        );
+        let json = serde_json::to_value(&rendered.blocks[0]).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({ "kind": "steady", "name": "warmup", "minutes": 15.0 })
+        );
+
+        let strength = render(&stored(
+            SessionBody::Strength {
+                blocks: vec![
+                    Block::Steady(Steady {
+                        duration: 600,
+                        name: Some("row".into()),
+                        ..Steady::default()
+                    }),
+                    Block::Exercise(Exercise {
+                        name: "squat".into(),
+                        sets: vec![ExerciseSet::Reps {
+                            reps: 5,
+                            weight: 100.0,
+                        }],
+                    }),
+                ],
+            },
+            None,
+        ));
+        assert!(
+            strength.text.ends_with(": row 10 min. squat 5 × 100 kg."),
+            "{}",
+            strength.text
+        );
+        assert_eq!(strength.blocks.len(), 2);
     }
 }

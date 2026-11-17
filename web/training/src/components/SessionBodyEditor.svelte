@@ -1,16 +1,17 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import type { SessionBody } from "../domain";
+  import { formatDay } from "../dates";
   import {
     buildBody,
     draftFrom,
+    emptyBlock,
     emptyDistanceDraft,
-    emptyExercise,
     type DistanceDraft,
-    type DraftExercise,
+    type DraftBlock,
   } from "../draft";
+  import BlockListEditor from "./BlockListEditor.svelte";
   import DistanceEditor from "./DistanceEditor.svelte";
-  import StrengthEditor from "./StrengthEditor.svelte";
 
   type Props = {
     /** The sport whose fields are shown. Bind it to a `SportPicker`;
@@ -40,16 +41,18 @@
   let distance = $state<DistanceDraft>(
     first && first.sport !== "strength" ? first.distance : emptyDistanceDraft(),
   );
-  let exercises = $state<DraftExercise[]>(
-    first?.sport === "strength" ? first.exercises : [emptyExercise()],
+  let strength = $state<DraftBlock[]>(
+    first?.sport === "strength" ? first.blocks : [emptyBlock("exercise")],
   );
 
   /** Show `body` in the fields of its sport, without changing the sport shown.
-   * A strength body with no exercises leaves one empty exercise to fill in. */
+   * A strength body with no exercise leaves an empty one to fill in. */
   export function seed(body: SessionBody) {
     const draft = draftFrom(body);
     if (draft.sport === "strength") {
-      exercises = draft.exercises.length > 0 ? draft.exercises : [emptyExercise()];
+      strength = draft.blocks.some((block) => block.kind === "exercise")
+        ? draft.blocks
+        : [...draft.blocks, emptyBlock("exercise")];
     } else {
       distance = draft.distance;
     }
@@ -63,7 +66,7 @@
 
   /** The body the fields show, or what to fix before it can be saved. */
   export function build(): SessionBody | string {
-    return buildBody(sport, distance, exercises);
+    return buildBody(sport, distance, strength);
   }
 </script>
 
@@ -74,16 +77,22 @@
     {#if exercisesNote}
       <p class="text-muted" role="status">{exercisesNote}</p>
     {/if}
-    <StrengthEditor {exercises} {prefilledFrom} onchange={(next) => (exercises = next)} />
+    <div class="rise-in grid gap-7">
+      {#if prefilledFrom}
+        <p class="text-muted">
+          From your last strength session, {formatDay(prefilledFrom)}. Change what you need.
+        </p>
+      {/if}
+      <BlockListEditor {sport} blocks={strength} onchange={(next) => (strength = next)} />
+    </div>
   {/if}
 {:else}
   <DistanceEditor
     {sport}
-    bind:kind={distance.kind}
     bind:kilometres={distance.kilometres}
     bind:hours={distance.hours}
     bind:minutes={distance.minutes}
-    intervals={distance.intervals}
-    onchange={(next) => (distance.intervals = next)}
+    blocks={distance.blocks}
+    onchange={(next) => (distance.blocks = next)}
   />
 {/if}

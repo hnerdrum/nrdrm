@@ -5,8 +5,9 @@ use uuid::Uuid;
 
 /// A run, ride, or ski as an agent types it.
 ///
-/// `distance_km` and `minutes` can be omitted when `intervals` is present.
-/// The repeats are then totalled into the stored metres and seconds.
+/// `distance_km` and `minutes` are the whole session. `blocks` outline it in
+/// order: steady stretches and repeats. With blocks, a distance or time left
+/// out is what the blocks add up to; one given may be more, never less.
 /// `on_date` defaults to today in Europe/Oslo.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
@@ -18,41 +19,53 @@ pub struct DistanceSession {
     #[serde(default)]
     pub minutes: Option<f64>,
     #[serde(default)]
-    pub intervals: Vec<IntervalInput>,
+    pub blocks: Vec<BlockInput>,
 }
 
-/// One block of repeats in a run, ride, or ski.
+/// One part of a session, in order, tagged by `kind`.
 ///
-/// `distance_m` is the metres of one repeat and `seconds` is its time.
-/// A repeat needs one of them. `recovery_seconds` is the rest between
-/// repeats, and it counts toward the session time when the repeat has a time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct IntervalInput {
-    pub repetitions: u32,
-    #[serde(default)]
-    pub distance_m: u32,
-    #[serde(default)]
-    pub seconds: u32,
-    #[serde(default)]
-    pub recovery_seconds: u32,
+/// - `steady`: a stretch at one effort, such as a warmup, cooldown, easy or
+///   tempo part, or ten minutes on the rower. `distance_km`, `minutes` or
+///   both. Name a warmup exactly `warmup` and a cooldown exactly `cooldown`.
+/// - `repeats`: `repetitions` of `distance_m` metres and/or `seconds`, with
+///   `recovery_seconds` between them. The rest after the last repeat is not
+///   part of the block. Run, ride and ski only.
+/// - `exercise`: a named exercise and its sets. Strength only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "lowercase", deny_unknown_fields)]
+pub enum BlockInput {
+    Steady {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        distance_km: Option<f64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        minutes: Option<f64>,
+    },
+    Repeats {
+        repetitions: u32,
+        #[serde(default)]
+        distance_m: u32,
+        #[serde(default)]
+        seconds: u32,
+        #[serde(default)]
+        recovery_seconds: u32,
+    },
+    Exercise {
+        name: String,
+        sets: Vec<SetInput>,
+    },
 }
 
-/// A strength session as an agent types it.
-/// `on_date` defaults to today in Europe/Oslo.
+/// A strength session as an agent types it: exercise blocks, and steady
+/// blocks for a warmup such as the rower. `on_date` defaults to today in
+/// Europe/Oslo.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
 pub struct StrengthSession {
     #[serde(default)]
     pub on_date: Option<NaiveDate>,
-    pub exercises: Vec<ExerciseInput>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct ExerciseInput {
-    pub name: String,
-    pub sets: Vec<SetInput>,
+    pub blocks: Vec<BlockInput>,
 }
 
 /// A loaded or bodyweight effort, or a timed hold such as a plank.
@@ -73,8 +86,9 @@ pub struct SetInput {
 /// Changes to one stored session. A field that is omitted stays as it is.
 ///
 /// The sport stays too. A run does not become a strength session.
-/// `intervals` or `exercises`, when present, replace that list. An empty
-/// interval list removes the repeats and leaves the distance and time.
+/// `blocks`, when present, replace every block; `[]` removes them and leaves
+/// the distance and time. An omitted distance or time stays, unless it was
+/// what the old blocks added up to: then it follows the new blocks.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
 pub struct SessionUpdate {
@@ -85,9 +99,7 @@ pub struct SessionUpdate {
     #[serde(default)]
     pub minutes: Option<f64>,
     #[serde(default)]
-    pub intervals: Option<Vec<IntervalInput>>,
-    #[serde(default)]
-    pub exercises: Option<Vec<ExerciseInput>>,
+    pub blocks: Option<Vec<BlockInput>>,
 }
 
 /// A date inside the week to read. Omitted means today in Europe/Oslo.
@@ -130,9 +142,7 @@ pub struct UpdateQuery {
     #[serde(default)]
     pub minutes: Option<f64>,
     #[serde(default)]
-    pub intervals: Option<Vec<IntervalInput>>,
-    #[serde(default)]
-    pub exercises: Option<Vec<ExerciseInput>>,
+    pub blocks: Option<Vec<BlockInput>>,
 }
 
 impl UpdateQuery {
@@ -141,8 +151,7 @@ impl UpdateQuery {
             on_date: self.on_date,
             distance_km: self.distance_km,
             minutes: self.minutes,
-            intervals: self.intervals.clone(),
-            exercises: self.exercises.clone(),
+            blocks: self.blocks.clone(),
         }
     }
 }
@@ -165,8 +174,8 @@ pub struct PresetsQuery {
 /// A new preset: a name and a session body with no date, in the units the
 /// log tools take.
 ///
-/// A strength preset has `exercises`. A run, ride or ski has `distance_km`
-/// and `minutes`, or `intervals`, whose repeats are then totalled.
+/// A strength preset has exercise blocks. A run, ride or ski has
+/// `distance_km` and `minutes`, `blocks`, or both, as in the log tools.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
 pub struct PresetInput {
@@ -177,14 +186,12 @@ pub struct PresetInput {
     #[serde(default)]
     pub minutes: Option<f64>,
     #[serde(default)]
-    pub intervals: Vec<IntervalInput>,
-    #[serde(default)]
-    pub exercises: Option<Vec<ExerciseInput>>,
+    pub blocks: Vec<BlockInput>,
 }
 
 /// One preset and the fields to change. Omitted fields stay as they are, and
-/// so does the sport. `intervals` or `exercises`, when present, replace that
-/// list.
+/// so does the sport. `blocks`, when present, replace every block, as in
+/// `update_session`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(deny_unknown_fields)]
 pub struct PresetUpdateQuery {
@@ -196,9 +203,7 @@ pub struct PresetUpdateQuery {
     #[serde(default)]
     pub minutes: Option<f64>,
     #[serde(default)]
-    pub intervals: Option<Vec<IntervalInput>>,
-    #[serde(default)]
-    pub exercises: Option<Vec<ExerciseInput>>,
+    pub blocks: Option<Vec<BlockInput>>,
 }
 
 impl PresetUpdateQuery {
@@ -207,8 +212,7 @@ impl PresetUpdateQuery {
             on_date: None,
             distance_km: self.distance_km,
             minutes: self.minutes,
-            intervals: self.intervals.clone(),
-            exercises: self.exercises.clone(),
+            blocks: self.blocks.clone(),
         }
     }
 }
