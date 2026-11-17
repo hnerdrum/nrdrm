@@ -25,6 +25,7 @@
     onadd: () => void;
     onopen: (session: LoggedSession) => void;
     onsessions: () => void;
+    onpresets: () => void;
     onlogout: () => void;
   };
 
@@ -45,12 +46,13 @@
     onadd,
     onopen,
     onsessions,
+    onpresets,
     onlogout,
   }: Props = $props();
 </script>
 
 <div class="pb-[calc(6.75rem+env(safe-area-inset-bottom,0px))] wide:pb-12">
-  <WeekHeader {monday} {atCurrent} {loggingOut} {onprevious} {onnext} {onadd} {onlogout} />
+  <WeekHeader {monday} {atCurrent} {loggingOut} {onprevious} {onnext} {onadd} {onpresets} {onlogout} />
   {#if logoutError}
     <p class="mx-auto mt-6 max-w-272 font-medium" role="alert">{logoutError}</p>
   {/if}

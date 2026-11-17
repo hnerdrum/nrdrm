@@ -40,7 +40,9 @@
   let distance = $state<DistanceDraft>(
     first && first.sport !== "strength" ? first.distance : emptyDistanceDraft(),
   );
-  let exercises = $state<DraftExercise[]>(first?.sport === "strength" ? first.exercises : []);
+  let exercises = $state<DraftExercise[]>(
+    first?.sport === "strength" ? first.exercises : [emptyExercise()],
+  );
 
   /** Show `body` in the fields of its sport, without changing the sport shown.
    * A strength body with no exercises leaves one empty exercise to fill in. */

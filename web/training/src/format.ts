@@ -97,3 +97,14 @@ export function sessionDuration(body: SessionBody): string | null {
   }
   return formatDuration(body.duration);
 }
+
+/** One line that says what a preset holds: its exercises, or its repeats or
+ * distance and time. */
+export function presetSummary(body: SessionBody): string {
+  if (body.sport === 'strength') {
+    return body.exercises.map((exercise) => exercise.name).join(', ');
+  }
+  const main = sessionMain(body).text;
+  const duration = sessionDuration(body);
+  return duration ? `${main} · ${duration}` : main;
+}
